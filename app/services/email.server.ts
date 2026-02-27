@@ -213,3 +213,98 @@ Please confirm or decline so your group knows who's coming.
 		text,
 	});
 }
+
+export async function sendEventFromAvailabilityNotification(options: {
+	eventTitle: string;
+	eventType: string;
+	dateTime: string;
+	location?: string;
+	groupName: string;
+	eventUrl: string;
+	availableRecipients: Array<{ email: string; name: string }>;
+	maybeRecipients: Array<{ email: string; name: string }>;
+	noResponseRecipients: Array<{ email: string; name: string }>;
+}): Promise<void> {
+	const typeEmoji =
+		options.eventType === "show" ? "🎭" : options.eventType === "rehearsal" ? "🎯" : "📅";
+	const locationLine = options.location
+		? `<p style="margin:0 0 4px;font-size:13px;color:#64748b;">📍 ${options.location}</p>`
+		: "";
+
+	const eventBlock = `<table cellpadding="0" cellspacing="0" width="100%" style="background-color:#f0fdf4;border-radius:8px;padding:16px;margin-bottom:8px;">
+<tr><td>
+<p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0f172a;">${typeEmoji} ${options.eventTitle}</p>
+<p style="margin:0 0 4px;font-size:13px;color:#64748b;">${options.groupName} · ${options.dateTime}</p>
+${locationLine}
+</td></tr>
+</table>`;
+
+	// Email people who said "available" — they're confirmed
+	for (const recipient of options.availableRecipients) {
+		const html = emailLayout(`
+<h1 style="margin:0 0 8px;font-size:20px;color:#0f172a;">You're Confirmed! 🎉</h1>
+<p style="margin:0 0 20px;font-size:14px;color:#64748b;">
+Great news, ${recipient.name} — the event you said you were available for is happening!
+</p>
+${eventBlock}
+${ctaButton(options.eventUrl, "View Event Details →")}
+<p style="margin:0;font-size:13px;color:#94a3b8;">
+You indicated you were available for this date. See you there!
+</p>`);
+
+		const text = `You're confirmed! "${options.eventTitle}" (${options.groupName}) is happening. ${options.dateTime}${options.location ? ` at ${options.location}` : ""}. View: ${options.eventUrl}`;
+
+		void sendEmail({
+			to: recipient.email,
+			subject: `${typeEmoji} You're confirmed — "${options.eventTitle}" is happening!`,
+			html,
+			text,
+		});
+	}
+
+	// Email people who said "maybe" — ask them to confirm
+	for (const recipient of options.maybeRecipients) {
+		const html = emailLayout(`
+<h1 style="margin:0 0 8px;font-size:20px;color:#0f172a;">Can You Make It?</h1>
+<p style="margin:0 0 20px;font-size:14px;color:#64748b;">
+Hi ${recipient.name}, you said you might be free — the event is now scheduled!
+</p>
+${eventBlock}
+${ctaButton(options.eventUrl, "Confirm Attendance →")}
+<p style="margin:0;font-size:13px;color:#94a3b8;">
+Please let your group know if you can make it.
+</p>`);
+
+		const text = `Can you make it? "${options.eventTitle}" (${options.groupName}) is on ${options.dateTime}${options.location ? ` at ${options.location}` : ""}. Please confirm: ${options.eventUrl}`;
+
+		void sendEmail({
+			to: recipient.email,
+			subject: `${typeEmoji} Can you make it? "${options.eventTitle}" is on ${options.dateTime}`,
+			html,
+			text,
+		});
+	}
+
+	// Email people who didn't respond — inform them
+	for (const recipient of options.noResponseRecipients) {
+		const html = emailLayout(`
+<h1 style="margin:0 0 8px;font-size:20px;color:#0f172a;">New Event Scheduled</h1>
+<p style="margin:0 0 20px;font-size:14px;color:#64748b;">
+Hi ${recipient.name}, a new event has been scheduled for your group.
+</p>
+${eventBlock}
+${ctaButton(options.eventUrl, "View Event Details →")}
+<p style="margin:0;font-size:13px;color:#94a3b8;">
+Check out the details and let your group know if you can attend.
+</p>`);
+
+		const text = `New event scheduled: "${options.eventTitle}" (${options.groupName}). ${options.dateTime}${options.location ? ` at ${options.location}` : ""}. View: ${options.eventUrl}`;
+
+		void sendEmail({
+			to: recipient.email,
+			subject: `${typeEmoji} New event — "${options.eventTitle}" on ${options.dateTime}`,
+			html,
+			text,
+		});
+	}
+}
