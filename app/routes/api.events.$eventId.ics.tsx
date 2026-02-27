@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
-import { getEventWithAssignments } from "~/services/events.server";
 import { requireUser } from "~/services/auth.server";
+import { getEventWithAssignments } from "~/services/events.server";
 
 function formatICalDate(date: Date): string {
 	return date
@@ -10,7 +10,11 @@ function formatICalDate(date: Date): string {
 }
 
 function escapeICalText(text: string): string {
-	return text.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+	return text
+		.replace(/\\/g, "\\\\")
+		.replace(/;/g, "\\;")
+		.replace(/,/g, "\\,")
+		.replace(/\n/g, "\\n");
 }
 
 function foldLine(line: string): string {
@@ -40,9 +44,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 	const role = url.searchParams.get("role");
 
 	// Performers at shows with call time get earlier start
-	const isPerformerAtShow =
-		role === "Performer" && event.eventType === "show" && event.callTime;
-	const startTime = isPerformerAtShow ? new Date(event.callTime!) : new Date(event.startTime);
+	const isPerformerAtShow = role === "Performer" && event.eventType === "show" && event.callTime;
+	const startTime = isPerformerAtShow
+		? new Date(event.callTime as unknown as string)
+		: new Date(event.startTime);
 	const endTime = new Date(event.endTime);
 
 	const now = new Date();

@@ -201,8 +201,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
 export default function NewEvent() {
 	const { groupId } = useParams();
-	const { fromRequest, prefillDate, members, availabilityData } =
-		useLoaderData<typeof loader>();
+	const { fromRequest, prefillDate, members, availabilityData } = useLoaderData<typeof loader>();
 	const actionData = useActionData<typeof action>();
 	const navigation = useNavigation();
 	const isSubmitting = navigation.state === "submitting";
@@ -211,9 +210,7 @@ export default function NewEvent() {
 	const [selectedPerformers, setSelectedPerformers] = useState<Set<string>>(() => {
 		// Pre-select available members when creating from availability
 		if (availabilityData.length > 0) {
-			return new Set(
-				availabilityData.filter((a) => a.status === "available").map((a) => a.userId),
-			);
+			return new Set(availabilityData.filter((a) => a.status === "available").map((a) => a.userId));
 		}
 		return new Set();
 	});
@@ -234,9 +231,7 @@ export default function NewEvent() {
 
 	// Members who didn't respond to availability
 	const respondedUserIds = new Set(availabilityData.map((a) => a.userId));
-	const noResponseMembers = hasAvailData
-		? members.filter((m) => !respondedUserIds.has(m.id))
-		: [];
+	const noResponseMembers = hasAvailData ? members.filter((m) => !respondedUserIds.has(m.id)) : [];
 
 	return (
 		<div className="max-w-3xl">
@@ -410,17 +405,14 @@ export default function NewEvent() {
 							Cast Assignment
 						</h3>
 						<p className="mb-4 text-xs text-slate-500">
-							Select performers for this show. Other group members can self-register as
-							viewers.
+							Select performers for this show. Other group members can self-register as viewers.
 						</p>
 
 						{hasAvailData ? (
 							<div className="space-y-3">
 								{availableMembers.length > 0 && (
 									<div>
-										<h4 className="mb-1.5 text-xs font-semibold text-emerald-700">
-											✅ Available
-										</h4>
+										<h4 className="mb-1.5 text-xs font-semibold text-emerald-700">✅ Available</h4>
 										<div className="flex flex-wrap gap-2">
 											{availableMembers.map((u) => (
 												<label
@@ -497,9 +489,7 @@ export default function NewEvent() {
 								)}
 								{noResponseMembers.length > 0 && (
 									<div>
-										<h4 className="mb-1.5 text-xs font-semibold text-slate-400">
-											— No Response
-										</h4>
+										<h4 className="mb-1.5 text-xs font-semibold text-slate-400">— No Response</h4>
 										<div className="flex flex-wrap gap-2">
 											{noResponseMembers.map((m) => (
 												<label

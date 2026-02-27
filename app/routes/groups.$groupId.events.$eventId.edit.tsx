@@ -94,7 +94,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		startTime: new Date(`${date}T${startTime}:00`),
 		endTime: new Date(`${date}T${endTime}:00`),
 		location: typeof location === "string" ? location : undefined,
-		callTime: hasCallTime ? new Date(`${date}T${callTime}:00`) : eventType === "show" ? undefined : null,
+		callTime: hasCallTime
+			? new Date(`${date}T${callTime}:00`)
+			: eventType === "show"
+				? undefined
+				: null,
 	});
 
 	return redirect(`/groups/${groupId}/events/${eventId}`);
@@ -176,7 +180,7 @@ export default function EditEvent() {
 											name="eventType"
 											value={type.value}
 											defaultChecked={event.eventType === type.value}
-											onChange={() => setEventType(type.value)}
+											onChange={() => setEventType(type.value as "rehearsal" | "show" | "other")}
 											className="peer sr-only"
 										/>
 										<span

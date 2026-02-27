@@ -354,9 +354,7 @@ export default function EventDetail() {
 										return (
 											<li key={a.userId} className="flex items-center justify-between px-6 py-3">
 												<div>
-													<span className="text-sm font-medium text-slate-900">
-														{a.userName}
-													</span>
+													<span className="text-sm font-medium text-slate-900">{a.userName}</span>
 													<span className="ml-2 text-xs text-purple-500">Performer</span>
 												</div>
 												<div className="flex items-center gap-2">
@@ -541,9 +539,7 @@ export default function EventDetail() {
 								</h3>
 							</div>
 							{viewers.length === 0 && !canSelfRegister ? (
-								<div className="p-6 text-center text-sm text-slate-500">
-									No viewers yet.
-								</div>
+								<div className="p-6 text-center text-sm text-slate-500">No viewers yet.</div>
 							) : (
 								<>
 									{viewers.length > 0 && (
@@ -555,9 +551,7 @@ export default function EventDetail() {
 														key={a.userId}
 														className="flex items-center justify-between px-6 py-3"
 													>
-														<span className="text-sm font-medium text-slate-900">
-															{a.userName}
-														</span>
+														<span className="text-sm font-medium text-slate-900">{a.userName}</span>
 														<div className="flex items-center gap-2">
 															<span
 																className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${statusCfg.badgeClass}`}
@@ -566,11 +560,7 @@ export default function EventDetail() {
 															</span>
 															{isAdmin && (
 																<Form method="post">
-																	<input
-																		type="hidden"
-																		name="intent"
-																		value="remove-assignment"
-																	/>
+																	<input type="hidden" name="intent" value="remove-assignment" />
 																	<input type="hidden" name="userId" value={a.userId} />
 																	<button
 																		type="submit"
@@ -896,9 +886,7 @@ export default function EventDetail() {
 								</p>
 							)}
 							{isShow && callTimeStr && isMyPerformer && (
-								<p className="mt-1 text-xs text-purple-600">
-									📍 Arrive by {callTimeStr}
-								</p>
+								<p className="mt-1 text-xs text-purple-600">📍 Arrive by {callTimeStr}</p>
 							)}
 							{myAssignment.status === "confirmed" ? (
 								<div className="mt-3">
@@ -955,9 +943,7 @@ export default function EventDetail() {
 					{!isShow && canSelfRegister && (
 						<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
 							<h3 className="text-sm font-semibold text-slate-900">Attending?</h3>
-							<p className="mt-1 text-xs text-slate-500">
-								Let your group know you'll be there.
-							</p>
+							<p className="mt-1 text-xs text-slate-500">Let your group know you'll be there.</p>
 							<Form method="post" className="mt-3">
 								<input type="hidden" name="intent" value="attend" />
 								<button
