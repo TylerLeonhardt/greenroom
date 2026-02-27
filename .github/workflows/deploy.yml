@@ -1,13 +1,11 @@
 name: Deploy
+# Triggered manually until Azure infrastructure is provisioned
 on:
-  push:
-    branches: [master]
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
 
