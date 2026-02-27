@@ -382,7 +382,7 @@ CI runs on every push/PR to `master`: typecheck → lint → build → test
 
 - **greenroom-architecture** (`.github/skills/greenroom-architecture/`) — Remix route structure, loader/action patterns, service layer conventions, component architecture, and UI styling guidelines. Reference for how to build features that match the existing codebase.
 - **greenroom-db** (`.github/skills/greenroom-db/`) — Drizzle ORM schema reference, migration workflow, query patterns (joins, upserts, transactions, window functions), JSON column patterns, index strategy, and multi-tenancy approach.
-- **greenroom-testing** (`.github/skills/greenroom-testing/`) — Vitest configuration, testing Remix loaders/actions, mocking services and auth, test file structure, and what to prioritize testing.
+- **greenroom-testing** (`.github/skills/greenroom-testing/`) — Vitest configuration, testing Remix loaders/actions, mocking services and auth, test file structure, rate limiting and email testing patterns.
 - **greenroom-security** (`.github/skills/greenroom-security/`) — Auth guard hierarchy, multi-tenancy isolation rules, rate limiting patterns, session security, password hashing, OAuth CSRF protection, and known security tech debt.
 - **playwright-cli** (`.github/skills/playwright-cli/`) — Browser automation skill for web testing, demo recording, and screenshots. Use for end-to-end testing, capturing screenshots of UI flows, recording demo videos, and interacting with the app in a real browser. See `SKILL.md` for full command reference and `references/` for advanced topics (request mocking, session management, test generation, tracing, video recording).
 
