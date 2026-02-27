@@ -1,5 +1,8 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { Form, useLoaderData, useRouteLoaderData } from "@remix-run/react";
+import { Form, Link, useLoaderData, useRouteLoaderData } from "@remix-run/react";
+import { CalendarDays } from "lucide-react";
+import { EventCard } from "~/components/event-card";
+import { getGroupEvents } from "~/services/events.server";
 import {
 	getGroupWithMembers,
 	removeMember,
@@ -13,7 +16,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 	await requireGroupMember(request, groupId);
 	const data = await getGroupWithMembers(groupId);
 	if (!data) throw new Response("Not Found", { status: 404 });
-	return { members: data.members };
+	const upcomingEvents = await getGroupEvents(groupId, { upcoming: true });
+	return { members: data.members, upcomingEvents };
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -56,7 +60,7 @@ function UserAvatar({ name, profileImage }: { name: string; profileImage: string
 }
 
 export default function GroupOverview() {
-	const { members } = useLoaderData<typeof loader>();
+	const { members, upcomingEvents } = useLoaderData<typeof loader>();
 	const parentData = useRouteLoaderData<typeof groupLayoutLoader>("routes/groups.$groupId");
 	const role = parentData?.role;
 	const group = parentData?.group;
@@ -128,7 +132,7 @@ export default function GroupOverview() {
 						</div>
 						<div className="flex justify-between">
 							<dt className="text-sm text-slate-500">Upcoming Events</dt>
-							<dd className="text-sm font-medium text-slate-900">—</dd>
+							<dd className="text-sm font-medium text-slate-900">{upcomingEvents.length}</dd>
 						</div>
 						<div className="flex justify-between">
 							<dt className="text-sm text-slate-500">Open Availability</dt>
@@ -136,6 +140,38 @@ export default function GroupOverview() {
 						</div>
 					</dl>
 				</div>
+
+				{/* Upcoming Events Preview */}
+				{upcomingEvents.length > 0 && (
+					<div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+						<div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+							<h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+								<CalendarDays className="h-4 w-4" /> Next Up
+							</h3>
+							<Link
+								to={`/groups/${group?.id}/events`}
+								className="text-xs font-medium text-emerald-600 hover:text-emerald-700"
+							>
+								View all →
+							</Link>
+						</div>
+						<div className="divide-y divide-slate-100 p-3">
+							{upcomingEvents.slice(0, 3).map((event) => (
+								<EventCard
+									key={event.id}
+									id={event.id}
+									groupId={event.groupId}
+									title={event.title}
+									eventType={event.eventType}
+									startTime={event.startTime as unknown as string}
+									endTime={event.endTime as unknown as string}
+									location={event.location}
+									compact
+								/>
+							))}
+						</div>
+					</div>
+				)}
 
 				{/* Invite Code (admin only) */}
 				{role === "admin" && group && (

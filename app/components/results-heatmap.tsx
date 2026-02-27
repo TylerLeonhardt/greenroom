@@ -17,6 +17,7 @@ interface ResultsHeatmapProps {
 	totalMembers: number;
 	totalResponded: number;
 	groupId: string;
+	requestId?: string;
 }
 
 function formatDateDisplay(dateStr: string): { dayOfWeek: string; display: string } {
@@ -54,6 +55,7 @@ export function ResultsHeatmap({
 	totalMembers,
 	totalResponded,
 	groupId,
+	requestId,
 }: ResultsHeatmapProps) {
 	const [expandedDate, setExpandedDate] = useState<string | null>(null);
 	const [sortBy, setSortBy] = useState<"date" | "score">("date");
@@ -167,7 +169,7 @@ export function ResultsHeatmap({
 											</td>
 											<td className="px-4 py-3 text-right">
 												<a
-													href={`/groups/${groupId}/events/new?date=${row.date}`}
+													href={`/groups/${groupId}/events/new?date=${row.date}${requestId ? `&fromRequest=${requestId}` : ""}`}
 													onClick={(e) => e.stopPropagation()}
 													className="text-xs font-medium text-emerald-600 hover:text-emerald-700"
 												>
@@ -258,7 +260,7 @@ export function ResultsHeatmap({
 										)}
 									</div>
 									<a
-										href={`/groups/${groupId}/events/new?date=${row.date}`}
+										href={`/groups/${groupId}/events/new?date=${row.date}${requestId ? `&fromRequest=${requestId}` : ""}`}
 										className="mt-3 inline-block text-xs font-medium text-emerald-600 hover:text-emerald-700"
 									>
 										Create Event →

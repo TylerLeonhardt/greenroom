@@ -1,6 +1,9 @@
 import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { Link, useLoaderData } from "@remix-run/react";
+import { CalendarDays } from "lucide-react";
+import { EventCard } from "~/components/event-card";
 import { requireUser } from "~/services/auth.server";
+import { getUserUpcomingEvents } from "~/services/events.server";
 import { getUserGroups } from "~/services/groups.server";
 
 export const meta: MetaFunction = () => {
@@ -10,11 +13,12 @@ export const meta: MetaFunction = () => {
 export async function loader({ request }: LoaderFunctionArgs) {
 	const user = await requireUser(request);
 	const groups = await getUserGroups(user.id);
-	return { user, groups };
+	const upcomingEvents = await getUserUpcomingEvents(user.id, 5);
+	return { user, groups, upcomingEvents };
 }
 
 export default function Dashboard() {
-	const { user, groups } = useLoaderData<typeof loader>();
+	const { user, groups, upcomingEvents } = useLoaderData<typeof loader>();
 	const displayGroups = groups.slice(0, 4);
 
 	return (
@@ -83,11 +87,35 @@ export default function Dashboard() {
 			</div>
 
 			<div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-				<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-					<h2 className="text-lg font-semibold text-slate-900">Upcoming Events</h2>
-					<p className="mt-2 text-sm text-slate-500">
-						Upcoming rehearsals and shows will appear here.
-					</p>
+				<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:col-span-2 lg:col-span-2">
+					<div className="flex items-center justify-between">
+						<h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+							<CalendarDays className="h-5 w-5" /> Upcoming Events
+						</h2>
+					</div>
+					{upcomingEvents.length === 0 ? (
+						<p className="mt-3 text-sm text-slate-500">
+							No upcoming events. Events will appear here when they&apos;re scheduled.
+						</p>
+					) : (
+						<div className="mt-4 grid gap-3">
+							{upcomingEvents.map((event) => (
+								<EventCard
+									key={event.id}
+									id={event.id}
+									groupId={event.groupId}
+									title={event.title}
+									eventType={event.eventType}
+									startTime={event.startTime as unknown as string}
+									endTime={event.endTime as unknown as string}
+									location={event.location}
+									groupName={event.groupName}
+									userStatus={event.userStatus}
+									compact
+								/>
+							))}
+						</div>
+					)}
 				</div>
 
 				<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">

@@ -249,6 +249,7 @@ export default function AvailabilityRequestDetail() {
 							totalMembers={results.totalMembers}
 							totalResponded={results.totalResponded}
 							groupId={availRequest.groupId}
+							requestId={availRequest.id}
 						/>
 					</div>
 
