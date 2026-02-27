@@ -224,7 +224,7 @@ export async function action({ request }: ActionFunctionArgs) {
 | `/auth/google` | Public | Redirects to Google OAuth consent screen |
 | `/auth/google/callback` | Public | Handles OAuth code exchange, creates session |
 | `/api/health` | Public | Returns `{ status: "ok", timestamp }` |
-| `/api/events/:eventId/ics` | `requireUser` | Downloads .ics file (role-aware start times for performers) |
+| `/api/events/:eventId/ics` | `requireUser` + `requireGroupMember` | Downloads .ics file (role-aware start times for performers) |
 | `/dashboard` | `requireUser` | Action items, upcoming events, group list |
 | `/groups` | `requireUser` | List user's groups + inline join form |
 | `/groups/new` | `requireUser` | Create group form |
