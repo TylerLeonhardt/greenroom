@@ -8,10 +8,18 @@ import {
 	useNavigation,
 	useParams,
 } from "@remix-run/react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Clock, Users } from "lucide-react";
+import { useState } from "react";
 import { getAvailabilityRequest } from "~/services/availability.server";
-import { sendEventCreatedNotification } from "~/services/email.server";
-import { createEvent } from "~/services/events.server";
+import {
+	sendEventCreatedNotification,
+	sendEventFromAvailabilityNotification,
+} from "~/services/email.server";
+import {
+	bulkAssignToEvent,
+	createEvent,
+	getAvailabilityForEventDate,
+} from "~/services/events.server";
 import { getGroupWithMembers, requireGroupAdmin } from "~/services/groups.server";
 
 export const meta: MetaFunction = () => {
@@ -27,14 +35,21 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 	const prefillDate = url.searchParams.get("date");
 
 	let fromRequest: { id: string; title: string } | null = null;
+	let availabilityData: Array<{ userId: string; userName: string; status: string }> = [];
 	if (fromRequestId) {
 		const req = await getAvailabilityRequest(fromRequestId);
 		if (req && req.groupId === groupId) {
 			fromRequest = { id: req.id, title: req.title };
+			if (prefillDate) {
+				availabilityData = await getAvailabilityForEventDate(fromRequestId, prefillDate);
+			}
 		}
 	}
 
-	return { fromRequest, prefillDate };
+	const groupData = await getGroupWithMembers(groupId);
+	const members = groupData?.members ?? [];
+
+	return { fromRequest, prefillDate, members, availabilityData };
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -50,6 +65,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	const location = formData.get("location");
 	const description = formData.get("description");
 	const fromRequestId = formData.get("fromRequestId");
+	const callTime = formData.get("callTime");
+	const performerIds = formData.getAll("performerIds");
 
 	if (typeof title !== "string" || !title.trim()) {
 		return { error: "Title is required." };
@@ -70,6 +87,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		return { error: "End time must be after start time." };
 	}
 
+	const hasCallTime =
+		eventType === "show" && typeof callTime === "string" && callTime.trim() !== "";
+
 	const event = await createEvent({
 		groupId,
 		title: title.trim(),
@@ -81,41 +101,137 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		createdById: user.id,
 		createdFromRequestId:
 			typeof fromRequestId === "string" && fromRequestId ? fromRequestId : undefined,
+		callTime: hasCallTime ? new Date(`${date}T${callTime}:00`) : undefined,
 	});
 
-	// Fire-and-forget email notification to group members
+	// Assign performers for show events
+	if (eventType === "show") {
+		const validPerformerIds = performerIds.filter(
+			(id): id is string => typeof id === "string" && id.length > 0,
+		);
+		if (validPerformerIds.length > 0) {
+			// Verify all provided performerIds are actual members of this group
+			const groupData = await getGroupWithMembers(groupId);
+			const memberIds = new Set(groupData?.members.map((m) => m.id) ?? []);
+			const verifiedIds = validPerformerIds.filter((id) => memberIds.has(id));
+			if (verifiedIds.length > 0) {
+				await bulkAssignToEvent(event.id, verifiedIds, "Performer");
+			}
+		}
+	}
+
+	// Fire-and-forget email notifications
 	const appUrl = process.env.APP_URL ?? "http://localhost:5173";
-	void getGroupWithMembers(groupId).then((groupData) => {
+	const eventUrl = `${appUrl}/groups/${groupId}/events/${event.id}`;
+	const validFromRequestId =
+		typeof fromRequestId === "string" && fromRequestId ? fromRequestId : null;
+
+	void (async () => {
+		const groupData = await getGroupWithMembers(groupId);
 		if (!groupData) return;
-		const recipients = groupData.members
-			.filter((m) => m.id !== user.id)
-			.map((m) => ({ email: m.email, name: m.name }));
-		if (recipients.length === 0) return;
 
 		const eventStart = new Date(`${date}T${startTime}:00`);
 		const eventEnd = new Date(`${date}T${endTime}:00`);
 		const dateTime = `${eventStart.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} · ${eventStart.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} – ${eventEnd.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
 
-		void sendEventCreatedNotification({
-			eventTitle: event.title,
-			eventType: event.eventType,
-			dateTime,
-			location: event.location ?? undefined,
-			groupName: groupData.group.name,
-			recipients,
-			eventUrl: `${appUrl}/groups/${groupId}/events/${event.id}`,
-		});
-	});
+		if (validFromRequestId && typeof date === "string") {
+			// Availability-aware notifications
+			const availData = await getAvailabilityForEventDate(validFromRequestId, date);
+			const memberMap = new Map(
+				groupData.members.map((m) => [m.id, { email: m.email, name: m.name }]),
+			);
+
+			const availableRecipients: Array<{ email: string; name: string }> = [];
+			const maybeRecipients: Array<{ email: string; name: string }> = [];
+			const respondedUserIds = new Set<string>();
+
+			for (const entry of availData) {
+				if (entry.userId === user.id) {
+					respondedUserIds.add(entry.userId);
+					continue;
+				}
+				respondedUserIds.add(entry.userId);
+				const member = memberMap.get(entry.userId);
+				if (!member) continue;
+				if (entry.status === "available") {
+					availableRecipients.push(member);
+				} else if (entry.status === "maybe") {
+					maybeRecipients.push(member);
+				}
+				// not_available → no email
+			}
+
+			// Members who didn't respond at all
+			const noResponseRecipients = groupData.members
+				.filter((m) => m.id !== user.id && !respondedUserIds.has(m.id))
+				.map((m) => ({ email: m.email, name: m.name }));
+
+			void sendEventFromAvailabilityNotification({
+				eventTitle: event.title,
+				eventType: event.eventType,
+				dateTime,
+				location: event.location ?? undefined,
+				groupName: groupData.group.name,
+				eventUrl,
+				availableRecipients,
+				maybeRecipients,
+				noResponseRecipients,
+			});
+		} else {
+			// Standard notification
+			const recipients = groupData.members
+				.filter((m) => m.id !== user.id)
+				.map((m) => ({ email: m.email, name: m.name }));
+			if (recipients.length === 0) return;
+
+			void sendEventCreatedNotification({
+				eventTitle: event.title,
+				eventType: event.eventType,
+				dateTime,
+				location: event.location ?? undefined,
+				groupName: groupData.group.name,
+				recipients,
+				eventUrl,
+			});
+		}
+	})();
 
 	return redirect(`/groups/${groupId}/events/${event.id}`);
 }
 
 export default function NewEvent() {
 	const { groupId } = useParams();
-	const { fromRequest, prefillDate } = useLoaderData<typeof loader>();
+	const { fromRequest, prefillDate, members, availabilityData } = useLoaderData<typeof loader>();
 	const actionData = useActionData<typeof action>();
 	const navigation = useNavigation();
 	const isSubmitting = navigation.state === "submitting";
+
+	const [eventType, setEventType] = useState("rehearsal");
+	const [selectedPerformers, setSelectedPerformers] = useState<Set<string>>(() => {
+		// Pre-select available members when creating from availability
+		if (availabilityData.length > 0) {
+			return new Set(availabilityData.filter((a) => a.status === "available").map((a) => a.userId));
+		}
+		return new Set();
+	});
+
+	const isShow = eventType === "show";
+
+	const togglePerformer = (id: string) => {
+		const next = new Set(selectedPerformers);
+		if (next.has(id)) next.delete(id);
+		else next.add(id);
+		setSelectedPerformers(next);
+	};
+
+	const availableMembers = availabilityData.filter((a) => a.status === "available");
+	const maybeMembers = availabilityData.filter((a) => a.status === "maybe");
+	const unavailableMembers = availabilityData.filter((a) => a.status === "not_available");
+	const hasAvailData = availabilityData.length > 0;
+
+	// Members who didn't respond to availability
+	const respondedUserIds = new Set(availabilityData.map((a) => a.userId));
+	const noResponseMembers = hasAvailData ? members.filter((m) => !respondedUserIds.has(m.id)) : [];
 
 	return (
 		<div className="max-w-3xl">
@@ -149,8 +265,11 @@ export default function NewEvent() {
 
 			<Form method="post" className="space-y-6">
 				{fromRequest && <input type="hidden" name="fromRequestId" value={fromRequest.id} />}
+				{Array.from(selectedPerformers).map((id) => (
+					<input key={id} type="hidden" name="performerIds" value={id} />
+				))}
 
-				{/* Title */}
+				{/* Title & Type */}
 				<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
 					<div className="space-y-4">
 						<div>
@@ -197,6 +316,7 @@ export default function NewEvent() {
 											name="eventType"
 											value={type.value}
 											defaultChecked={type.value === "rehearsal"}
+											onChange={() => setEventType(type.value)}
 											className="peer sr-only"
 										/>
 										<span
@@ -255,7 +375,175 @@ export default function NewEvent() {
 							/>
 						</div>
 					</div>
+
+					{/* Call Time — show only */}
+					{isShow && (
+						<div className="mt-4">
+							<label htmlFor="callTime" className="block text-sm font-medium text-slate-700">
+								<Clock className="mr-1 inline h-4 w-4 text-purple-500" />
+								Call Time
+								<span className="ml-1 text-xs font-normal text-slate-500">
+									(when performers need to arrive)
+								</span>
+							</label>
+							<input
+								id="callTime"
+								name="callTime"
+								type="time"
+								defaultValue="18:00"
+								className="mt-1 block w-full max-w-[200px] rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+							/>
+						</div>
+					)}
 				</div>
+
+				{/* Cast Assignment — show only */}
+				{isShow && members.length > 0 && (
+					<div className="rounded-xl border border-purple-200 bg-white p-6 shadow-sm">
+						<h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-slate-900">
+							<Users className="h-4 w-4 text-purple-500" />
+							Cast Assignment
+						</h3>
+						<p className="mb-4 text-xs text-slate-500">
+							Select performers for this show. Other group members can self-register as viewers.
+						</p>
+
+						{hasAvailData ? (
+							<div className="space-y-3">
+								{availableMembers.length > 0 && (
+									<div>
+										<h4 className="mb-1.5 text-xs font-semibold text-emerald-700">✅ Available</h4>
+										<div className="flex flex-wrap gap-2">
+											{availableMembers.map((u) => (
+												<label
+													key={u.userId}
+													className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+														selectedPerformers.has(u.userId)
+															? "border-emerald-400 bg-emerald-100 text-emerald-800"
+															: "border-slate-200 bg-white text-slate-700 hover:bg-emerald-50"
+													}`}
+												>
+													<input
+														type="checkbox"
+														className="sr-only"
+														checked={selectedPerformers.has(u.userId)}
+														onChange={() => togglePerformer(u.userId)}
+													/>
+													{u.userName}
+												</label>
+											))}
+										</div>
+									</div>
+								)}
+								{maybeMembers.length > 0 && (
+									<div>
+										<h4 className="mb-1.5 text-xs font-semibold text-amber-700">🤔 Maybe</h4>
+										<div className="flex flex-wrap gap-2">
+											{maybeMembers.map((u) => (
+												<label
+													key={u.userId}
+													className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+														selectedPerformers.has(u.userId)
+															? "border-amber-400 bg-amber-100 text-amber-800"
+															: "border-slate-200 bg-white text-slate-700 hover:bg-amber-50"
+													}`}
+												>
+													<input
+														type="checkbox"
+														className="sr-only"
+														checked={selectedPerformers.has(u.userId)}
+														onChange={() => togglePerformer(u.userId)}
+													/>
+													{u.userName}
+												</label>
+											))}
+										</div>
+									</div>
+								)}
+								{unavailableMembers.length > 0 && (
+									<div>
+										<h4 className="mb-1.5 text-xs font-semibold text-slate-500">
+											❌ Not Available
+										</h4>
+										<div className="flex flex-wrap gap-2">
+											{unavailableMembers.map((u) => (
+												<label
+													key={u.userId}
+													className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium opacity-60 transition-colors ${
+														selectedPerformers.has(u.userId)
+															? "border-red-400 bg-red-100 text-red-800"
+															: "border-slate-200 bg-white text-slate-500 hover:bg-slate-100"
+													}`}
+												>
+													<input
+														type="checkbox"
+														className="sr-only"
+														checked={selectedPerformers.has(u.userId)}
+														onChange={() => togglePerformer(u.userId)}
+													/>
+													{u.userName}
+												</label>
+											))}
+										</div>
+									</div>
+								)}
+								{noResponseMembers.length > 0 && (
+									<div>
+										<h4 className="mb-1.5 text-xs font-semibold text-slate-400">— No Response</h4>
+										<div className="flex flex-wrap gap-2">
+											{noResponseMembers.map((m) => (
+												<label
+													key={m.id}
+													className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+														selectedPerformers.has(m.id)
+															? "border-slate-400 bg-slate-200 text-slate-800"
+															: "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+													}`}
+												>
+													<input
+														type="checkbox"
+														className="sr-only"
+														checked={selectedPerformers.has(m.id)}
+														onChange={() => togglePerformer(m.id)}
+													/>
+													{m.name}
+												</label>
+											))}
+										</div>
+									</div>
+								)}
+							</div>
+						) : (
+							<div className="flex flex-wrap gap-2">
+								{members.map((m) => (
+									<label
+										key={m.id}
+										className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+											selectedPerformers.has(m.id)
+												? "border-purple-400 bg-purple-100 text-purple-800"
+												: "border-slate-200 bg-white text-slate-700 hover:bg-purple-50"
+										}`}
+									>
+										<input
+											type="checkbox"
+											className="sr-only"
+											checked={selectedPerformers.has(m.id)}
+											onChange={() => togglePerformer(m.id)}
+										/>
+										{m.name}
+									</label>
+								))}
+							</div>
+						)}
+
+						{selectedPerformers.size > 0 && (
+							<p className="mt-3 text-xs text-purple-600">
+								{selectedPerformers.size} performer{selectedPerformers.size !== 1 ? "s" : ""}{" "}
+								selected
+							</p>
+						)}
+					</div>
+				)}
 
 				{/* Location & Description */}
 				<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">

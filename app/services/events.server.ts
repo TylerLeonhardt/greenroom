@@ -24,6 +24,7 @@ export async function createEvent(data: {
 	location?: string;
 	createdById: string;
 	createdFromRequestId?: string;
+	callTime?: Date;
 }): Promise<Event> {
 	const [event] = await db
 		.insert(events)
@@ -37,6 +38,7 @@ export async function createEvent(data: {
 			location: data.location?.trim() || null,
 			createdById: data.createdById,
 			createdFromRequestId: data.createdFromRequestId ?? null,
+			callTime: data.callTime ?? null,
 		})
 		.returning();
 	if (!event) throw new Error("Failed to create event.");
@@ -124,6 +126,7 @@ export async function getGroupEvents(
 			location: events.location,
 			createdById: events.createdById,
 			createdFromRequestId: events.createdFromRequestId,
+			callTime: events.callTime,
 			createdAt: events.createdAt,
 			updatedAt: events.updatedAt,
 			assignmentCount: sql<number>`cast((
@@ -166,6 +169,7 @@ export async function getEventWithAssignments(eventId: string): Promise<{
 			location: events.location,
 			createdById: events.createdById,
 			createdFromRequestId: events.createdFromRequestId,
+			callTime: events.callTime,
 			createdAt: events.createdAt,
 			updatedAt: events.updatedAt,
 			createdByName: users.name,
@@ -213,6 +217,7 @@ export async function updateEvent(
 		startTime: Date;
 		endTime: Date;
 		location: string;
+		callTime: Date | null;
 	}>,
 ): Promise<Event> {
 	const [updated] = await db
@@ -226,6 +231,7 @@ export async function updateEvent(
 			...(data.startTime !== undefined ? { startTime: data.startTime } : {}),
 			...(data.endTime !== undefined ? { endTime: data.endTime } : {}),
 			...(data.location !== undefined ? { location: data.location.trim() || null } : {}),
+			...(data.callTime !== undefined ? { callTime: data.callTime } : {}),
 			updatedAt: new Date(),
 		})
 		.where(eq(events.id, eventId))
@@ -308,6 +314,7 @@ export async function getUserUpcomingEvents(
 			location: events.location,
 			createdById: events.createdById,
 			createdFromRequestId: events.createdFromRequestId,
+			callTime: events.callTime,
 			createdAt: events.createdAt,
 			updatedAt: events.updatedAt,
 			groupName: groups.name,

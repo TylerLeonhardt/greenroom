@@ -1,0 +1,1 @@
+ALTER TABLE "events" ADD COLUMN "call_time" timestamp with time zone;
