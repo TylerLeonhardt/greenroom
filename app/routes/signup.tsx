@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
-import { Form, Link, useActionData, useLoaderData } from "@remix-run/react";
+import { Form, Link, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { useState } from "react";
 import {
 	createUserSession,
 	getGoogleAuthURL,
@@ -71,12 +72,16 @@ export default function Signup() {
 	const { googleAuthURL } = useLoaderData<typeof loader>();
 	const actionData = useActionData<typeof action>();
 	const errors = actionData?.errors;
+	const navigation = useNavigation();
+	const isSubmitting = navigation.state === "submitting";
+	const [password, setPassword] = useState("");
 
 	return (
 		<div className="flex min-h-[calc(100vh-8rem)] flex-col items-center justify-center py-12">
 			<div className="w-full max-w-md">
 				<div className="text-center">
-					<h1 className="text-3xl font-bold text-slate-900">Create your account</h1>
+					<div className="text-3xl">🎭</div>
+					<h1 className="mt-3 text-3xl font-bold text-slate-900">Create your account</h1>
 					<p className="mt-2 text-slate-600">Join GreenRoom and start scheduling</p>
 				</div>
 
@@ -165,9 +170,36 @@ export default function Signup() {
 								autoComplete="new-password"
 								required
 								minLength={8}
+								value={password}
+								onChange={(e) => setPassword(e.target.value)}
 								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 								placeholder="••••••••"
 							/>
+							{password.length > 0 && (
+								<div className="mt-2 flex items-center gap-2">
+									<div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200">
+										<div
+											className={`h-full rounded-full transition-all ${
+												password.length >= 8
+													? "bg-emerald-500"
+													: password.length >= 4
+														? "bg-amber-500"
+														: "bg-red-400"
+											}`}
+											style={{
+												width: `${Math.min((password.length / 8) * 100, 100)}%`,
+											}}
+										/>
+									</div>
+									<span
+										className={`text-xs font-medium ${
+											password.length >= 8 ? "text-emerald-600" : "text-slate-400"
+										}`}
+									>
+										{password.length >= 8 ? "Strong" : `${password.length}/8`}
+									</span>
+								</div>
+							)}
 							{errors?.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
 						</div>
 
@@ -192,10 +224,15 @@ export default function Signup() {
 
 						<button
 							type="submit"
-							className="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:ring-offset-2"
+							disabled={isSubmitting}
+							className="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:ring-offset-2 disabled:opacity-50"
 						>
-							Create account
+							{isSubmitting ? "Creating account…" : "Create account"}
 						</button>
+
+						<p className="text-center text-xs text-slate-400">
+							By signing up, you agree to our Terms of Service
+						</p>
 					</Form>
 				</div>
 

@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
-import { Form, Link, useActionData, useLoaderData } from "@remix-run/react";
+import { Form, Link, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
 import { getOptionalUser, requireUser } from "~/services/auth.server";
 import { joinGroup } from "~/services/groups.server";
 
@@ -39,6 +39,8 @@ export async function action({ request }: ActionFunctionArgs) {
 export default function JoinGroup() {
 	const { code, isLoggedIn } = useLoaderData<typeof loader>();
 	const actionData = useActionData<typeof action>();
+	const navigation = useNavigation();
+	const isSubmitting = navigation.state === "submitting";
 
 	return (
 		<div className="flex flex-col items-center justify-center py-12">
@@ -93,10 +95,10 @@ export default function JoinGroup() {
 
 						<button
 							type="submit"
-							disabled={!isLoggedIn}
+							disabled={!isLoggedIn || isSubmitting}
 							className="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:ring-offset-2 disabled:opacity-50"
 						>
-							Join Group
+							{isSubmitting ? "Joining…" : "Join Group"}
 						</button>
 					</Form>
 				</div>

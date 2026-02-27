@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
-import { Form, Link, useActionData, useLoaderData } from "@remix-run/react";
+import { Form, Link, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
 import {
 	authenticator,
 	createUserSession,
@@ -32,12 +32,15 @@ export async function action({ request }: ActionFunctionArgs) {
 export default function Login() {
 	const { googleAuthURL } = useLoaderData<typeof loader>();
 	const actionData = useActionData<typeof action>();
+	const navigation = useNavigation();
+	const isSubmitting = navigation.state === "submitting";
 
 	return (
 		<div className="flex min-h-[calc(100vh-8rem)] flex-col items-center justify-center py-12">
 			<div className="w-full max-w-md">
 				<div className="text-center">
-					<h1 className="text-3xl font-bold text-slate-900">Welcome back</h1>
+					<div className="text-3xl">🎭</div>
+					<h1 className="mt-3 text-3xl font-bold text-slate-900">Welcome back</h1>
 					<p className="mt-2 text-slate-600">Sign in to your GreenRoom account</p>
 				</div>
 
@@ -115,9 +118,10 @@ export default function Login() {
 
 						<button
 							type="submit"
-							className="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:ring-offset-2"
+							disabled={isSubmitting}
+							className="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:ring-offset-2 disabled:opacity-50"
 						>
-							Sign in
+							{isSubmitting ? "Signing in…" : "Sign in"}
 						</button>
 					</Form>
 				</div>

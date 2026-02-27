@@ -1,5 +1,5 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { Form, useActionData, useLoaderData } from "@remix-run/react";
+import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
 import {
 	getGroupById,
 	regenerateInviteCode,
@@ -55,6 +55,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 export default function GroupSettings() {
 	const { group } = useLoaderData<typeof loader>();
 	const actionData = useActionData<typeof action>();
+	const navigation = useNavigation();
+	const isSubmitting = navigation.state === "submitting";
 
 	return (
 		<div className="max-w-2xl space-y-8">
@@ -107,9 +109,10 @@ export default function GroupSettings() {
 					</div>
 					<button
 						type="submit"
-						className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:ring-offset-2"
+						disabled={isSubmitting}
+						className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:ring-offset-2 disabled:opacity-50"
 					>
-						Save Changes
+						{isSubmitting ? "Saving…" : "Save Changes"}
 					</button>
 				</Form>
 			</div>

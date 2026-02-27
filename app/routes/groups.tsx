@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
-import { Form, Link, useActionData, useLoaderData } from "@remix-run/react";
+import { Form, Link, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
 import { requireUser } from "~/services/auth.server";
 import { createGroup, getUserGroups, joinGroup } from "~/services/groups.server";
 
@@ -62,6 +62,8 @@ function RoleBadge({ role }: { role: string }) {
 export default function Groups() {
 	const { groups } = useLoaderData<typeof loader>();
 	const actionData = useActionData<typeof action>();
+	const navigation = useNavigation();
+	const isSubmitting = navigation.state === "submitting";
 
 	return (
 		<div>
@@ -98,9 +100,10 @@ export default function Groups() {
 					</div>
 					<button
 						type="submit"
-						className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+						disabled={isSubmitting}
+						className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
 					>
-						Join Group
+						{isSubmitting ? "Joining…" : "Join Group"}
 					</button>
 				</Form>
 				{actionData?.intent === "join" && actionData.error && (

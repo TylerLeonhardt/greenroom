@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
-import { Form, Link, useActionData } from "@remix-run/react";
+import { Form, Link, useActionData, useNavigation } from "@remix-run/react";
 import { requireUser } from "~/services/auth.server";
 import { createGroup } from "~/services/groups.server";
 
@@ -43,6 +43,8 @@ export async function action({ request }: ActionFunctionArgs) {
 export default function NewGroup() {
 	const actionData = useActionData<typeof action>();
 	const errors = actionData?.errors as Record<string, string> | undefined;
+	const navigation = useNavigation();
+	const isSubmitting = navigation.state === "submitting";
 
 	return (
 		<div className="flex flex-col items-center justify-center py-12">
@@ -91,9 +93,10 @@ export default function NewGroup() {
 						<div className="flex gap-3 pt-2">
 							<button
 								type="submit"
-								className="flex-1 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:ring-offset-2"
+								disabled={isSubmitting}
+								className="flex-1 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:ring-offset-2 disabled:opacity-50"
 							>
-								Create Group
+								{isSubmitting ? "Creating…" : "Create Group"}
 							</button>
 							<Link
 								to="/groups"

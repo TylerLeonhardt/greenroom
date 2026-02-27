@@ -27,7 +27,7 @@ export default function Dashboard() {
 			<p className="mt-2 text-slate-600">Here&apos;s what&apos;s happening with your groups.</p>
 
 			{/* Action Required */}
-			{hasActions && (
+			{hasActions ? (
 				<div className="mt-8">
 					<h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
 						<AlertCircle className="h-5 w-5 text-amber-500" /> Action Required
@@ -107,6 +107,16 @@ export default function Dashboard() {
 							</Link>
 						))}
 					</div>
+				</div>
+			) : (
+				<div className="mt-8 rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">
+					<div className="text-3xl">✅</div>
+					<h3 className="mt-3 text-base font-semibold text-slate-900">
+						You&apos;re all caught up!
+					</h3>
+					<p className="mt-1 text-sm text-slate-500">
+						No pending availability requests or event confirmations.
+					</p>
 				</div>
 			)}
 
