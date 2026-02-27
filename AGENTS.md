@@ -193,6 +193,47 @@ if (rateLimit.limited) {
 - Stale entries cleaned up every 5 minutes automatically
 - IP extracted from `x-forwarded-for` header (works behind Azure Container Apps proxy)
 
+### Logging
+
+Structured logging via [pino](https://getpino.io/). Import the singleton logger from `app/services/logger.server.ts`:
+
+```typescript
+import { logger } from "./logger.server.js";
+
+logger.info({ userId, groupId }, "User joined group");
+logger.warn({ key, maxRequests }, "Rate limit exceeded");
+logger.error({ err: error, to: recipients }, "Failed to send email");
+```
+
+- Log level controlled by `LOG_LEVEL` env var (default: `"info"`)
+- In development, logs are plain JSON to stdout
+- In production, logs are JSON (no pretty-printing transport) for log aggregation
+- Always pass structured context as the first argument, message as the second
+
+### Rate Limiting
+
+In-memory sliding window rate limiter in `app/services/rate-limit.server.ts`. Used on auth routes to prevent brute-force attacks:
+
+```typescript
+import { checkLoginRateLimit, checkSignupRateLimit } from "~/services/rate-limit.server";
+
+// In a route action:
+const rateLimit = checkLoginRateLimit(request);
+if (rateLimit.limited) {
+  return json(
+    { error: `Too many attempts. Try again in ${rateLimit.retryAfter} seconds.` },
+    { status: 429 }
+  );
+}
+```
+
+- `checkLoginRateLimit(request)` — 10 requests per minute per IP
+- `checkSignupRateLimit(request)` — 5 requests per minute per IP
+- `checkRateLimit(key, maxRequests, windowMs)` — generic function for custom limits
+- `_resetForTests()` — clears all rate limit state (use in test `beforeEach`)
+- Stale entries cleaned up every 5 minutes automatically
+- IP extracted from `x-forwarded-for` header (works behind Azure Container Apps proxy)
+
 ### Remix Route Conventions
 
 - Flat file routing: `groups.$groupId.events.new.tsx` → `/groups/:groupId/events/new`
@@ -318,6 +359,7 @@ pnpm run dev
 | `APP_URL` | ✅ | `http://localhost:5173` locally |
 | `AZURE_COMMUNICATION_CONNECTION_STRING` | Optional | For sending emails (logs to console if missing) |
 | `LOG_LEVEL` | Optional | Pino log level: `trace`, `debug`, `info` (default), `warn`, `error`, `fatal` |
+| `LOG_LEVEL` | Optional | Pino log level: `trace`, `debug`, `info` (default), `warn`, `error`, `fatal` |
 
 ## Build, Test & Deploy Commands
 
@@ -407,6 +449,10 @@ CI runs on every push/PR to `master`: typecheck → lint → build → test
 - **greenroom-testing** (`.github/skills/greenroom-testing/`) — Vitest configuration, testing Remix loaders/actions, mocking services and auth, test file structure, rate limiting and email testing patterns.
 - **greenroom-security** (`.github/skills/greenroom-security/`) — Auth guard hierarchy, multi-tenancy isolation rules, rate limiting patterns, session security, password hashing, OAuth CSRF protection, and known security tech debt.
 - **playwright-cli** (`.github/skills/playwright-cli/`) — Browser automation skill for web testing, demo recording, and screenshots. Use for end-to-end testing, capturing screenshots of UI flows, recording demo videos, and interacting with the app in a real browser. See `SKILL.md` for full command reference and `references/` for advanced topics (request mocking, session management, test generation, tracing, video recording).
+- **azure-diagnostics** (`.github/skills/azure-diagnostics/`) — Azure resource diagnostics and troubleshooting. Covers Container Apps debugging (log analysis, health checks, image pull failures), Azure Functions diagnostics, Azure Resource Graph queries, and KQL query patterns. Essential for production incident response. Source: [microsoft/GitHub-Copilot-for-Azure](https://github.com/microsoft/GitHub-Copilot-for-Azure).
+- **azure-deploy** (`.github/skills/azure-deploy/`) — Azure deployment workflows including pre-deploy checklists, troubleshooting, region availability, and deployment recipes for Azure CLI, azd, Bicep, Terraform, and CI/CD pipelines (GitHub Actions & Azure DevOps). Includes Azure Identity SDK references for multiple languages. Source: [microsoft/GitHub-Copilot-for-Azure](https://github.com/microsoft/GitHub-Copilot-for-Azure).
+- **azure-cost-optimization** (`.github/skills/azure-cost-optimization/`) — Azure cost analysis and optimization. Covers Azure Quick Review, orphaned resource cleanup, rightsizing, Redis cache analysis, Azure Resource Graph cost queries, and spending analysis templates. Source: [microsoft/GitHub-Copilot-for-Azure](https://github.com/microsoft/GitHub-Copilot-for-Azure).
+- **azure-observability** (`.github/skills/azure-observability/`) — Azure Monitor, Application Insights, and Log Analytics. Covers OpenTelemetry instrumentation (Python, TypeScript, Java), log ingestion, metric queries, and Application Insights management SDK references. Source: [microsoft/GitHub-Copilot-for-Azure](https://github.com/microsoft/GitHub-Copilot-for-Azure).
 
 ## Known Issues / Tech Debt
 
