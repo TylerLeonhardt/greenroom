@@ -334,6 +334,10 @@ CI runs on every push/PR to `master`: typecheck → lint → build → test
   - `deploy.yml` — Docker build → Azure Container Registry → Azure Container Apps on push to `master`
 - **Database:** Azure PostgreSQL (SSL in production, `rejectUnauthorized: false`)
 
+## Available Skills
+
+- **playwright-cli** (`.github/skills/playwright-cli/`) — Browser automation skill for web testing, demo recording, and screenshots. Use for end-to-end testing, capturing screenshots of UI flows, recording demo videos, and interacting with the app in a real browser. See `SKILL.md` for full command reference and `references/` for advanced topics (request mocking, session management, test generation, tracing, video recording).
+
 ## Known Issues / Tech Debt
 
 - **No rate limiting on auth routes:** `/login`, `/signup`, and `/auth/google` have no rate limiting. Brute-force or credential-stuffing attacks are not mitigated at the application layer. Consider adding rate limiting middleware or using a reverse proxy/CDN rate limiter.
