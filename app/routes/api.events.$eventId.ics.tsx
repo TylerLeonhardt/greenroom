@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { requireUser } from "~/services/auth.server";
 import { getEventWithAssignments } from "~/services/events.server";
+import { requireGroupMember } from "~/services/groups.server";
 
 function formatICalDate(date: Date): string {
 	return date
@@ -38,6 +39,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 	if (!data) {
 		throw new Response("Not Found", { status: 404 });
 	}
+
+	// Verify the user is a member of the event's group
+	await requireGroupMember(request, data.event.groupId);
 
 	const { event } = data;
 	const url = new URL(request.url);

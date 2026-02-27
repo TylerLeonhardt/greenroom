@@ -30,12 +30,20 @@ vi.mock("~/services/auth.server", () => ({
 	requireUser: vi.fn().mockResolvedValue({ id: "user-1", email: "test@test.com", name: "Test" }),
 }));
 
+// Mock groups service
+vi.mock("~/services/groups.server", () => ({
+	requireGroupMember: vi
+		.fn()
+		.mockResolvedValue({ id: "user-1", email: "test@test.com", name: "Test" }),
+}));
+
 // Mock events service
 vi.mock("~/services/events.server", () => ({
 	getEventWithAssignments: vi.fn(),
 }));
 
 import { getEventWithAssignments } from "~/services/events.server";
+import { requireGroupMember } from "~/services/groups.server";
 import { loader } from "./api.events.$eventId.ics";
 
 describe("GET /api/events/:eventId/ics", () => {
@@ -177,5 +185,35 @@ describe("GET /api/events/:eventId/ics", () => {
 		const body = await response.text();
 		// Rehearsal always uses start_time regardless of role
 		expect(body).toContain("DTSTART:20260315T190000Z");
+	});
+	it("verifies group membership for the event", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: mockEvent,
+			assignments: [],
+		});
+
+		const request = new Request("http://localhost:5173/api/events/event-1/ics");
+		await loader({
+			request,
+			params: { eventId: "event-1" },
+			context: {},
+		});
+
+		expect(requireGroupMember).toHaveBeenCalledWith(request, "group-1");
+	});
+
+	it("rejects non-members of the event group", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: mockEvent,
+			assignments: [],
+		});
+		(requireGroupMember as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+			new Response("Not Found", { status: 404 }),
+		);
+
+		const request = new Request("http://localhost:5173/api/events/event-1/ics");
+		await expect(
+			loader({ request, params: { eventId: "event-1" }, context: {} }),
+		).rejects.toThrow();
 	});
 });
