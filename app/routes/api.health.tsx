@@ -7,10 +7,10 @@ export async function loader(_args: LoaderFunctionArgs) {
 	let dbStatus: "connected" | "disconnected" = "disconnected";
 
 	try {
-		const controller = new AbortController();
-		const timeout = setTimeout(() => controller.abort(), 2000);
-		await db.execute(sql`SELECT 1`);
-		clearTimeout(timeout);
+		const timeout = new Promise<never>((_, reject) =>
+			setTimeout(() => reject(new Error("Health check timeout")), 2000),
+		);
+		await Promise.race([db.execute(sql`SELECT 1`), timeout]);
 		dbStatus = "connected";
 	} catch (error) {
 		logger.error({ err: error }, "Health check: database unreachable");
