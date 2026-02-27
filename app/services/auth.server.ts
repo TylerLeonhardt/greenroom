@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { redirect } from "@remix-run/node";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
@@ -5,7 +6,7 @@ import { Authenticator } from "remix-auth";
 import { FormStrategy } from "remix-auth-form";
 import { db } from "../../src/db/index.js";
 import { users } from "../../src/db/schema.js";
-import { getUserId } from "./session.server.js";
+import { getSession, getUserId, sessionStorage } from "./session.server.js";
 
 type UserRecord = typeof users.$inferSelect;
 
@@ -159,13 +160,24 @@ export async function findOrCreateGoogleUser(profile: {
 	return toAuthUser(user);
 }
 
-export function getGoogleAuthURL(): string {
+export async function getGoogleAuthURL(request: Request): Promise<{
+	url: string;
+	headers: Headers;
+}> {
 	const clientId = process.env.GOOGLE_CLIENT_ID;
 	const appUrl = process.env.APP_URL ?? "http://localhost:5173";
 
 	if (!clientId) {
 		throw new Error("GOOGLE_CLIENT_ID environment variable is required");
 	}
+
+	const state = crypto.randomBytes(32).toString("hex");
+
+	const session = await getSession(request);
+	session.set("oauth_state", state);
+	const headers = new Headers({
+		"Set-Cookie": await sessionStorage.commitSession(session),
+	});
 
 	const params = new URLSearchParams({
 		client_id: clientId,
@@ -174,9 +186,25 @@ export function getGoogleAuthURL(): string {
 		scope: "openid email profile",
 		access_type: "online",
 		prompt: "select_account",
+		state,
 	});
 
-	return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+	return {
+		url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`,
+		headers,
+	};
+}
+
+export async function verifyOAuthState(request: Request, state: string | null): Promise<boolean> {
+	if (!state) return false;
+	const session = await getSession(request);
+	const storedState = session.get("oauth_state");
+	if (typeof storedState !== "string") return false;
+	try {
+		return crypto.timingSafeEqual(Buffer.from(storedState), Buffer.from(state));
+	} catch {
+		return false;
+	}
 }
 
 export async function exchangeGoogleCode(code: string): Promise<{

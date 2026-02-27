@@ -1,13 +1,8 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
-import { Form, Link, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { Form, Link, useActionData, useNavigation } from "@remix-run/react";
 import { useState } from "react";
-import {
-	createUserSession,
-	getGoogleAuthURL,
-	getOptionalUser,
-	registerUser,
-} from "~/services/auth.server";
+import { createUserSession, getOptionalUser, registerUser } from "~/services/auth.server";
 
 export const meta: MetaFunction = () => {
 	return [{ title: "Sign Up — GreenRoom" }];
@@ -16,7 +11,7 @@ export const meta: MetaFunction = () => {
 export async function loader({ request }: LoaderFunctionArgs) {
 	const user = await getOptionalUser(request);
 	if (user) throw redirect("/dashboard");
-	return { googleAuthURL: getGoogleAuthURL() };
+	return null;
 }
 
 interface ActionErrors {
@@ -69,7 +64,6 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Signup() {
-	const { googleAuthURL } = useLoaderData<typeof loader>();
 	const actionData = useActionData<typeof action>();
 	const errors = actionData?.errors;
 	const navigation = useNavigation();
@@ -93,7 +87,7 @@ export default function Signup() {
 					)}
 
 					<a
-						href={googleAuthURL}
+						href="/auth/google"
 						className="flex w-full items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
 					>
 						<svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">

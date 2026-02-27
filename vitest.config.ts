@@ -7,6 +7,9 @@ export default defineConfig({
 		environment: "node",
 		globals: true,
 		include: ["**/*.test.{ts,tsx}"],
+		env: {
+			SESSION_SECRET: "test-secret-for-vitest",
+		},
 	},
 	resolve: {
 		alias: {

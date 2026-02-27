@@ -253,6 +253,14 @@ export async function getAggregatedResults(requestId: string): Promise<{
 
 // --- Close / Reopen ---
 
+export async function getOpenAvailabilityRequestCount(groupId: string): Promise<number> {
+	const [row] = await db
+		.select({ count: count() })
+		.from(availabilityRequests)
+		.where(and(eq(availabilityRequests.groupId, groupId), eq(availabilityRequests.status, "open")));
+	return row?.count ?? 0;
+}
+
 export async function closeAvailabilityRequest(requestId: string): Promise<void> {
 	await db
 		.update(availabilityRequests)

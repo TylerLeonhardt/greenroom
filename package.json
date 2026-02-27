@@ -37,7 +37,6 @@
 		"react-dom": "^18.3.1",
 		"remix-auth": "^4.2.0",
 		"remix-auth-form": "^3.0.0",
-		"remix-auth-google": "^2.0.0",
 		"tailwind-merge": "^3.5.0",
 		"tailwindcss": "^4.2.1"
 	},

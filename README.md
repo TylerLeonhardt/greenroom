@@ -12,7 +12,7 @@ An improv group scheduling platform. Coordinate rehearsals, manage availability,
 - **TailwindCSS v4** for styling
 - **shadcn/ui** components (Radix UI primitives)
 - **Drizzle ORM** with PostgreSQL
-- **Auth.js v5** for authentication (Google OAuth + email/password)
+- **remix-auth v4** with FormStrategy for email/password + manual Google OAuth
 - **Biome** for linting + formatting
 - **Vitest** for testing
 - **Docker** for local development and deployment

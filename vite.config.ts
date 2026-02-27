@@ -18,6 +18,7 @@ export default defineConfig({
 	plugins: [
 		tailwindcss(),
 		remix({
+			ignoredRouteFiles: ["**/*.test.{ts,tsx}"],
 			future: {
 				v3_fetcherPersist: true,
 				v3_relativeSplatPath: true,
