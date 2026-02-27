@@ -8,7 +8,8 @@ import {
 	useNavigation,
 	useParams,
 } from "@remix-run/react";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft, Clock, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { deleteEvent, getEventWithAssignments, updateEvent } from "~/services/events.server";
 import { requireGroupAdmin } from "~/services/groups.server";
 
@@ -28,6 +29,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
 	const start = new Date(data.event.startTime);
 	const end = new Date(data.event.endTime);
+	const ct = data.event.callTime ? new Date(data.event.callTime) : null;
 
 	return {
 		event: data.event,
@@ -35,6 +37,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 			date: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`,
 			startTime: `${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}`,
 			endTime: `${String(end.getHours()).padStart(2, "0")}:${String(end.getMinutes()).padStart(2, "0")}`,
+			callTime: ct
+				? `${String(ct.getHours()).padStart(2, "0")}:${String(ct.getMinutes()).padStart(2, "0")}`
+				: "",
 		},
 	};
 }
@@ -58,6 +63,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	const endTime = formData.get("endTime");
 	const location = formData.get("location");
 	const description = formData.get("description");
+	const callTime = formData.get("callTime");
 
 	if (typeof title !== "string" || !title.trim()) {
 		return { error: "Title is required." };
@@ -78,6 +84,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		return { error: "End time must be after start time." };
 	}
 
+	const hasCallTime =
+		eventType === "show" && typeof callTime === "string" && callTime.trim() !== "";
+
 	await updateEvent(eventId, {
 		title: title.trim(),
 		description: typeof description === "string" ? description : undefined,
@@ -85,6 +94,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		startTime: new Date(`${date}T${startTime}:00`),
 		endTime: new Date(`${date}T${endTime}:00`),
 		location: typeof location === "string" ? location : undefined,
+		callTime: hasCallTime ? new Date(`${date}T${callTime}:00`) : eventType === "show" ? undefined : null,
 	});
 
 	return redirect(`/groups/${groupId}/events/${eventId}`);
@@ -96,6 +106,8 @@ export default function EditEvent() {
 	const actionData = useActionData<typeof action>();
 	const navigation = useNavigation();
 	const isSubmitting = navigation.state === "submitting";
+	const [eventType, setEventType] = useState(event.eventType);
+	const isShow = eventType === "show";
 
 	return (
 		<div className="max-w-3xl">
@@ -164,6 +176,7 @@ export default function EditEvent() {
 											name="eventType"
 											value={type.value}
 											defaultChecked={event.eventType === type.value}
+											onChange={() => setEventType(type.value)}
 											className="peer sr-only"
 										/>
 										<span
@@ -222,6 +235,26 @@ export default function EditEvent() {
 							/>
 						</div>
 					</div>
+
+					{/* Call Time — show only */}
+					{isShow && (
+						<div className="mt-4">
+							<label htmlFor="callTime" className="block text-sm font-medium text-slate-700">
+								<Clock className="mr-1 inline h-4 w-4 text-purple-500" />
+								Call Time
+								<span className="ml-1 text-xs font-normal text-slate-500">
+									(when performers need to arrive)
+								</span>
+							</label>
+							<input
+								id="callTime"
+								name="callTime"
+								type="time"
+								defaultValue={prefill.callTime}
+								className="mt-1 block w-full max-w-[200px] rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+							/>
+						</div>
+					)}
 				</div>
 
 				{/* Location & Description */}
