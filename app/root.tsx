@@ -8,6 +8,7 @@ import {
 	Scripts,
 	ScrollRestoration,
 	useLoaderData,
+	useLocation,
 } from "@remix-run/react";
 import { getOptionalUser } from "~/services/auth.server";
 import stylesheet from "./tailwind.css?url";
@@ -17,6 +18,21 @@ export const links: LinksFunction = () => [{ rel: "stylesheet", href: stylesheet
 export async function loader({ request }: LoaderFunctionArgs) {
 	const user = await getOptionalUser(request);
 	return { user };
+}
+
+function NavLink({ to, children }: { to: string; children: React.ReactNode }) {
+	const location = useLocation();
+	const isActive = location.pathname === to || location.pathname.startsWith(`${to}/`);
+	return (
+		<Link
+			to={to}
+			className={`text-sm transition-colors ${
+				isActive ? "font-medium text-emerald-600" : "text-slate-600 hover:text-slate-900"
+			}`}
+		>
+			{children}
+		</Link>
+	);
 }
 
 function NavBar() {
@@ -31,12 +47,8 @@ function NavBar() {
 				<div className="flex items-center gap-4">
 					{user ? (
 						<>
-							<Link to="/dashboard" className="text-sm text-slate-600 hover:text-slate-900">
-								Dashboard
-							</Link>
-							<Link to="/groups" className="text-sm text-slate-600 hover:text-slate-900">
-								Groups
-							</Link>
+							<NavLink to="/dashboard">Dashboard</NavLink>
+							<NavLink to="/groups">Groups</NavLink>
 							<span className="text-sm font-medium text-slate-700">{user.name}</span>
 							<Form method="post" action="/logout">
 								<button

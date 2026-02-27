@@ -1,34 +1,81 @@
-import type { MetaFunction } from "@remix-run/node";
-import { Link, useParams } from "@remix-run/react";
+import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
+import { Link, Outlet, useLoaderData, useLocation } from "@remix-run/react";
+import { getGroupById, getUserRole, requireGroupMember } from "~/services/groups.server";
 
-export const meta: MetaFunction = () => {
-	return [{ title: "Group — GreenRoom" }];
+export const meta: MetaFunction<typeof loader> = ({ data }) => {
+	return [{ title: data ? `${data.group.name} — GreenRoom` : "Group — GreenRoom" }];
 };
 
-export default function GroupDetail() {
-	const { groupId } = useParams();
+export async function loader({ request, params }: LoaderFunctionArgs) {
+	const groupId = params.groupId ?? "";
+	const user = await requireGroupMember(request, groupId);
+	const group = await getGroupById(groupId);
+	if (!group) throw new Response("Not Found", { status: 404 });
+	const role = await getUserRole(user.id, groupId);
+	return { group, user, role };
+}
+
+function TabLink({
+	to,
+	active,
+	children,
+}: {
+	to: string;
+	active: boolean;
+	children: React.ReactNode;
+}) {
+	return (
+		<Link
+			to={to}
+			className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+				active
+					? "border-emerald-600 text-emerald-600"
+					: "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700"
+			}`}
+		>
+			{children}
+		</Link>
+	);
+}
+
+export default function GroupLayout() {
+	const { group, role } = useLoaderData<typeof loader>();
+	const location = useLocation();
+	const basePath = `/groups/${group.id}`;
+
+	const isOverview = location.pathname === basePath || location.pathname === `${basePath}/`;
+	const isAvailability = location.pathname.startsWith(`${basePath}/availability`);
+	const isEvents = location.pathname.startsWith(`${basePath}/events`);
+	const isSettings = location.pathname.startsWith(`${basePath}/settings`);
 
 	return (
 		<div>
-			<h1 className="text-3xl font-bold text-gray-900">Group Detail</h1>
-			<p className="mt-2 text-gray-600">Group ID: {groupId}</p>
-			<div className="mt-6 flex gap-4">
-				<Link
-					to={`/groups/${groupId}/availability`}
-					className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-				>
+			<div className="mb-6">
+				<Link to="/groups" className="text-sm text-slate-500 hover:text-slate-700">
+					← Back to Groups
+				</Link>
+				<h1 className="mt-2 text-3xl font-bold text-slate-900">{group.name}</h1>
+				{group.description && <p className="mt-1 text-slate-600">{group.description}</p>}
+			</div>
+
+			<div className="mb-6 flex gap-0 border-b border-slate-200">
+				<TabLink to={basePath} active={isOverview}>
+					Overview
+				</TabLink>
+				<TabLink to={`${basePath}/availability`} active={isAvailability}>
 					Availability
-				</Link>
-				<Link
-					to={`/groups/${groupId}/events`}
-					className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-				>
+				</TabLink>
+				<TabLink to={`${basePath}/events`} active={isEvents}>
 					Events
-				</Link>
+				</TabLink>
+				{role === "admin" && (
+					<TabLink to={`${basePath}/settings`} active={isSettings}>
+						Settings
+					</TabLink>
+				)}
 			</div>
-			<div className="mt-8 rounded-lg border border-gray-200 bg-white p-8 shadow-sm">
-				<p className="text-sm text-gray-500">Group detail content coming soon</p>
-			</div>
+
+			<Outlet />
 		</div>
 	);
 }
