@@ -331,8 +331,200 @@ describe("route-name", () => {
 - Auth guard functions work correctly (redirect unauthenticated, 404 non-members, 403 non-admins)
 - Action validation logic (required fields, invalid input)
 - Service function business logic (invite code generation, score calculation, date aggregation)
+- Rate limiting behavior (allow/block thresholds, window expiry)
 - Edge cases: empty groups, no responses, expired requests
 
 **Lower priority (integration tests):**
 - Full loader → service → DB flow (requires test database)
 - Component rendering (needs jsdom environment)
+
+---
+
+## Environment Configuration
+
+### `SESSION_SECRET` Requirement
+
+The session service (`app/services/session.server.ts`) throws at module load time if `SESSION_SECRET` is not set. This means any test that imports a service file (even transitively) will crash without it.
+
+Vitest handles this in `vitest.config.ts`:
+
+```typescript
+export default defineConfig({
+  test: {
+    env: {
+      SESSION_SECRET: "test-secret-for-vitest",
+    },
+  },
+});
+```
+
+If you add new environment variables that are validated at module load time, add them here too.
+
+---
+
+## Testing Rate Limiting
+
+The rate limiter (`app/services/rate-limit.server.ts`) uses in-memory state. Use `_resetForTests()` to clear state between tests.
+
+### Direct Service Tests
+
+```typescript
+import { describe, it, expect, beforeEach } from "vitest";
+import { _resetForTests, checkRateLimit } from "~/services/rate-limit.server";
+
+describe("rate limiting", () => {
+  beforeEach(() => {
+    _resetForTests(); // Clear all rate limit state
+  });
+
+  it("allows requests under the limit", () => {
+    const result = checkRateLimit("test-key", 5, 60000);
+    expect(result.limited).toBe(false);
+  });
+
+  it("blocks after exceeding limit", () => {
+    for (let i = 0; i < 5; i++) {
+      checkRateLimit("test-key", 5, 60000);
+    }
+    const result = checkRateLimit("test-key", 5, 60000);
+    expect(result.limited).toBe(true);
+    expect(result.retryAfter).toBeGreaterThan(0);
+  });
+
+  it("isolates keys", () => {
+    for (let i = 0; i < 5; i++) {
+      checkRateLimit("key-a", 5, 60000);
+    }
+    const result = checkRateLimit("key-b", 5, 60000);
+    expect(result.limited).toBe(false);
+  });
+});
+```
+
+### Mocking Rate Limiting in Route Tests
+
+When testing login/signup route actions, mock the rate limiter to control behavior:
+
+```typescript
+vi.mock("~/services/rate-limit.server", () => ({
+  checkLoginRateLimit: vi.fn().mockReturnValue({ limited: false }),
+}));
+
+import { checkLoginRateLimit } from "~/services/rate-limit.server";
+
+describe("login action", () => {
+  beforeEach(() => {
+    (checkLoginRateLimit as ReturnType<typeof vi.fn>).mockReturnValue({ limited: false });
+  });
+
+  it("returns 429 when rate limited", async () => {
+    (checkLoginRateLimit as ReturnType<typeof vi.fn>).mockReturnValue({
+      limited: true,
+      retryAfter: 45,
+    });
+
+    const formData = new FormData();
+    formData.set("email", "test@example.com");
+    formData.set("password", "password123");
+
+    const request = new Request("http://localhost/login", {
+      method: "POST",
+      body: formData,
+    });
+
+    const result = await action({ request, params: {}, context: {} });
+    expect(result).toEqual(
+      expect.objectContaining({ error: expect.stringContaining("Too many") })
+    );
+  });
+});
+```
+
+---
+
+## Testing Email Service
+
+The email service (`app/services/email.server.ts`) uses fire-and-forget patterns. Mock it at the service boundary:
+
+### Mocking `sendEmail`
+
+```typescript
+vi.mock("~/services/email.server", () => ({
+  sendEmail: vi.fn().mockResolvedValue({ success: true }),
+  sendAvailabilityRequestNotification: vi.fn().mockResolvedValue(undefined),
+  sendEventCreatedNotification: vi.fn().mockResolvedValue(undefined),
+  sendEventAssignmentNotification: vi.fn().mockResolvedValue(undefined),
+}));
+
+import { sendEmail } from "~/services/email.server";
+
+it("sends notification after creating availability request", async () => {
+  // ... perform action ...
+  expect(sendAvailabilityRequestNotification).toHaveBeenCalledWith(
+    expect.objectContaining({
+      requestTitle: "March Rehearsal",
+      groupName: "Test Group",
+    })
+  );
+});
+```
+
+### Testing Email Graceful Degradation
+
+The email service never throws — it returns `{ success: boolean; error?: string }`. When `AZURE_COMMUNICATION_CONNECTION_STRING` is not set, it logs to console and returns `{ success: true }` (graceful no-op). You don't need to test this in route tests; it's handled by the service layer.
+
+---
+
+## E2E Testing with Playwright
+
+GreenRoom has the `playwright-cli` skill (`.github/skills/playwright-cli/`) for browser automation.
+
+### Login Flow
+
+```typescript
+// Navigate to login page
+await page.goto("http://localhost:5173/login");
+
+// Fill in credentials
+await page.fill('input[name="email"]', "test@example.com");
+await page.fill('input[name="password"]', "password123");
+await page.click('button[type="submit"]');
+
+// Verify redirect to dashboard
+await page.waitForURL("**/dashboard");
+expect(page.url()).toContain("/dashboard");
+```
+
+### URL Structure for Navigation
+
+```
+/                                          → Landing page
+/login                                     → Login form
+/signup                                    → Registration form
+/dashboard                                 → Authenticated dashboard
+/groups                                    → Group list
+/groups/new                                → Create group
+/groups/<groupId>                          → Group overview
+/groups/<groupId>/availability             → Availability requests
+/groups/<groupId>/availability/new         → Create availability request
+/groups/<groupId>/availability/<requestId> → View/respond to request
+/groups/<groupId>/events                   → Events list
+/groups/<groupId>/events/new               → Create event
+/groups/<groupId>/events/<eventId>         → Event detail
+/groups/<groupId>/settings                 → Group settings (admin)
+```
+
+### Test Data Setup
+
+For E2E tests, seed the database with test data using the seed script or direct API calls:
+
+```bash
+# Run the demo seed script (creates test users and groups)
+node seed-demo.mjs
+```
+
+Or create test data programmatically by:
+1. POST to `/signup` to create a user
+2. POST to `/login` to authenticate
+3. POST to `/groups/new` to create a group
+4. Use the returned group ID for further operations
