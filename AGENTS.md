@@ -55,7 +55,9 @@ app/
 │   ├── availability.server.ts  # Availability requests, responses, aggregation
 │   ├── events.server.ts        # Events CRUD, assignments, bulk assign, cross-group queries
 │   ├── dashboard.server.ts     # Dashboard data aggregation (parallel queries)
-│   └── email.server.ts         # Azure Communication Services email with graceful fallback
+│   ├── email.server.ts         # Azure Communication Services email with graceful fallback
+│   ├── logger.server.ts        # Pino structured logger, configurable via LOG_LEVEL env var
+│   └── rate-limit.server.ts    # In-memory sliding window rate limiter for auth routes
 └── components/                 # Reusable React components
     ├── availability-grid.tsx   # Date × status grid for submitting availability
     ├── date-selector.tsx       # Calendar-based date picker for creating requests
@@ -125,9 +127,50 @@ Fire-and-forget pattern with graceful degradation:
 void sendAvailabilityRequestNotification({ ... });
 ```
 
-- If `AZURE_COMMUNICATION_CONNECTION_STRING` is not set, emails log to console instead of throwing
+- If `AZURE_COMMUNICATION_CONNECTION_STRING` is not set, emails log via pino instead of throwing
 - `sendEmail()` returns `{ success: boolean; error?: string }` — never throws
 - Email sending never blocks the user's request/response cycle
+
+### Logging
+
+Structured logging via [pino](https://getpino.io/). Import the singleton logger from `app/services/logger.server.ts`:
+
+```typescript
+import { logger } from "./logger.server.js";
+
+logger.info({ userId, groupId }, "User joined group");
+logger.warn({ key, maxRequests }, "Rate limit exceeded");
+logger.error({ err: error, to: recipients }, "Failed to send email");
+```
+
+- Log level controlled by `LOG_LEVEL` env var (default: `"info"`)
+- In development, logs are plain JSON to stdout
+- In production, logs are JSON (no pretty-printing transport) for log aggregation
+- Always pass structured context as the first argument, message as the second
+
+### Rate Limiting
+
+In-memory sliding window rate limiter in `app/services/rate-limit.server.ts`. Used on auth routes to prevent brute-force attacks:
+
+```typescript
+import { checkLoginRateLimit, checkSignupRateLimit } from "~/services/rate-limit.server";
+
+// In a route action:
+const rateLimit = checkLoginRateLimit(request);
+if (rateLimit.limited) {
+  return json(
+    { error: `Too many attempts. Try again in ${rateLimit.retryAfter} seconds.` },
+    { status: 429 }
+  );
+}
+```
+
+- `checkLoginRateLimit(request)` — 10 requests per minute per IP
+- `checkSignupRateLimit(request)` — 5 requests per minute per IP
+- `checkRateLimit(key, maxRequests, windowMs)` — generic function for custom limits
+- `_resetForTests()` — clears all rate limit state (use in test `beforeEach`)
+- Stale entries cleaned up every 5 minutes automatically
+- IP extracted from `x-forwarded-for` header (works behind Azure Container Apps proxy)
 
 ### Remix Route Conventions
 
@@ -252,6 +295,7 @@ pnpm run dev
 | `GOOGLE_CLIENT_SECRET` | ✅ | Google OAuth client secret |
 | `APP_URL` | ✅ | `http://localhost:5173` locally |
 | `AZURE_COMMUNICATION_CONNECTION_STRING` | Optional | For sending emails (logs to console if missing) |
+| `LOG_LEVEL` | Optional | Pino log level: `trace`, `debug`, `info` (default), `warn`, `error`, `fatal` |
 
 ## Build, Test & Deploy Commands
 
@@ -336,11 +380,15 @@ CI runs on every push/PR to `master`: typecheck → lint → build → test
 
 ## Available Skills
 
+- **greenroom-architecture** (`.github/skills/greenroom-architecture/`) — Remix route structure, loader/action patterns, service layer conventions, component architecture, and UI styling guidelines. Reference for how to build features that match the existing codebase.
+- **greenroom-db** (`.github/skills/greenroom-db/`) — Drizzle ORM schema reference, migration workflow, query patterns (joins, upserts, transactions, window functions), JSON column patterns, index strategy, and multi-tenancy approach.
+- **greenroom-testing** (`.github/skills/greenroom-testing/`) — Vitest configuration, testing Remix loaders/actions, mocking services and auth, test file structure, and what to prioritize testing.
+- **greenroom-security** (`.github/skills/greenroom-security/`) — Auth guard hierarchy, multi-tenancy isolation rules, rate limiting patterns, session security, password hashing, OAuth CSRF protection, and known security tech debt.
 - **playwright-cli** (`.github/skills/playwright-cli/`) — Browser automation skill for web testing, demo recording, and screenshots. Use for end-to-end testing, capturing screenshots of UI flows, recording demo videos, and interacting with the app in a real browser. See `SKILL.md` for full command reference and `references/` for advanced topics (request mocking, session management, test generation, tracing, video recording).
 
 ## Known Issues / Tech Debt
 
-- **No rate limiting on auth routes:** `/login`, `/signup`, and `/auth/google` have no rate limiting. Brute-force or credential-stuffing attacks are not mitigated at the application layer. Consider adding rate limiting middleware or using a reverse proxy/CDN rate limiter.
 - **No CSRF tokens on mutations:** Form actions rely on `sameSite: "lax"` cookies but do not include CSRF tokens. While `sameSite` mitigates most CSRF vectors, explicit tokens would provide defense-in-depth for state-changing operations.
 - **`rejectUnauthorized: false` in production DB config:** The PostgreSQL connection uses `rejectUnauthorized: false` for SSL in production (see `src/db/index.ts`). This disables certificate validation and makes the connection vulnerable to man-in-the-middle attacks. Should be replaced with a proper CA certificate.
 - **Date serialization workarounds:** Remix serializes `Date` objects to strings when passing from loader to component. The codebase uses `as unknown as string` casts (e.g., in `groups.$groupId._index.tsx` for `startTime`/`endTime`). This is a known Remix limitation — consider a serialization helper or using ISO strings from the service layer.
+- **In-memory rate limiting:** Rate limiting uses an in-memory sliding window (`app/services/rate-limit.server.ts`). This works for single-instance deployments but does not share state across multiple container replicas. For multi-instance deployments, consider Redis-backed rate limiting.
