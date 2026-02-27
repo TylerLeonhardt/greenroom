@@ -3,7 +3,8 @@ import { Form, Link, redirect, useActionData, useNavigation, useParams } from "@
 import { useState } from "react";
 import { DateSelector } from "~/components/date-selector";
 import { createAvailabilityRequest } from "~/services/availability.server";
-import { requireGroupAdmin } from "~/services/groups.server";
+import { sendAvailabilityRequestNotification } from "~/services/email.server";
+import { getGroupWithMembers, requireGroupAdmin } from "~/services/groups.server";
 
 export const meta: MetaFunction = () => {
 	return [{ title: "New Availability Request — GreenRoom" }];
@@ -60,6 +61,30 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		createdById: user.id,
 		expiresAt:
 			typeof expiresAt === "string" && expiresAt ? new Date(`${expiresAt}T23:59:59`) : undefined,
+	});
+
+	// Fire-and-forget email notification to group members
+	const appUrl = process.env.APP_URL ?? "http://localhost:5173";
+	void getGroupWithMembers(groupId).then((groupData) => {
+		if (!groupData) return;
+		const recipients = groupData.members
+			.filter((m) => m.id !== user.id)
+			.map((m) => ({ email: m.email, name: m.name }));
+		if (recipients.length === 0) return;
+
+		const startDate = new Date(`${dateRangeStart}T00:00:00`);
+		const endDate = new Date(`${dateRangeEnd}T00:00:00`);
+		const dateRange = `${startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+
+		void sendAvailabilityRequestNotification({
+			requestId: req.id,
+			requestTitle: req.title,
+			groupName: groupData.group.name,
+			dateRange,
+			createdByName: user.name,
+			recipients,
+			requestUrl: `${appUrl}/groups/${groupId}/availability/${req.id}`,
+		});
 	});
 
 	return redirect(`/groups/${groupId}/availability/${req.id}`);

@@ -10,8 +10,9 @@ import {
 } from "@remix-run/react";
 import { ArrowLeft } from "lucide-react";
 import { getAvailabilityRequest } from "~/services/availability.server";
+import { sendEventCreatedNotification } from "~/services/email.server";
 import { createEvent } from "~/services/events.server";
-import { requireGroupAdmin } from "~/services/groups.server";
+import { getGroupWithMembers, requireGroupAdmin } from "~/services/groups.server";
 
 export const meta: MetaFunction = () => {
 	return [{ title: "Create Event — GreenRoom" }];
@@ -80,6 +81,30 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		createdById: user.id,
 		createdFromRequestId:
 			typeof fromRequestId === "string" && fromRequestId ? fromRequestId : undefined,
+	});
+
+	// Fire-and-forget email notification to group members
+	const appUrl = process.env.APP_URL ?? "http://localhost:5173";
+	void getGroupWithMembers(groupId).then((groupData) => {
+		if (!groupData) return;
+		const recipients = groupData.members
+			.filter((m) => m.id !== user.id)
+			.map((m) => ({ email: m.email, name: m.name }));
+		if (recipients.length === 0) return;
+
+		const eventStart = new Date(`${date}T${startTime}:00`);
+		const eventEnd = new Date(`${date}T${endTime}:00`);
+		const dateTime = `${eventStart.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} · ${eventStart.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} – ${eventEnd.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+
+		void sendEventCreatedNotification({
+			eventTitle: event.title,
+			eventType: event.eventType,
+			dateTime,
+			location: event.location ?? undefined,
+			groupName: groupData.group.name,
+			recipients,
+			eventUrl: `${appUrl}/groups/${groupId}/events/${event.id}`,
+		});
 	});
 
 	return redirect(`/groups/${groupId}/events/${event.id}`);

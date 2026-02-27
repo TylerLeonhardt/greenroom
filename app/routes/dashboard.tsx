@@ -1,10 +1,9 @@
 import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { Link, useLoaderData } from "@remix-run/react";
-import { CalendarDays } from "lucide-react";
+import { AlertCircle, CalendarDays, Clock, Plus, Users } from "lucide-react";
 import { EventCard } from "~/components/event-card";
 import { requireUser } from "~/services/auth.server";
-import { getUserUpcomingEvents } from "~/services/events.server";
-import { getUserGroups } from "~/services/groups.server";
+import { getDashboardData } from "~/services/dashboard.server";
 
 export const meta: MetaFunction = () => {
 	return [{ title: "Dashboard — GreenRoom" }];
@@ -12,31 +11,160 @@ export const meta: MetaFunction = () => {
 
 export async function loader({ request }: LoaderFunctionArgs) {
 	const user = await requireUser(request);
-	const groups = await getUserGroups(user.id);
-	const upcomingEvents = await getUserUpcomingEvents(user.id, 5);
-	return { user, groups, upcomingEvents };
+	const data = await getDashboardData(user.id);
+	return { user, ...data };
 }
 
 export default function Dashboard() {
-	const { user, groups, upcomingEvents } = useLoaderData<typeof loader>();
+	const { user, groups, upcomingEvents, pendingRequests, pendingConfirmations } =
+		useLoaderData<typeof loader>();
 	const displayGroups = groups.slice(0, 4);
+	const hasActions = pendingRequests.length > 0 || pendingConfirmations.length > 0;
 
 	return (
 		<div>
-			<h1 className="text-3xl font-bold text-slate-900">Welcome back, {user.name}!</h1>
+			<h1 className="text-3xl font-bold text-slate-900">Welcome back, {user.name}! 👋</h1>
 			<p className="mt-2 text-slate-600">Here&apos;s what&apos;s happening with your groups.</p>
 
-			{/* Groups Section */}
+			{/* Action Required */}
+			{hasActions && (
+				<div className="mt-8">
+					<h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+						<AlertCircle className="h-5 w-5 text-amber-500" /> Action Required
+					</h2>
+					<div className="mt-3 space-y-3">
+						{pendingRequests.map((req) => (
+							<Link
+								key={req.id}
+								to={`/groups/${req.groupId}/availability/${req.id}`}
+								className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-4 transition-all hover:border-amber-300 hover:shadow-sm"
+							>
+								<div className="min-w-0 flex-1">
+									<div className="flex items-center gap-2">
+										<span className="text-sm">📋</span>
+										<span className="truncate text-sm font-semibold text-slate-900">
+											&ldquo;{req.title}&rdquo; needs your response
+										</span>
+									</div>
+									<div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+										<span>{req.groupName}</span>
+										<span>·</span>
+										<span>{req.dateRange}</span>
+										{req.expiresAt && (
+											<>
+												<span>·</span>
+												<span className="flex items-center gap-1 text-amber-600">
+													<Clock className="h-3 w-3" />
+													Due{" "}
+													{new Date(req.expiresAt).toLocaleDateString("en-US", {
+														month: "short",
+														day: "numeric",
+													})}
+												</span>
+											</>
+										)}
+									</div>
+								</div>
+								<span className="ml-4 shrink-0 text-sm font-medium text-emerald-600">
+									Respond →
+								</span>
+							</Link>
+						))}
+						{pendingConfirmations.map((evt) => (
+							<Link
+								key={evt.id}
+								to={`/groups/${evt.groupId}/events/${evt.id}`}
+								className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-4 transition-all hover:border-amber-300 hover:shadow-sm"
+							>
+								<div className="min-w-0 flex-1">
+									<div className="flex items-center gap-2">
+										<span className="text-sm">
+											{evt.eventType === "show"
+												? "🎭"
+												: evt.eventType === "rehearsal"
+													? "🎯"
+													: "📅"}
+										</span>
+										<span className="truncate text-sm font-semibold text-slate-900">
+											Confirm attendance: &ldquo;{evt.title}&rdquo;
+										</span>
+									</div>
+									<div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+										<span>{evt.groupName}</span>
+										<span>·</span>
+										<span>
+											{new Date(evt.startTime).toLocaleDateString("en-US", {
+												weekday: "short",
+												month: "short",
+												day: "numeric",
+											})}
+										</span>
+									</div>
+								</div>
+								<span className="ml-4 shrink-0 text-sm font-medium text-emerald-600">
+									Confirm →
+								</span>
+							</Link>
+						))}
+					</div>
+				</div>
+			)}
+
+			{/* Upcoming Events */}
 			<div className="mt-8">
 				<div className="flex items-center justify-between">
-					<h2 className="text-lg font-semibold text-slate-900">Your Groups</h2>
-					{groups.length > 4 && (
-						<Link
-							to="/groups"
-							className="text-sm font-medium text-emerald-600 hover:text-emerald-700"
-						>
-							View all groups →
-						</Link>
+					<h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+						<CalendarDays className="h-5 w-5" /> Upcoming Events
+					</h2>
+				</div>
+				{upcomingEvents.length === 0 ? (
+					<div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">
+						<p className="text-sm text-slate-500">
+							No upcoming events. Events will appear here when they&apos;re scheduled.
+						</p>
+					</div>
+				) : (
+					<div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+						{upcomingEvents.map((event) => (
+							<EventCard
+								key={event.id}
+								id={event.id}
+								groupId={event.groupId}
+								title={event.title}
+								eventType={event.eventType}
+								startTime={event.startTime as unknown as string}
+								endTime={event.endTime as unknown as string}
+								location={event.location}
+								groupName={event.groupName}
+								userStatus={event.userStatus}
+								compact
+							/>
+						))}
+					</div>
+				)}
+			</div>
+
+			{/* Your Groups */}
+			<div className="mt-8">
+				<div className="flex items-center justify-between">
+					<h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+						<Users className="h-5 w-5" /> Your Groups
+					</h2>
+					{groups.length > 0 && (
+						<div className="flex items-center gap-3">
+							<Link
+								to="/groups/new"
+								className="inline-flex items-center gap-1 text-sm font-medium text-emerald-600 hover:text-emerald-700"
+							>
+								<Plus className="h-4 w-4" /> Create Group
+							</Link>
+							<Link
+								to="/groups/join"
+								className="text-sm font-medium text-slate-500 hover:text-slate-700"
+							>
+								Join Group
+							</Link>
+						</div>
 					)}
 				</div>
 
@@ -82,48 +210,16 @@ export default function Dashboard() {
 								</div>
 							</Link>
 						))}
+						{groups.length > 4 && (
+							<Link
+								to="/groups"
+								className="flex items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white p-5 text-sm font-medium text-slate-500 transition-all hover:border-emerald-200 hover:text-emerald-600"
+							>
+								View all {groups.length} groups →
+							</Link>
+						)}
 					</div>
 				)}
-			</div>
-
-			<div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-				<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:col-span-2 lg:col-span-2">
-					<div className="flex items-center justify-between">
-						<h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
-							<CalendarDays className="h-5 w-5" /> Upcoming Events
-						</h2>
-					</div>
-					{upcomingEvents.length === 0 ? (
-						<p className="mt-3 text-sm text-slate-500">
-							No upcoming events. Events will appear here when they&apos;re scheduled.
-						</p>
-					) : (
-						<div className="mt-4 grid gap-3">
-							{upcomingEvents.map((event) => (
-								<EventCard
-									key={event.id}
-									id={event.id}
-									groupId={event.groupId}
-									title={event.title}
-									eventType={event.eventType}
-									startTime={event.startTime as unknown as string}
-									endTime={event.endTime as unknown as string}
-									location={event.location}
-									groupName={event.groupName}
-									userStatus={event.userStatus}
-									compact
-								/>
-							))}
-						</div>
-					)}
-				</div>
-
-				<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-					<h2 className="text-lg font-semibold text-slate-900">Pending Requests</h2>
-					<p className="mt-2 text-sm text-slate-500">
-						Availability requests needing your response will appear here.
-					</p>
-				</div>
 			</div>
 		</div>
 	);
