@@ -2,6 +2,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { Form, Link, useLoaderData, useRouteLoaderData } from "@remix-run/react";
 import { CalendarDays } from "lucide-react";
 import { EventCard } from "~/components/event-card";
+import { getOpenAvailabilityRequestCount } from "~/services/availability.server";
 import { getGroupEvents } from "~/services/events.server";
 import {
 	getGroupWithMembers,
@@ -16,8 +17,11 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 	await requireGroupMember(request, groupId);
 	const data = await getGroupWithMembers(groupId);
 	if (!data) throw new Response("Not Found", { status: 404 });
-	const upcomingEvents = await getGroupEvents(groupId, { upcoming: true });
-	return { members: data.members, upcomingEvents };
+	const [upcomingEvents, openAvailabilityCount] = await Promise.all([
+		getGroupEvents(groupId, { upcoming: true }),
+		getOpenAvailabilityRequestCount(groupId),
+	]);
+	return { members: data.members, upcomingEvents, openAvailabilityCount };
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -60,7 +64,7 @@ function UserAvatar({ name, profileImage }: { name: string; profileImage: string
 }
 
 export default function GroupOverview() {
-	const { members, upcomingEvents } = useLoaderData<typeof loader>();
+	const { members, upcomingEvents, openAvailabilityCount } = useLoaderData<typeof loader>();
 	const parentData = useRouteLoaderData<typeof groupLayoutLoader>("routes/groups.$groupId");
 	const role = parentData?.role;
 	const group = parentData?.group;
@@ -136,7 +140,7 @@ export default function GroupOverview() {
 						</div>
 						<div className="flex justify-between">
 							<dt className="text-sm text-slate-500">Open Availability</dt>
-							<dd className="text-sm font-medium text-slate-900">—</dd>
+							<dd className="text-sm font-medium text-slate-900">{openAvailabilityCount}</dd>
 						</div>
 					</dl>
 				</div>

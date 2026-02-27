@@ -62,9 +62,6 @@ importers:
       remix-auth-form:
         specifier: ^3.0.0
         version: 3.0.0(remix-auth@4.2.0)
-      remix-auth-google:
-        specifier: ^2.0.0
-        version: 2.0.0(@remix-run/server-runtime@2.17.4(typescript@5.9.3))(remix-auth@4.2.0)
       tailwind-merge:
         specifier: ^3.5.0
         version: 3.5.0
@@ -3142,18 +3139,6 @@ packages:
     peerDependencies:
       remix-auth: ^4.0.0
 
-  remix-auth-google@2.0.0:
-    resolution: {integrity: sha512-qP38N1ZJADz+HlH2lrEn/rSL6m5Dwcnz8xUFDhbHecDMl9FU/UpkUx3w8jj5XhNSnkSue/GWT+p7OEkatgbXNA==}
-    peerDependencies:
-      '@remix-run/server-runtime': ^2.0.1
-      remix-auth: ^3.2.1
-
-  remix-auth-oauth2@1.11.2:
-    resolution: {integrity: sha512-5ORP+LMi5CVCA/Wb8Z+FCAJ73Uiy4uyjEzhlVwNBfdAkPOnfxzoi+q/pY/CrueYv3OniCXRM35ZYqkVi3G1UPw==}
-    peerDependencies:
-      '@remix-run/server-runtime': ^1.0.0 || ^2.0.0
-      remix-auth: ^3.6.0
-
   remix-auth@4.2.0:
     resolution: {integrity: sha512-3LSfWEvSgG2CgbG/p4ge5hbV8tTXWNnnYIGbTr9oSSiHz9dD7wh6S0MEyo3pwh7MlKezB2WIlevGeyqUZykk7g==}
     engines: {node: '>=20.0.0'}
@@ -3513,10 +3498,6 @@ packages:
   utils-merge@1.0.1:
     resolution: {integrity: sha512-pMZTvIkT1d+TFGvDOqodOclx0QWkkgi6Tdoa8gC8ffGAAqz9pzPTZWAybbsHHoED/ztMtkv/VoYTYyShUn81hA==}
     engines: {node: '>= 0.4.0'}
-
-  uuid@9.0.1:
-    resolution: {integrity: sha512-b+1eJOlsR9K8HJpow9Ok3fiWOWSIcIzXodvv0rQjVoOVNpWMpxf1wZNpt4y9h10odCNrqnYp1OBzRktckBe3sA==}
-    hasBin: true
 
   uvu@0.5.6:
     resolution: {integrity: sha512-+g8ENReyr8YsOc6fv/NVJs2vFdHBnBNdfE49rshrTzDWOlUx4Gq7KOS2GD8eqhy2j+Ejq29+SbKH8yjkAqXqoA==}
@@ -6839,23 +6820,6 @@ snapshots:
     dependencies:
       remix-auth: 4.2.0
 
-  remix-auth-google@2.0.0(@remix-run/server-runtime@2.17.4(typescript@5.9.3))(remix-auth@4.2.0):
-    dependencies:
-      '@remix-run/server-runtime': 2.17.4(typescript@5.9.3)
-      remix-auth: 4.2.0
-      remix-auth-oauth2: 1.11.2(@remix-run/server-runtime@2.17.4(typescript@5.9.3))(remix-auth@4.2.0)
-    transitivePeerDependencies:
-      - supports-color
-
-  remix-auth-oauth2@1.11.2(@remix-run/server-runtime@2.17.4(typescript@5.9.3))(remix-auth@4.2.0):
-    dependencies:
-      '@remix-run/server-runtime': 2.17.4(typescript@5.9.3)
-      debug: 4.4.3
-      remix-auth: 4.2.0
-      uuid: 9.0.1
-    transitivePeerDependencies:
-      - supports-color
-
   remix-auth@4.2.0: {}
 
   require-like@0.1.2: {}
@@ -7258,8 +7222,6 @@ snapshots:
       which-typed-array: 1.1.20
 
   utils-merge@1.0.1: {}
-
-  uuid@9.0.1: {}
 
   uvu@0.5.6:
     dependencies:

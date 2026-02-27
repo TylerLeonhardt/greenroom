@@ -333,3 +333,10 @@ CI runs on every push/PR to `master`: typecheck → lint → build → test
   - `ci.yml` — typecheck + lint + build + test on push/PR to `master`
   - `deploy.yml` — Docker build → Azure Container Registry → Azure Container Apps on push to `master`
 - **Database:** Azure PostgreSQL (SSL in production, `rejectUnauthorized: false`)
+
+## Known Issues / Tech Debt
+
+- **No rate limiting on auth routes:** `/login`, `/signup`, and `/auth/google` have no rate limiting. Brute-force or credential-stuffing attacks are not mitigated at the application layer. Consider adding rate limiting middleware or using a reverse proxy/CDN rate limiter.
+- **No CSRF tokens on mutations:** Form actions rely on `sameSite: "lax"` cookies but do not include CSRF tokens. While `sameSite` mitigates most CSRF vectors, explicit tokens would provide defense-in-depth for state-changing operations.
+- **`rejectUnauthorized: false` in production DB config:** The PostgreSQL connection uses `rejectUnauthorized: false` for SSL in production (see `src/db/index.ts`). This disables certificate validation and makes the connection vulnerable to man-in-the-middle attacks. Should be replaced with a proper CA certificate.
+- **Date serialization workarounds:** Remix serializes `Date` objects to strings when passing from loader to component. The codebase uses `as unknown as string` casts (e.g., in `groups.$groupId._index.tsx` for `startTime`/`endTime`). This is a known Remix limitation — consider a serialization helper or using ISO strings from the service layer.
