@@ -1,5 +1,5 @@
 import { Check, ChevronDown, ChevronRight, HelpCircle, Star, X } from "lucide-react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 
 interface DateResult {
 	date: string;
@@ -130,9 +130,8 @@ export function ResultsHeatmap({
 								const isExpanded = expandedDate === row.date;
 								const isBest = topDateSet.has(row.date) && row.score > 0;
 								return (
-									<>
+									<Fragment key={row.date}>
 										<tr
-											key={row.date}
 											className={`cursor-pointer transition-colors ${getHeatColor(row.score, maxScore)} hover:bg-slate-100/50`}
 											onClick={() => setExpandedDate(isExpanded ? null : row.date)}
 										>
@@ -198,7 +197,7 @@ export function ResultsHeatmap({
 												</td>
 											</tr>
 										)}
-									</>
+									</Fragment>
 								);
 							})}
 						</tbody>
