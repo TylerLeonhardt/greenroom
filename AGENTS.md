@@ -33,6 +33,7 @@ app/
 │   ├── auth.google.tsx         # Redirects to Google OAuth consent
 │   ├── auth.google.callback.tsx # Handles Google OAuth code exchange
 │   ├── api.health.tsx          # Health check endpoint (GET)
+│   ├── api.events.$eventId.ics.tsx # iCal export (GET, role-aware start times)
 │   ├── $.tsx                   # Catch-all 404 page
 │   ├── dashboard.tsx           # Authenticated dashboard (requires login)
 │   ├── groups.tsx              # Groups list with inline join form
@@ -130,6 +131,26 @@ void sendAvailabilityRequestNotification({ ... });
 - If `AZURE_COMMUNICATION_CONNECTION_STRING` is not set, emails log via pino instead of throwing
 - `sendEmail()` returns `{ success: boolean; error?: string }` — never throws
 - Email sending never blocks the user's request/response cycle
+- `sendEventFromAvailabilityNotification()` — availability-aware: sends targeted emails based on member's response (available/maybe/no response). Does NOT email people who said "not_available".
+
+### Show Events & Performer/Viewer Roles
+
+Show events (`eventType === 'show'`) have special behavior:
+
+- **Call Time:** `callTime` column (nullable timestamp) stores when performers need to arrive. Only used for shows.
+- **Cast Assignment:** When creating a show, admins can select performers. Selected members get `role = "Performer"` in `event_assignments`.
+- **Self-Registration:** Any group member can click "I'll be there" to add themselves as a `Viewer` (auto-confirmed).
+- **iCal Export:** Performers get `callTime` as their calendar event start; viewers get `startTime`. Route: `/api/events/:eventId/ics?role=Performer`.
+- **Availability Pre-selection:** When creating from an availability request, members who said "available" are pre-checked.
+
+```typescript
+// Assigning performers during event creation
+await bulkAssignToEvent(event.id, performerIds, "Performer");
+
+// Self-registration as viewer
+await assignToEvent(eventId, user.id, "Viewer");
+await updateAssignmentStatus(eventId, user.id, "confirmed");
+```
 
 ### Logging
 
@@ -203,6 +224,7 @@ export async function action({ request }: ActionFunctionArgs) {
 | `/auth/google` | Public | Redirects to Google OAuth consent screen |
 | `/auth/google/callback` | Public | Handles OAuth code exchange, creates session |
 | `/api/health` | Public | Returns `{ status: "ok", timestamp }` |
+| `/api/events/:eventId/ics` | `requireUser` | Downloads .ics file (role-aware start times for performers) |
 | `/dashboard` | `requireUser` | Action items, upcoming events, group list |
 | `/groups` | `requireUser` | List user's groups + inline join form |
 | `/groups/new` | `requireUser` | Create group form |
@@ -231,8 +253,8 @@ export async function action({ request }: ActionFunctionArgs) {
 | `group_memberships` | id, groupId → groups, userId → users, role (admin/member) | Unique on (groupId, userId). Creator gets admin role |
 | `availability_requests` | id, groupId → groups, title, requestedDates (JSONB `string[]`), status (open/closed), expiresAt | `requestedDates` is a JSON array of ISO date strings |
 | `availability_responses` | id, requestId → availability_requests, userId → users, responses (JSONB) | `responses` is `Record<string, "available" | "maybe" | "not_available">`. Upsert on (requestId, userId) |
-| `events` | id, groupId → groups, title, eventType, startTime, endTime, location, createdFromRequestId | Links back to availability request if created from one |
-| `event_assignments` | id, eventId → events, userId → users, role, status (pending/confirmed/declined) | Unique on (eventId, userId). `onConflictDoNothing` for bulk assigns |
+| `events` | id, groupId → groups, title, eventType, startTime, endTime, callTime, location, createdFromRequestId | Links back to availability request if created from one. `callTime` is nullable (only for shows — performer arrival time) |
+| `event_assignments` | id, eventId → events, userId → users, role, status (pending/confirmed/declined) | Unique on (eventId, userId). `onConflictDoNothing` for bulk assigns. Role values: "Performer" (shows), "Viewer" (self-registered attendees) |
 
 ### Enums
 
