@@ -193,47 +193,6 @@ if (rateLimit.limited) {
 - Stale entries cleaned up every 5 minutes automatically
 - IP extracted from `x-forwarded-for` header (works behind Azure Container Apps proxy)
 
-### Logging
-
-Structured logging via [pino](https://getpino.io/). Import the singleton logger from `app/services/logger.server.ts`:
-
-```typescript
-import { logger } from "./logger.server.js";
-
-logger.info({ userId, groupId }, "User joined group");
-logger.warn({ key, maxRequests }, "Rate limit exceeded");
-logger.error({ err: error, to: recipients }, "Failed to send email");
-```
-
-- Log level controlled by `LOG_LEVEL` env var (default: `"info"`)
-- In development, logs are plain JSON to stdout
-- In production, logs are JSON (no pretty-printing transport) for log aggregation
-- Always pass structured context as the first argument, message as the second
-
-### Rate Limiting
-
-In-memory sliding window rate limiter in `app/services/rate-limit.server.ts`. Used on auth routes to prevent brute-force attacks:
-
-```typescript
-import { checkLoginRateLimit, checkSignupRateLimit } from "~/services/rate-limit.server";
-
-// In a route action:
-const rateLimit = checkLoginRateLimit(request);
-if (rateLimit.limited) {
-  return json(
-    { error: `Too many attempts. Try again in ${rateLimit.retryAfter} seconds.` },
-    { status: 429 }
-  );
-}
-```
-
-- `checkLoginRateLimit(request)` — 10 requests per minute per IP
-- `checkSignupRateLimit(request)` — 5 requests per minute per IP
-- `checkRateLimit(key, maxRequests, windowMs)` — generic function for custom limits
-- `_resetForTests()` — clears all rate limit state (use in test `beforeEach`)
-- Stale entries cleaned up every 5 minutes automatically
-- IP extracted from `x-forwarded-for` header (works behind Azure Container Apps proxy)
-
 ### Remix Route Conventions
 
 - Flat file routing: `groups.$groupId.events.new.tsx` → `/groups/:groupId/events/new`
@@ -358,7 +317,6 @@ pnpm run dev
 | `GOOGLE_CLIENT_SECRET` | ✅ | Google OAuth client secret |
 | `APP_URL` | ✅ | `http://localhost:5173` locally |
 | `AZURE_COMMUNICATION_CONNECTION_STRING` | Optional | For sending emails (logs to console if missing) |
-| `LOG_LEVEL` | Optional | Pino log level: `trace`, `debug`, `info` (default), `warn`, `error`, `fatal` |
 | `LOG_LEVEL` | Optional | Pino log level: `trace`, `debug`, `info` (default), `warn`, `error`, `fatal` |
 
 ## Build, Test & Deploy Commands
