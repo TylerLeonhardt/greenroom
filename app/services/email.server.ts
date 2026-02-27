@@ -10,7 +10,12 @@ function getEmailClient(): EmailClient | null {
 	if (emailClient) return emailClient;
 	const connectionString = process.env.AZURE_COMMUNICATION_CONNECTION_STRING;
 	if (!connectionString) return null;
-	emailClient = new EmailClient(connectionString);
+	try {
+		emailClient = new EmailClient(connectionString);
+	} catch {
+		console.warn("Invalid AZURE_COMMUNICATION_CONNECTION_STRING — email disabled");
+		return null;
+	}
 	return emailClient;
 }
 
