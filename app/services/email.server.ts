@@ -1,4 +1,5 @@
 import { EmailClient } from "@azure/communication-email";
+import { logger } from "./logger.server.js";
 
 // --- Core Email Sender ---
 
@@ -23,10 +24,10 @@ export async function sendEmail(options: {
 	const recipients = Array.isArray(options.to) ? options.to : [options.to];
 
 	if (!client) {
-		console.log("[email] Azure Communication Services not configured — logging email:");
-		console.log(`  To: ${recipients.join(", ")}`);
-		console.log(`  Subject: ${options.subject}`);
-		console.log(`  Body (text): ${options.text ?? "(html only)"}`);
+		logger.info(
+			{ to: recipients, subject: options.subject },
+			"Azure Communication Services not configured — email not sent",
+		);
 		return { success: true };
 	}
 
@@ -46,7 +47,7 @@ export async function sendEmail(options: {
 		return { success: true };
 	} catch (error) {
 		const message = error instanceof Error ? error.message : "Unknown email error";
-		console.error("[email] Failed to send:", message);
+		logger.error({ err: error, to: recipients }, "Failed to send email");
 		return { success: false, error: message };
 	}
 }

@@ -2,6 +2,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remi
 import { redirect } from "@remix-run/node";
 import { Form, Link, useActionData, useNavigation } from "@remix-run/react";
 import { authenticator, createUserSession, getOptionalUser } from "~/services/auth.server";
+import { checkLoginRateLimit } from "~/services/rate-limit.server";
 
 export const meta: MetaFunction = () => {
 	return [{ title: "Login — GreenRoom" }];
@@ -14,6 +15,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+	const rateLimit = checkLoginRateLimit(request);
+	if (rateLimit.limited) {
+		return Response.json(
+			{ error: "Too many login attempts. Please try again later." },
+			{ status: 429, headers: { "Retry-After": String(rateLimit.retryAfter) } },
+		);
+	}
+
 	try {
 		const user = await authenticator.authenticate("form", request);
 		return createUserSession(user.id, "/dashboard");

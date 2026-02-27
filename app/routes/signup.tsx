@@ -3,6 +3,7 @@ import { redirect } from "@remix-run/node";
 import { Form, Link, useActionData, useNavigation } from "@remix-run/react";
 import { useState } from "react";
 import { createUserSession, getOptionalUser, registerUser } from "~/services/auth.server";
+import { checkSignupRateLimit } from "~/services/rate-limit.server";
 
 export const meta: MetaFunction = () => {
 	return [{ title: "Sign Up — GreenRoom" }];
@@ -23,6 +24,14 @@ interface ActionErrors {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+	const rateLimit = checkSignupRateLimit(request);
+	if (rateLimit.limited) {
+		return Response.json(
+			{ errors: { form: "Too many signup attempts. Please try again later." } },
+			{ status: 429, headers: { "Retry-After": String(rateLimit.retryAfter) } },
+		);
+	}
+
 	const formData = await request.formData();
 	const name = formData.get("name");
 	const email = formData.get("email");
