@@ -1,6 +1,7 @@
 import { and, eq, gte, sql } from "drizzle-orm";
 import { db } from "../../src/db/index.js";
 import {
+	availabilityRequests,
 	availabilityResponses,
 	eventAssignments,
 	events,
@@ -327,6 +328,17 @@ export async function getUserUpcomingEvents(
 		.limit(limit);
 
 	return rows;
+}
+
+// --- Availability request ownership check ---
+
+export async function getAvailabilityRequestGroupId(requestId: string): Promise<string | null> {
+	const [row] = await db
+		.select({ groupId: availabilityRequests.groupId })
+		.from(availabilityRequests)
+		.where(eq(availabilityRequests.id, requestId))
+		.limit(1);
+	return row?.groupId ?? null;
 }
 
 // --- Availability data for cast suggestions ---

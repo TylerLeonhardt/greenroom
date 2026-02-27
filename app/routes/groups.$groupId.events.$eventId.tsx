@@ -22,6 +22,7 @@ import { useState } from "react";
 import {
 	bulkAssignToEvent,
 	getAvailabilityForEventDate,
+	getAvailabilityRequestGroupId,
 	getEventWithAssignments,
 	removeAssignment,
 	updateAssignmentStatus,
@@ -56,12 +57,16 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 		members = groupData?.members ?? [];
 
 		if (data.event.createdFromRequestId) {
-			const eventDate = new Date(data.event.startTime);
-			const dateKey = `${eventDate.getFullYear()}-${String(eventDate.getMonth() + 1).padStart(2, "0")}-${String(eventDate.getDate()).padStart(2, "0")}`;
-			availabilityData = await getAvailabilityForEventDate(
-				data.event.createdFromRequestId,
-				dateKey,
-			);
+			// Verify the availability request belongs to this group before exposing its data
+			const requestGroupId = await getAvailabilityRequestGroupId(data.event.createdFromRequestId);
+			if (requestGroupId === groupId) {
+				const eventDate = new Date(data.event.startTime);
+				const dateKey = `${eventDate.getFullYear()}-${String(eventDate.getMonth() + 1).padStart(2, "0")}-${String(eventDate.getDate()).padStart(2, "0")}`;
+				availabilityData = await getAvailabilityForEventDate(
+					data.event.createdFromRequestId,
+					dateKey,
+				);
+			}
 		}
 	}
 
@@ -96,9 +101,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		const role = formData.get("role");
 		const validIds = userIds.filter((id): id is string => typeof id === "string" && id.length > 0);
 		if (validIds.length > 0) {
+			// Verify all provided userIds are actual members of this group
+			const groupData = await getGroupWithMembers(groupId);
+			const memberIds = new Set(groupData?.members.map((m) => m.id) ?? []);
+			const verifiedIds = validIds.filter((id) => memberIds.has(id));
+			if (verifiedIds.length === 0) {
+				return { error: "None of the specified users are members of this group." };
+			}
 			await bulkAssignToEvent(
 				eventId,
-				validIds,
+				verifiedIds,
 				typeof role === "string" && role ? role : undefined,
 			);
 		}
