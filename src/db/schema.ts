@@ -146,6 +146,7 @@ export const events = pgTable(
 			.notNull()
 			.references(() => users.id),
 		createdFromRequestId: uuid("created_from_request_id").references(() => availabilityRequests.id),
+		callTime: timestamp("call_time", { withTimezone: true }),
 		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 		updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 	},
