@@ -1,3 +1,6 @@
+[![CI](https://github.com/TylerLeonhardt/greenroom/actions/workflows/ci.yml/badge.svg)](https://github.com/TylerLeonhardt/greenroom/actions/workflows/ci.yml)
+[![Deploy](https://github.com/TylerLeonhardt/greenroom/actions/workflows/deploy.yml/badge.svg)](https://github.com/TylerLeonhardt/greenroom/actions/workflows/deploy.yml)
+
 # 🎭 GreenRoom
 
 An improv group scheduling platform. Coordinate rehearsals, manage availability, and never miss a show.
@@ -71,9 +74,28 @@ docker compose down
 | `pnpm test:watch` | Run tests in watch mode |
 | `pnpm typecheck` | TypeScript type checking |
 
+## Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `DATABASE_URL` | PostgreSQL connection string | ✅ |
+| `SESSION_SECRET` | Secret for signing session cookies | ✅ |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID | ✅ |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | ✅ |
+| `APP_URL` | Public URL of the app (used for emails and OAuth callbacks) | ✅ |
+| `AZURE_COMMUNICATION_CONNECTION_STRING` | Azure Communication Services connection string (for emails) | Optional |
+| `NODE_ENV` | `production` in deployed environments | Auto |
+| `PORT` | Port the server listens on (default: `3000`) | Auto |
+
+See `.env.example` for a template.
+
 ## Deployment
 
-GreenRoom is designed to deploy on **Azure Container Apps**.
+GreenRoom deploys on **Azure Container Apps** with CI/CD via GitHub Actions.
+
+See [docs/azure-setup.md](docs/azure-setup.md) for full Azure infrastructure setup instructions.
+
+### Quick Start
 
 ```bash
 # Build the Docker image
@@ -83,7 +105,10 @@ docker build -t greenroom .
 docker run -p 3000:3000 --env-file .env greenroom
 ```
 
-Set the required environment variables (see `.env.example`) in your container app configuration.
+### CI/CD
+
+- **CI** (`.github/workflows/ci.yml`): Runs typecheck, lint, build, and tests on every push and PR to `master`.
+- **Deploy** (`.github/workflows/deploy.yml`): Builds a Docker image, pushes to Azure Container Registry, and deploys to Azure Container Apps on pushes to `master`.
 
 ## License
 
