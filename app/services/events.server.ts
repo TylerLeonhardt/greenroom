@@ -9,6 +9,7 @@ import {
 	groups,
 	users,
 } from "../../src/db/schema.js";
+import { localTimeToUTC } from "../lib/date-utils.js";
 
 type Event = typeof events.$inferSelect;
 
@@ -54,12 +55,13 @@ export async function createEventsFromAvailability(data: {
 	location?: string;
 	createdById: string;
 	autoAssignAvailable?: boolean;
+	timezone?: string | null;
 }): Promise<Event[]> {
 	const createdEvents: Event[] = [];
 
 	for (const dateInfo of data.dates) {
-		const startTime = new Date(`${dateInfo.date}T${dateInfo.startTime}:00`);
-		const endTime = new Date(`${dateInfo.date}T${dateInfo.endTime}:00`);
+		const startTime = localTimeToUTC(dateInfo.date, dateInfo.startTime, data.timezone);
+		const endTime = localTimeToUTC(dateInfo.date, dateInfo.endTime, data.timezone);
 
 		const event = await createEvent({
 			groupId: data.groupId,

@@ -15,6 +15,7 @@ vi.mock("~/services/groups.server", () => ({
 		email: "test@example.com",
 		name: "Test User",
 		profileImage: null,
+		timezone: "America/New_York",
 	}),
 	getGroupWithMembers: vi.fn().mockResolvedValue({
 		group: { id: "g1", name: "Test" },
@@ -59,6 +60,7 @@ describe("availability.new action — validation", () => {
 			email: "test@example.com",
 			name: "Test User",
 			profileImage: null,
+			timezone: "America/New_York",
 		});
 	});
 
@@ -151,6 +153,64 @@ describe("availability.new action — validation", () => {
 		});
 		expect(result).toEqual({
 			error: "Response deadline must be in the future.",
+		});
+	});
+
+	it("succeeds with empty time fields (all-day request)", async () => {
+		const request = makeRequest({
+			...validFields,
+			requestedStartTime: "",
+			requestedEndTime: "",
+		});
+		const result = await action({
+			request,
+			params: { groupId: "g1" },
+			context: {},
+		});
+		expect(result).toBeInstanceOf(Response);
+		expect((result as Response).status).toBe(302);
+	});
+
+	it("succeeds when time fields are not submitted at all", async () => {
+		const request = makeRequest(validFields);
+		const result = await action({
+			request,
+			params: { groupId: "g1" },
+			context: {},
+		});
+		expect(result).toBeInstanceOf(Response);
+		expect((result as Response).status).toBe(302);
+	});
+
+	it("rejects invalid time format", async () => {
+		const request = makeRequest({
+			...validFields,
+			requestedStartTime: "abc",
+			requestedEndTime: "def",
+		});
+		const result = await action({
+			request,
+			params: { groupId: "g1" },
+			context: {},
+		});
+		// Invalid format is treated as "not specified" — should succeed as all-day
+		expect(result).toBeInstanceOf(Response);
+		expect((result as Response).status).toBe(302);
+	});
+
+	it("returns error when only start time is provided", async () => {
+		const request = makeRequest({
+			...validFields,
+			requestedStartTime: "09:00",
+			requestedEndTime: "",
+		});
+		const result = await action({
+			request,
+			params: { groupId: "g1" },
+			context: {},
+		});
+		expect(result).toEqual({
+			error: "Please provide both start and end times, or leave both empty for all-day.",
 		});
 	});
 });

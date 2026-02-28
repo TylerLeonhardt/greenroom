@@ -11,7 +11,7 @@ import {
 import { ArrowLeft, Clock, Users } from "lucide-react";
 import { useState } from "react";
 import { InlineTimezoneSelector } from "~/components/timezone-selector";
-import { formatEventTime } from "~/lib/date-utils";
+import { formatEventTime, localTimeToUTC } from "~/lib/date-utils";
 import { getAvailabilityRequest } from "~/services/availability.server";
 import {
 	sendEventCreatedNotification,
@@ -110,13 +110,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		title: title.trim(),
 		description: typeof description === "string" ? description.trim() || undefined : undefined,
 		eventType: eventType as "rehearsal" | "show" | "other",
-		startTime: new Date(`${date}T${startTime}:00`),
-		endTime: new Date(`${date}T${endTime}:00`),
+		startTime: localTimeToUTC(date, startTime, user.timezone),
+		endTime: localTimeToUTC(date, endTime, user.timezone),
 		location: typeof location === "string" ? location.trim() || undefined : undefined,
 		createdById: user.id,
 		createdFromRequestId:
 			typeof fromRequestId === "string" && fromRequestId ? fromRequestId : undefined,
-		callTime: hasCallTime ? new Date(`${date}T${callTime}:00`) : undefined,
+		callTime: hasCallTime ? localTimeToUTC(date, callTime.trim(), user.timezone) : undefined,
 	});
 
 	// Assign performers for show events

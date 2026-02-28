@@ -176,3 +176,102 @@ export function formatTimeRange(startTime?: string | null, endTime?: string | nu
 	};
 	return `${format(startTime)} – ${format(endTime)}`;
 }
+
+/**
+ * Convert a local date/time in a specific timezone to a UTC Date.
+ *
+ * When a user in "America/Los_Angeles" enters 19:00 on 2026-03-15,
+ * we need to store it as 02:00 UTC on 2026-03-16 (PDT = UTC-7).
+ * Without this, `new Date("2026-03-15T19:00:00")` on a UTC server
+ * stores 19:00 UTC, which displays as 12:00 PM in LA — a 7-hour shift.
+ *
+ * Uses iterative refinement to handle DST transitions correctly.
+ */
+export function localTimeToUTC(dateStr: string, timeStr: string, timezone?: string | null): Date {
+	if (!timezone) {
+		// No timezone — interpret as server-local time (existing behavior)
+		return new Date(`${dateStr}T${timeStr}:00`);
+	}
+
+	const [year, month, day] = dateStr.split("-").map(Number);
+	const [hour, minute] = timeStr.split(":").map(Number);
+
+	let guess = Date.UTC(year, month - 1, day, hour, minute, 0);
+
+	const formatter = new Intl.DateTimeFormat("en-US", {
+		timeZone: timezone,
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit",
+		hour: "2-digit",
+		minute: "2-digit",
+		hour12: false,
+	});
+
+	// Iteratively refine to handle DST transitions
+	for (let i = 0; i < 3; i++) {
+		const parts = formatter.formatToParts(new Date(guess));
+		const get = (type: string) => {
+			const val = Number.parseInt(parts.find((p) => p.type === type)?.value ?? "0", 10);
+			return type === "hour" && val === 24 ? 0 : val;
+		};
+
+		const actualYear = get("year");
+		const actualMonth = get("month");
+		const actualDay = get("day");
+		const actualHour = get("hour");
+		const actualMinute = get("minute");
+
+		if (
+			actualYear === year &&
+			actualMonth === month &&
+			actualDay === day &&
+			actualHour === hour &&
+			actualMinute === minute
+		) {
+			return new Date(guess);
+		}
+
+		// Adjust guess based on the difference
+		const actualAsUTC = Date.UTC(
+			actualYear,
+			actualMonth - 1,
+			actualDay,
+			actualHour,
+			actualMinute,
+			0,
+		);
+		const targetAsUTC = Date.UTC(year, month - 1, day, hour, minute, 0);
+		guess += targetAsUTC - actualAsUTC;
+	}
+
+	return new Date(guess);
+}
+
+/**
+ * Convert a UTC Date to local date/time strings in a specific timezone.
+ * Returns { date: "YYYY-MM-DD", time: "HH:MM" } for form prefilling.
+ */
+export function utcToLocalParts(
+	date: Date,
+	timezone?: string | null,
+): { date: string; time: string } {
+	const formatter = new Intl.DateTimeFormat("en-US", {
+		timeZone: timezone ?? undefined,
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit",
+		hour: "2-digit",
+		minute: "2-digit",
+		hour12: false,
+	});
+
+	const parts = formatter.formatToParts(date);
+	const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00";
+	const hour = get("hour") === "24" ? "00" : get("hour");
+
+	return {
+		date: `${get("year")}-${get("month")}-${get("day")}`,
+		time: `${hour}:${get("minute")}`,
+	};
+}
