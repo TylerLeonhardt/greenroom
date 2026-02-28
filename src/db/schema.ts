@@ -58,6 +58,8 @@ export const groups = pgTable(
 		createdById: uuid("created_by_id")
 			.notNull()
 			.references(() => users.id),
+		membersCanCreateRequests: boolean("members_can_create_requests").default(false).notNull(),
+		membersCanCreateEvents: boolean("members_can_create_events").default(false).notNull(),
 		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 		updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 	},

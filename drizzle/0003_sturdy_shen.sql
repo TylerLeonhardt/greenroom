@@ -1,0 +1,2 @@
+ALTER TABLE "groups" ADD COLUMN "members_can_create_requests" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "groups" ADD COLUMN "members_can_create_events" boolean DEFAULT false NOT NULL;

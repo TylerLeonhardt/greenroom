@@ -14,7 +14,7 @@ import { InlineTimezoneSelector } from "~/components/timezone-selector";
 import { formatDateShort, formatTimeRange } from "~/lib/date-utils";
 import { createAvailabilityRequest } from "~/services/availability.server";
 import { sendAvailabilityRequestNotification } from "~/services/email.server";
-import { getGroupWithMembers, requireGroupAdmin } from "~/services/groups.server";
+import { getGroupWithMembers, requireGroupAdminOrPermission } from "~/services/groups.server";
 
 export const meta: MetaFunction = () => {
 	return [{ title: "New Availability Request — My Call Time" }];
@@ -22,13 +22,13 @@ export const meta: MetaFunction = () => {
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
 	const groupId = params.groupId ?? "";
-	const user = await requireGroupAdmin(request, groupId);
+	const user = await requireGroupAdminOrPermission(request, groupId, "membersCanCreateRequests");
 	return { userTimezone: user.timezone };
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
 	const groupId = params.groupId ?? "";
-	const user = await requireGroupAdmin(request, groupId);
+	const user = await requireGroupAdminOrPermission(request, groupId, "membersCanCreateRequests");
 	const formData = await request.formData();
 
 	const title = formData.get("title");

@@ -22,7 +22,7 @@ import {
 	createEvent,
 	getAvailabilityForEventDate,
 } from "~/services/events.server";
-import { getGroupWithMembers, requireGroupAdmin } from "~/services/groups.server";
+import { getGroupWithMembers, requireGroupAdminOrPermission } from "~/services/groups.server";
 
 export const meta: MetaFunction = () => {
 	return [{ title: "Create Event — My Call Time" }];
@@ -30,7 +30,7 @@ export const meta: MetaFunction = () => {
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
 	const groupId = params.groupId ?? "";
-	const user = await requireGroupAdmin(request, groupId);
+	const user = await requireGroupAdminOrPermission(request, groupId, "membersCanCreateEvents");
 
 	const url = new URL(request.url);
 	const fromRequestId = url.searchParams.get("fromRequest");
@@ -56,7 +56,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
 export async function action({ request, params }: ActionFunctionArgs) {
 	const groupId = params.groupId ?? "";
-	const user = await requireGroupAdmin(request, groupId);
+	const user = await requireGroupAdminOrPermission(request, groupId, "membersCanCreateEvents");
 	const formData = await request.formData();
 
 	const title = formData.get("title");
