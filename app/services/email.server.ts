@@ -121,31 +121,37 @@ export async function sendVerificationEmail(options: {
 	name: string;
 	verificationUrl: string;
 }): Promise<void> {
-	logger.info("Sending verification email");
+	const html =
+		"<p>Hi " +
+		options.name +
+		",</p><p>Click to verify your email: <a href='" +
+		options.verificationUrl +
+		"'>Verify Email</a></p><p>This link expires in 24 hours.</p>";
+	const text = `Verify your email: ${options.verificationUrl}`;
+	const subject = "Verify your email - My Call Time";
 
-	const html = `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:20px;">
-<h2>Verify Your Email</h2>
-<p>Hi ${escapeHtml(options.name)}, thanks for signing up for My Call Time!</p>
-<p>Please verify your email address by clicking the link below:</p>
-<p><a href="${options.verificationUrl}" style="display:inline-block;background:#059669;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">Verify Email Address</a></p>
-<p style="color:#666;font-size:13px;">This link expires in 24 hours. If you didn't create an account, you can safely ignore this email.</p>
-<p style="color:#999;font-size:12px;">— My Call Time</p>
-</div>`;
-
-	const text = `Verify your email for My Call Time: ${options.verificationUrl}. This link expires in 24 hours.`;
+	logger.info(
+		{
+			to: options.email,
+			subject,
+			htmlLength: html.length,
+			htmlPreview: html.substring(0, 200),
+			verificationUrl: options.verificationUrl,
+		},
+		"About to send verification email",
+	);
 
 	const result = await sendEmail({
 		to: options.email,
-		subject: "Verify your email - My Call Time",
+		subject,
 		html,
 		text,
 	});
 
-	if (result.success) {
-		logger.info("Verification email sent successfully");
-	} else {
-		logger.error({ error: result.error }, "Verification email failed to send");
-	}
+	logger.info(
+		{ to: options.email, success: result.success, error: result.error },
+		"Verification email result",
+	);
 }
 
 export async function sendAvailabilityRequestNotification(options: {
