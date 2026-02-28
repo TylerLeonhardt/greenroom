@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { getSession, sessionStorage } from "./session.server";
 
 const CSRF_SESSION_KEY = "csrfToken";
@@ -29,7 +29,8 @@ export async function validateCsrfToken(request: Request, formData: FormData): P
 		typeof formToken !== "string" ||
 		!sessionToken ||
 		!formToken ||
-		sessionToken !== formToken
+		sessionToken.length !== formToken.length ||
+		!timingSafeEqual(Buffer.from(sessionToken), Buffer.from(formToken))
 	) {
 		throw new Response("Invalid CSRF token", { status: 403 });
 	}
