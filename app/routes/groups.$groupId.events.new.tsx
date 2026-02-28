@@ -73,6 +73,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	if (typeof title !== "string" || !title.trim()) {
 		return { error: "Title is required." };
 	}
+	if (title.trim().length > 200) {
+		return { error: "Title must be 200 characters or less." };
+	}
 	if (typeof eventType !== "string" || !["rehearsal", "show", "other"].includes(eventType)) {
 		return { error: "Please select an event type." };
 	}
@@ -91,6 +94,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
 	const hasCallTime =
 		eventType === "show" && typeof callTime === "string" && callTime.trim() !== "";
+	if (hasCallTime && callTime.trim() >= startTime) {
+		return { error: "Call time must be before start time." };
+	}
+
+	if (typeof location === "string" && location.trim().length > 200) {
+		return { error: "Location must be 200 characters or less." };
+	}
+	if (typeof description === "string" && description.trim().length > 2000) {
+		return { error: "Description must be 2,000 characters or less." };
+	}
 
 	const event = await createEvent({
 		groupId,
@@ -282,6 +295,7 @@ export default function NewEvent() {
 								name="title"
 								type="text"
 								required
+								maxLength={200}
 								placeholder="e.g., Friday Night Show"
 								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 							/>
@@ -560,6 +574,7 @@ export default function NewEvent() {
 								id="location"
 								name="location"
 								type="text"
+								maxLength={200}
 								placeholder="e.g., Studio A, Main Theater"
 								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 							/>
@@ -572,6 +587,7 @@ export default function NewEvent() {
 								id="description"
 								name="description"
 								rows={3}
+								maxLength={2000}
 								placeholder="Any additional details..."
 								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 							/>

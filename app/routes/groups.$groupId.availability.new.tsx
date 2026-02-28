@@ -43,11 +43,22 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	if (typeof title !== "string" || !title.trim()) {
 		return { error: "Title is required." };
 	}
+	if (title.trim().length > 200) {
+		return { error: "Title must be 200 characters or less." };
+	}
+	if (typeof description === "string" && description.trim().length > 2000) {
+		return { error: "Description must be 2,000 characters or less." };
+	}
 	if (typeof dateRangeStart !== "string" || !dateRangeStart) {
 		return { error: "Start date is required." };
 	}
 	if (typeof dateRangeEnd !== "string" || !dateRangeEnd) {
 		return { error: "End date is required." };
+	}
+
+	const today = new Date().toISOString().split("T")[0];
+	if (dateRangeStart < today) {
+		return { error: "Start date must not be in the past." };
 	}
 	if (dateRangeStart > dateRangeEnd) {
 		return { error: "Start date must be before end date." };
@@ -70,6 +81,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	}
 	if (selectedDates.length === 0) {
 		return { error: "Please select at least one date." };
+	}
+
+	if (typeof expiresAt === "string" && expiresAt) {
+		if (expiresAt < today) {
+			return { error: "Response deadline must be in the future." };
+		}
 	}
 
 	const req = await createAvailabilityRequest({
@@ -162,6 +179,7 @@ export default function NewAvailabilityRequest() {
 								name="title"
 								type="text"
 								required
+								maxLength={200}
 								placeholder="e.g., March Rehearsal Schedule"
 								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 							/>
@@ -174,6 +192,7 @@ export default function NewAvailabilityRequest() {
 								id="description"
 								name="description"
 								rows={2}
+								maxLength={2000}
 								placeholder="Any additional context for the group..."
 								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 							/>

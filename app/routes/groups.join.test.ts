@@ -43,7 +43,7 @@ describe("groups.join action", () => {
 		});
 
 		const formData = new FormData();
-		formData.set("code", "ABCD1234");
+		formData.set("code", "ABCD2345");
 
 		const request = new Request("http://localhost/groups/join", {
 			method: "POST",
@@ -54,17 +54,30 @@ describe("groups.join action", () => {
 		expect(result).toBeInstanceOf(Response);
 		expect((result as Response).status).toBe(302);
 		expect((result as Response).headers.get("Location")).toBe("/groups/group-123");
-		expect(joinGroup).toHaveBeenCalledWith("user-1", "ABCD1234");
+		expect(joinGroup).toHaveBeenCalledWith("user-1", "ABCD2345");
 	});
 
-	it("returns error for invalid invite code", async () => {
+	it("returns error for invalid invite code format", async () => {
+		const formData = new FormData();
+		formData.set("code", "BADCODE!");
+
+		const request = new Request("http://localhost/groups/join", {
+			method: "POST",
+			body: formData,
+		});
+
+		const result = await action({ request, params: {}, context: {} });
+		expect(result).toEqual({ error: "Invalid invite code format. Codes are 8 characters." });
+	});
+
+	it("returns error for invalid invite code from service", async () => {
 		(joinGroup as ReturnType<typeof vi.fn>).mockResolvedValue({
 			success: false,
 			error: "Invalid invite code.",
 		});
 
 		const formData = new FormData();
-		formData.set("code", "BADCODE1");
+		formData.set("code", "BADCXYZQ");
 
 		const request = new Request("http://localhost/groups/join", {
 			method: "POST",
@@ -83,8 +96,7 @@ describe("groups.join action", () => {
 		});
 
 		const formData = new FormData();
-		formData.set("code", "ABCD1234");
-
+		formData.set("code", "ABCD2345");
 		const request = new Request("http://localhost/groups/join", {
 			method: "POST",
 			body: formData,

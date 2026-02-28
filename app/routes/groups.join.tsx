@@ -24,6 +24,11 @@ export async function action({ request }: ActionFunctionArgs) {
 		return { error: "Invite code is required." };
 	}
 
+	const codeStr = code.trim().toUpperCase();
+	if (!/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/.test(codeStr)) {
+		return { error: "Invalid invite code format. Codes are 8 characters." };
+	}
+
 	const result = await joinGroup(user.id, code);
 
 	if (!result.success) {
@@ -88,6 +93,7 @@ export default function JoinGroup() {
 								type="text"
 								defaultValue={code}
 								required
+								maxLength={8}
 								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-center text-lg uppercase tracking-widest text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 								placeholder="ABCD1234"
 							/>
