@@ -157,6 +157,103 @@ The health endpoint is available at `GET /api/health` and returns:
 { "status": "ok", "timestamp": "2025-01-01T00:00:00.000Z" }
 ```
 
+## Email Deliverability (Custom Domain)
+
+My Call Time sends emails from `DoNotReply@mycalltime.app` via Azure Communication Services. For emails to actually be delivered (and not land in spam), your custom domain needs SPF, DKIM, and DMARC DNS records.
+
+> **Quick workaround:** If you need emails flowing immediately without DNS setup, change the sender address in `app/services/email.server.ts` to use Azure's default domain: `DoNotReply@<your-acs-resource-id>.azurecomm.net`. This works out of the box but looks less professional.
+
+### Step 1: Add a Custom Domain in Azure Communication Services
+
+1. Go to **Azure Portal** → your **Communication Services** resource
+2. In the left sidebar, go to **Email** → **Domains**
+3. Click **Add domain** → **Custom domain**
+4. Enter your domain (e.g., `mycalltime.app`) and click **Add**
+5. Azure will show you the DNS records you need to add — keep this page open
+
+### Step 2: Add DNS Records
+
+Add the following records at your DNS provider (e.g., Cloudflare, Namecheap, Route 53):
+
+#### SPF Record
+
+Authorizes Azure Communication Services to send email on behalf of your domain.
+
+| Type | Name | Value |
+|------|------|-------|
+| TXT | `@` | `v=spf1 include:azurecomm.net ~all` |
+
+> If you already have an SPF record, add `include:azurecomm.net` before the `~all` or `-all` in your existing record. A domain can only have one SPF TXT record.
+
+#### DKIM Records
+
+DKIM cryptographically signs your emails so recipients can verify they haven't been tampered with. Azure generates two CNAME records during domain verification — you'll find them on the domain verification page from Step 1.
+
+| Type | Name | Value |
+|------|------|-------|
+| CNAME | `selector1-azurecomm-prod-net._domainkey` | *(copy from Azure portal)* |
+| CNAME | `selector2-azurecomm-prod-net._domainkey` | *(copy from Azure portal)* |
+
+> The exact CNAME names and values are unique to your domain. Copy them directly from the Azure portal — do not guess.
+
+#### DMARC Record
+
+Tells receiving mail servers what to do with emails that fail SPF/DKIM checks.
+
+| Type | Name | Value |
+|------|------|-------|
+| TXT | `_dmarc` | `v=DMARC1; p=quarantine;` |
+
+> `p=quarantine` tells receivers to flag suspicious emails as spam rather than silently dropping them. Once you've confirmed everything works, you can tighten this to `p=reject`.
+
+### Step 3: Verify Domain in Azure
+
+1. After adding all DNS records, go back to the Azure portal domain verification page
+2. Click **Verify** for each record type (SPF, DKIM, DMARC)
+3. DNS propagation can take up to 48 hours, but usually completes within 15–30 minutes
+4. All three should show a green checkmark ✅ when verified
+
+### Step 4: Configure the Sender Address
+
+1. In the Azure portal, go to **Communication Services** → **Email** → **Domains** → your verified domain
+2. Click **MailFrom addresses** → **Add**
+3. Add `DoNotReply` as the MailFrom address (this creates `DoNotReply@mycalltime.app`)
+4. The sender address in `app/services/email.server.ts` should match:
+
+```typescript
+const senderAddress = "DoNotReply@mycalltime.app";
+```
+
+### Verifying DNS Records
+
+Use these tools to confirm your records are set up correctly:
+
+```bash
+# Check SPF record
+dig TXT mycalltime.app +short
+# Should include: "v=spf1 include:azurecomm.net ~all"
+
+# Check DKIM records
+dig CNAME selector1-azurecomm-prod-net._domainkey.mycalltime.app +short
+dig CNAME selector2-azurecomm-prod-net._domainkey.mycalltime.app +short
+
+# Check DMARC record
+dig TXT _dmarc.mycalltime.app +short
+# Should return: "v=DMARC1; p=quarantine;"
+```
+
+On Windows (or if you don't have `dig`):
+
+```bash
+nslookup -type=TXT mycalltime.app
+nslookup -type=CNAME selector1-azurecomm-prod-net._domainkey.mycalltime.app
+nslookup -type=TXT _dmarc.mycalltime.app
+```
+
+You can also use [MXToolbox](https://mxtoolbox.com/SuperTool.aspx) to check all records in a browser:
+- Enter `mycalltime.app` and select **SPF Record Lookup**
+- Enter `_dmarc.mycalltime.app` and select **DMARC Lookup**
+
 ## Estimated Monthly Costs
 
 | Service | Tier | Cost |
