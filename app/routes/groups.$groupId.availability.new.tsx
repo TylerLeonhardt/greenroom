@@ -148,6 +148,9 @@ export default function NewAvailabilityRequest() {
 	const [dateRangeStart, setDateRangeStart] = useState("");
 	const [dateRangeEnd, setDateRangeEnd] = useState("");
 	const [selectedDates, setSelectedDates] = useState<string[]>([]);
+	const [expiresAt, setExpiresAt] = useState("");
+	const [requestedStartTime, setRequestedStartTime] = useState("");
+	const [requestedEndTime, setRequestedEndTime] = useState("");
 
 	return (
 		<div className="max-w-3xl">
@@ -266,6 +269,8 @@ export default function NewAvailabilityRequest() {
 						<input
 							name="expiresAt"
 							type="date"
+							value={expiresAt}
+							onChange={(e) => setExpiresAt(e.target.value)}
 							className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 						/>
 						<p className="mt-1 text-xs text-slate-500">
@@ -295,6 +300,8 @@ export default function NewAvailabilityRequest() {
 								id="requestedStartTime"
 								name="requestedStartTime"
 								type="time"
+								value={requestedStartTime}
+								onChange={(e) => setRequestedStartTime(e.target.value)}
 								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 							/>
 						</div>
@@ -309,6 +316,8 @@ export default function NewAvailabilityRequest() {
 								id="requestedEndTime"
 								name="requestedEndTime"
 								type="time"
+								value={requestedEndTime}
+								onChange={(e) => setRequestedEndTime(e.target.value)}
 								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 							/>
 						</div>
