@@ -68,6 +68,8 @@ export async function getUserGroups(
 			description: groups.description,
 			inviteCode: groups.inviteCode,
 			createdById: groups.createdById,
+			membersCanCreateRequests: groups.membersCanCreateRequests,
+			membersCanCreateEvents: groups.membersCanCreateEvents,
 			createdAt: groups.createdAt,
 			updatedAt: groups.updatedAt,
 			role: groupMemberships.role,
@@ -241,6 +243,27 @@ export async function regenerateInviteCode(groupId: string): Promise<string> {
 	throw new Error("Failed to generate unique invite code.");
 }
 
+export async function updateGroupPermissions(
+	groupId: string,
+	data: { membersCanCreateRequests?: boolean; membersCanCreateEvents?: boolean },
+): Promise<Group> {
+	const [updated] = await db
+		.update(groups)
+		.set({
+			...(data.membersCanCreateRequests !== undefined
+				? { membersCanCreateRequests: data.membersCanCreateRequests }
+				: {}),
+			...(data.membersCanCreateEvents !== undefined
+				? { membersCanCreateEvents: data.membersCanCreateEvents }
+				: {}),
+			updatedAt: new Date(),
+		})
+		.where(eq(groups.id, groupId))
+		.returning();
+	if (!updated) throw new Error("Group not found.");
+	return updated;
+}
+
 // --- Route Helpers ---
 
 export async function requireGroupMember(request: Request, groupId: string) {
@@ -254,5 +277,29 @@ export async function requireGroupAdmin(request: Request, groupId: string) {
 	const user = await requireUser(request);
 	const admin = await isGroupAdmin(user.id, groupId);
 	if (!admin) throw new Response("Forbidden", { status: 403 });
+	return user;
+}
+
+/**
+ * Require that the user is either a group admin OR a member with the specified permission enabled.
+ * Use this instead of requireGroupAdmin for actions that can optionally be opened to members.
+ */
+export async function requireGroupAdminOrPermission(
+	request: Request,
+	groupId: string,
+	permission: "membersCanCreateRequests" | "membersCanCreateEvents",
+) {
+	const user = await requireUser(request);
+	const admin = await isGroupAdmin(user.id, groupId);
+	if (admin) return user;
+
+	const member = await isGroupMember(user.id, groupId);
+	if (!member) throw new Response("Not Found", { status: 404 });
+
+	const group = await getGroupById(groupId);
+	if (!group || !group[permission]) {
+		throw new Response("Forbidden", { status: 403 });
+	}
+
 	return user;
 }

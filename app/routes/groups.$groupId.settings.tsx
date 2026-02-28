@@ -5,6 +5,7 @@ import {
 	regenerateInviteCode,
 	requireGroupAdmin,
 	updateGroup,
+	updateGroupPermissions,
 } from "~/services/groups.server";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -46,6 +47,18 @@ export async function action({ request, params }: ActionFunctionArgs) {
 			return { success: true, message: `Invite code regenerated: ${newCode}` };
 		} catch {
 			return { error: "Failed to regenerate invite code.", success: false };
+		}
+	}
+
+	if (intent === "update-permissions") {
+		try {
+			await updateGroupPermissions(groupId, {
+				membersCanCreateRequests: formData.get("membersCanCreateRequests") === "on",
+				membersCanCreateEvents: formData.get("membersCanCreateEvents") === "on",
+			});
+			return { success: true, message: "Member permissions updated." };
+		} catch {
+			return { error: "Failed to update permissions.", success: false };
 		}
 	}
 
@@ -157,6 +170,60 @@ export default function GroupSettings() {
 						</button>
 					</Form>
 				</div>
+			</div>
+
+			{/* Member Permissions */}
+			<div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+				<div className="border-b border-slate-100 px-6 py-4">
+					<h2 className="text-lg font-semibold text-slate-900">Member Permissions</h2>
+					<p className="mt-1 text-sm text-slate-500">
+						Control what regular members can do in this group
+					</p>
+				</div>
+				<Form method="post" className="p-6">
+					<input type="hidden" name="intent" value="update-permissions" />
+					<div className="space-y-4">
+						<label className="flex items-center justify-between gap-4">
+							<div>
+								<span className="text-sm font-medium text-slate-700">
+									Allow members to create availability requests
+								</span>
+								<p className="text-xs text-slate-500">
+									Members can create scheduling polls, not just admins
+								</p>
+							</div>
+							<input
+								type="checkbox"
+								name="membersCanCreateRequests"
+								defaultChecked={group.membersCanCreateRequests}
+								className="h-5 w-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/20"
+							/>
+						</label>
+						<label className="flex items-center justify-between gap-4">
+							<div>
+								<span className="text-sm font-medium text-slate-700">
+									Allow members to create events
+								</span>
+								<p className="text-xs text-slate-500">
+									Members can create rehearsals, shows, and other events
+								</p>
+							</div>
+							<input
+								type="checkbox"
+								name="membersCanCreateEvents"
+								defaultChecked={group.membersCanCreateEvents}
+								className="h-5 w-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/20"
+							/>
+						</label>
+					</div>
+					<button
+						type="submit"
+						disabled={isSubmitting}
+						className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:ring-offset-2 disabled:opacity-50"
+					>
+						{isSubmitting ? "Saving…" : "Save Permissions"}
+					</button>
+				</Form>
 			</div>
 		</div>
 	);

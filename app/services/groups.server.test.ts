@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { generateInviteCode } from "~/services/groups.server";
 
 const VALID_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -43,5 +43,241 @@ describe("generateInviteCode", () => {
 			const code = generateInviteCode();
 			expect(code).toBe(code.toUpperCase());
 		}
+	});
+});
+
+// --- requireGroupAdminOrPermission tests ---
+
+vi.mock("~/services/auth.server", () => ({
+	requireUser: vi.fn().mockResolvedValue({
+		id: "user-1",
+		email: "test@example.com",
+		name: "Test User",
+		profileImage: null,
+	}),
+}));
+
+vi.mock("../../src/db/index.js", () => ({
+	db: {
+		select: vi.fn().mockReturnThis(),
+		from: vi.fn().mockReturnThis(),
+		where: vi.fn().mockReturnThis(),
+		limit: vi.fn().mockResolvedValue([]),
+		innerJoin: vi.fn().mockReturnThis(),
+		orderBy: vi.fn().mockReturnThis(),
+		insert: vi.fn().mockReturnThis(),
+		values: vi.fn().mockReturnThis(),
+		returning: vi.fn().mockResolvedValue([]),
+		update: vi.fn().mockReturnThis(),
+		set: vi.fn().mockReturnThis(),
+		delete: vi.fn().mockReturnThis(),
+	},
+}));
+
+const { requireGroupAdminOrPermission } = await import("~/services/groups.server");
+const { requireUser } = await import("~/services/auth.server");
+const { db } = await import("../../src/db/index.js");
+
+describe("requireGroupAdminOrPermission", () => {
+	const mockRequest = new Request("http://localhost/test");
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		(requireUser as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: "user-1",
+			email: "test@example.com",
+			name: "Test User",
+			profileImage: null,
+		});
+	});
+
+	it("allows admin users regardless of permission setting", async () => {
+		(db.select as ReturnType<typeof vi.fn>).mockReturnValue({
+			from: vi.fn().mockReturnValue({
+				where: vi.fn().mockReturnValue({
+					limit: vi.fn().mockResolvedValue([{ role: "admin" }]),
+				}),
+			}),
+		});
+
+		const user = await requireGroupAdminOrPermission(
+			mockRequest,
+			"group-1",
+			"membersCanCreateRequests",
+		);
+		expect(user.id).toBe("user-1");
+	});
+
+	it("allows member when membersCanCreateRequests is enabled", async () => {
+		let callCount = 0;
+		(db.select as ReturnType<typeof vi.fn>).mockImplementation(() => {
+			callCount++;
+			if (callCount === 1) {
+				// isGroupAdmin — not admin
+				return {
+					from: vi.fn().mockReturnValue({
+						where: vi.fn().mockReturnValue({
+							limit: vi.fn().mockResolvedValue([{ role: "member" }]),
+						}),
+					}),
+				};
+			}
+			if (callCount === 2) {
+				// isGroupMember — is member
+				return {
+					from: vi.fn().mockReturnValue({
+						where: vi.fn().mockReturnValue({
+							limit: vi.fn().mockResolvedValue([{ id: "membership-1" }]),
+						}),
+					}),
+				};
+			}
+			// getGroupById — permission enabled
+			return {
+				from: vi.fn().mockReturnValue({
+					where: vi.fn().mockReturnValue({
+						limit: vi.fn().mockResolvedValue([
+							{
+								id: "group-1",
+								name: "Test Group",
+								membersCanCreateRequests: true,
+								membersCanCreateEvents: false,
+							},
+						]),
+					}),
+				}),
+			};
+		});
+
+		const user = await requireGroupAdminOrPermission(
+			mockRequest,
+			"group-1",
+			"membersCanCreateRequests",
+		);
+		expect(user.id).toBe("user-1");
+	});
+
+	it("blocks member when permission is disabled", async () => {
+		let callCount = 0;
+		(db.select as ReturnType<typeof vi.fn>).mockImplementation(() => {
+			callCount++;
+			if (callCount === 1) {
+				return {
+					from: vi.fn().mockReturnValue({
+						where: vi.fn().mockReturnValue({
+							limit: vi.fn().mockResolvedValue([{ role: "member" }]),
+						}),
+					}),
+				};
+			}
+			if (callCount === 2) {
+				return {
+					from: vi.fn().mockReturnValue({
+						where: vi.fn().mockReturnValue({
+							limit: vi.fn().mockResolvedValue([{ id: "membership-1" }]),
+						}),
+					}),
+				};
+			}
+			return {
+				from: vi.fn().mockReturnValue({
+					where: vi.fn().mockReturnValue({
+						limit: vi.fn().mockResolvedValue([
+							{
+								id: "group-1",
+								name: "Test Group",
+								membersCanCreateRequests: false,
+								membersCanCreateEvents: false,
+							},
+						]),
+					}),
+				}),
+			};
+		});
+
+		try {
+			await requireGroupAdminOrPermission(mockRequest, "group-1", "membersCanCreateRequests");
+			expect.fail("Should have thrown");
+		} catch (error) {
+			expect(error).toBeInstanceOf(Response);
+			expect((error as Response).status).toBe(403);
+		}
+	});
+
+	it("throws 404 for non-member", async () => {
+		let callCount = 0;
+		(db.select as ReturnType<typeof vi.fn>).mockImplementation(() => {
+			callCount++;
+			if (callCount === 1) {
+				return {
+					from: vi.fn().mockReturnValue({
+						where: vi.fn().mockReturnValue({
+							limit: vi.fn().mockResolvedValue([]),
+						}),
+					}),
+				};
+			}
+			return {
+				from: vi.fn().mockReturnValue({
+					where: vi.fn().mockReturnValue({
+						limit: vi.fn().mockResolvedValue([]),
+					}),
+				}),
+			};
+		});
+
+		try {
+			await requireGroupAdminOrPermission(mockRequest, "group-1", "membersCanCreateRequests");
+			expect.fail("Should have thrown");
+		} catch (error) {
+			expect(error).toBeInstanceOf(Response);
+			expect((error as Response).status).toBe(404);
+		}
+	});
+
+	it("checks membersCanCreateEvents permission correctly", async () => {
+		let callCount = 0;
+		(db.select as ReturnType<typeof vi.fn>).mockImplementation(() => {
+			callCount++;
+			if (callCount === 1) {
+				return {
+					from: vi.fn().mockReturnValue({
+						where: vi.fn().mockReturnValue({
+							limit: vi.fn().mockResolvedValue([{ role: "member" }]),
+						}),
+					}),
+				};
+			}
+			if (callCount === 2) {
+				return {
+					from: vi.fn().mockReturnValue({
+						where: vi.fn().mockReturnValue({
+							limit: vi.fn().mockResolvedValue([{ id: "membership-1" }]),
+						}),
+					}),
+				};
+			}
+			return {
+				from: vi.fn().mockReturnValue({
+					where: vi.fn().mockReturnValue({
+						limit: vi.fn().mockResolvedValue([
+							{
+								id: "group-1",
+								name: "Test Group",
+								membersCanCreateRequests: false,
+								membersCanCreateEvents: true,
+							},
+						]),
+					}),
+				}),
+			};
+		});
+
+		const user = await requireGroupAdminOrPermission(
+			mockRequest,
+			"group-1",
+			"membersCanCreateEvents",
+		);
+		expect(user.id).toBe("user-1");
 	});
 });
