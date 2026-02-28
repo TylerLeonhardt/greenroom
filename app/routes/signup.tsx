@@ -77,7 +77,7 @@ export async function action({ request }: ActionFunctionArgs) {
 		// Generate verification token and send email
 		const appUrl = process.env.APP_URL ?? "http://localhost:5173";
 		const token = await generateVerificationToken(user.id);
-		sendVerificationEmail({
+		await sendVerificationEmail({
 			email: user.email,
 			name: user.name,
 			verificationUrl: `${appUrl}/verify-email?token=${token}`,
