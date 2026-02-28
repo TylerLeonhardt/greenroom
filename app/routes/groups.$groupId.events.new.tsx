@@ -24,7 +24,7 @@ import {
 import { getGroupWithMembers, requireGroupAdmin } from "~/services/groups.server";
 
 export const meta: MetaFunction = () => {
-	return [{ title: "Create Event — GreenRoom" }];
+	return [{ title: "Create Event — My Call Time" }];
 };
 
 export async function loader({ request, params }: LoaderFunctionArgs) {

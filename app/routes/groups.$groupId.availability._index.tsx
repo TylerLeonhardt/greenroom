@@ -7,7 +7,7 @@ import { requireGroupMember } from "~/services/groups.server";
 import type { loader as groupLayoutLoader } from "./groups.$groupId";
 
 export const meta: MetaFunction = () => {
-	return [{ title: "Availability — GreenRoom" }];
+	return [{ title: "Availability — My Call Time" }];
 };
 
 export async function loader({ request, params }: LoaderFunctionArgs) {

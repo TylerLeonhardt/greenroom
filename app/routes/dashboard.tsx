@@ -7,7 +7,7 @@ import { requireUser } from "~/services/auth.server";
 import { getDashboardData } from "~/services/dashboard.server";
 
 export const meta: MetaFunction = () => {
-	return [{ title: "Dashboard — GreenRoom" }];
+	return [{ title: "Dashboard — My Call Time" }];
 };
 
 export async function loader({ request }: LoaderFunctionArgs) {

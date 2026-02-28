@@ -1,10 +1,10 @@
-# GreenRoom — Agent Notes
+# My Call Time — Agent Notes
 
-Institutional knowledge for agents working on the GreenRoom codebase. Read this before touching anything.
+Institutional knowledge for agents working on the My Call Time codebase. Read this before touching anything.
 
-## What Is GreenRoom?
+## What Is My Call Time?
 
-GreenRoom is a scheduling platform for improv groups. It solves the "when is everyone free?" problem that every improv troupe, ensemble, or comedy team faces. An admin creates an availability request, members respond with Available/Maybe/Unavailable per date, and the admin sees a heatmap of the best dates to schedule rehearsals or shows.
+My Call Time is a scheduling platform for improv groups. It solves the "when is everyone free?" problem that every improv troupe, ensemble, or comedy team faces. An admin creates an availability request, members respond with Available/Maybe/Unavailable per date, and the admin sees a heatmap of the best dates to schedule rehearsals or shows.
 
 **Who it's for:** Improv group organizers (admins) and their members. Multi-group support — one user can be in many groups.
 

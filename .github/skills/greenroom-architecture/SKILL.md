@@ -1,13 +1,13 @@
 ---
 name: greenroom-architecture
-description: GreenRoom application architecture, patterns, and conventions
+description: My Call Time application architecture, patterns, and conventions
 ---
 
-# GreenRoom Architecture
+# My Call Time Architecture
 
 ## Remix Route Structure
 
-GreenRoom uses Remix v2 flat file routing with Vite. Routes live in `app/routes/` and follow dot notation:
+My Call Time uses Remix v2 flat file routing with Vite. Routes live in `app/routes/` and follow dot notation:
 
 ```
 groups.$groupId.events.new.tsx  →  /groups/:groupId/events/new

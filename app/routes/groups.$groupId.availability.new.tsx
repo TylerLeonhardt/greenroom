@@ -8,7 +8,7 @@ import { sendAvailabilityRequestNotification } from "~/services/email.server";
 import { getGroupWithMembers, requireGroupAdmin } from "~/services/groups.server";
 
 export const meta: MetaFunction = () => {
-	return [{ title: "New Availability Request — GreenRoom" }];
+	return [{ title: "New Availability Request — My Call Time" }];
 };
 
 export async function loader({ request, params }: LoaderFunctionArgs) {

@@ -37,7 +37,7 @@ import { getGroupWithMembers, isGroupAdmin, requireGroupMember } from "~/service
 import type { loader as groupLayoutLoader } from "./groups.$groupId";
 
 export const meta: MetaFunction = () => {
-	return [{ title: "Event Detail — GreenRoom" }];
+	return [{ title: "Event Detail — My Call Time" }];
 };
 
 export async function loader({ request, params }: LoaderFunctionArgs) {

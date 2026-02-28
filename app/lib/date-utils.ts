@@ -1,5 +1,5 @@
 /**
- * Centralized date formatting utilities for GreenRoom.
+ * Centralized date formatting utilities for My Call Time.
  * All date display should use these functions to ensure consistent
  * timezone-aware formatting across the app.
  *

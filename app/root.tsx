@@ -68,7 +68,7 @@ function NavBar() {
 		<nav className="border-b border-slate-200 bg-white shadow-sm">
 			<div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
 				<Link to="/" className="text-xl font-bold text-emerald-600">
-					🎭 GreenRoom
+					🎭 My Call Time
 				</Link>
 
 				{/* Desktop nav */}
@@ -237,14 +237,14 @@ export function ErrorBoundary() {
 			<head>
 				<meta charSet="utf-8" />
 				<meta name="viewport" content="width=device-width, initial-scale=1" />
-				<title>{title} — GreenRoom</title>
+				<title>{title} — My Call Time</title>
 				<Links />
 			</head>
 			<body className="min-h-screen bg-slate-50">
 				<nav className="border-b border-slate-200 bg-white shadow-sm">
 					<div className="mx-auto flex h-16 max-w-7xl items-center px-4 sm:px-6 lg:px-8">
 						<a href="/" className="text-xl font-bold text-emerald-600">
-							🎭 GreenRoom
+							🎭 My Call Time
 						</a>
 					</div>
 				</nav>

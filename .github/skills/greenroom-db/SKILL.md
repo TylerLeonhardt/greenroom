@@ -1,9 +1,9 @@
 ---
 name: greenroom-db
-description: GreenRoom database schema, Drizzle ORM patterns, and migration workflow
+description: My Call Time database schema, Drizzle ORM patterns, and migration workflow
 ---
 
-# GreenRoom Database Layer
+# My Call Time Database Layer
 
 ## Schema Reference
 
@@ -263,7 +263,7 @@ Aggregated in `getAggregatedResults()` by iterating all responses and counting s
 
 ## Multi-Tenancy Approach
 
-GreenRoom uses **application-layer tenant isolation**, not PostgreSQL RLS:
+My Call Time uses **application-layer tenant isolation**, not PostgreSQL RLS:
 
 1. Every request validates group membership via `requireGroupMember()` / `requireGroupAdmin()`
 2. Every service function filters by `groupId` in WHERE clauses

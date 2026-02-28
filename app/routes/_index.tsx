@@ -5,17 +5,17 @@ import { getOptionalUser } from "~/services/auth.server";
 
 export const meta: MetaFunction = () => {
 	return [
-		{ title: "GreenRoom — Improv Group Scheduling" },
+		{ title: "My Call Time — Scheduling for Improv Groups" },
 		{
 			name: "description",
 			content:
-				"GreenRoom is a free scheduling platform for improv groups. Find availability, schedule rehearsals, and manage shows.",
+				"My Call Time is a free scheduling platform for improv groups. Find availability, schedule rehearsals, and never miss a show.",
 		},
-		{ property: "og:title", content: "GreenRoom — Improv Group Scheduling" },
+		{ property: "og:title", content: "My Call Time — Scheduling for Improv Groups" },
 		{
 			property: "og:description",
 			content:
-				"GreenRoom is a free scheduling platform for improv groups. Find availability, schedule rehearsals, and manage shows.",
+				"My Call Time is a free scheduling platform for improv groups. Find availability, schedule rehearsals, and never miss a show.",
 		},
 		{ property: "og:type", content: "website" },
 	];
@@ -63,13 +63,13 @@ export default function Index() {
 						🎭
 					</div>
 					<h1 className="mt-6 text-5xl font-extrabold tracking-tight text-slate-900 sm:text-6xl">
-						<span className="text-emerald-600">GreenRoom</span>
+						<span className="text-emerald-600">My Call Time</span>
 					</h1>
 					<p className="mt-4 text-xl font-medium text-slate-600 sm:text-2xl">
-						Where your ensemble comes together
+						Never miss your call time
 					</p>
 					<p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-500">
-						Stop juggling group texts and spreadsheets. GreenRoom makes scheduling rehearsals,
+						Stop juggling group texts and spreadsheets. My Call Time makes scheduling rehearsals,
 						finding availability, and managing shows effortless.
 					</p>
 					<div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
@@ -127,7 +127,7 @@ export default function Index() {
 			<footer className="border-t border-slate-200 bg-white py-8">
 				<div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 					<div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-						<p className="text-sm text-slate-400">© 2026 GreenRoom</p>
+						<p className="text-sm text-slate-400">© 2026 My Call Time</p>
 						<div className="flex gap-6">
 							<a
 								href="https://github.com/TylerLeonhardt/greenroom"
