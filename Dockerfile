@@ -19,6 +19,7 @@ FROM base AS runtime
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/build ./build
+COPY --from=build /app/certs ./certs
 COPY --from=build /app/package.json ./
 EXPOSE 3000
 ENV NODE_ENV=production
