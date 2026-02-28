@@ -48,6 +48,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	const groupId = params.groupId ?? "";
 	const eventId = params.eventId ?? "";
 	await requireGroupAdmin(request, groupId);
+
+	// Verify the event belongs to this group before any mutation
+	const data = await getEventWithAssignments(eventId);
+	if (!data || data.event.groupId !== groupId) {
+		throw new Response("Not Found", { status: 404 });
+	}
+
 	const formData = await request.formData();
 	const intent = formData.get("intent");
 

@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { and, count, eq, sql } from "drizzle-orm";
 import { db } from "../../src/db/index.js";
 import { groupMemberships, groups, users } from "../../src/db/schema.js";
@@ -11,7 +12,7 @@ export function generateInviteCode(): string {
 	const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no I/O/0/1 to avoid confusion
 	let code = "";
 	for (let i = 0; i < 8; i++) {
-		code += chars[Math.floor(Math.random() * chars.length)];
+		code += chars[crypto.randomInt(chars.length)];
 	}
 	return code;
 }

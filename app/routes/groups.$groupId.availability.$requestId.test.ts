@@ -129,6 +129,76 @@ describe("availability response action", () => {
 		expect(result).toEqual({ error: "Invalid action." });
 	});
 
+	it("rejects responses with invalid status values", async () => {
+		const formData = new FormData();
+		formData.set("intent", "respond");
+		formData.set("responses", JSON.stringify({ "2025-03-15": "hacked_value" }));
+
+		const request = new Request("http://localhost/groups/g1/availability/r1", {
+			method: "POST",
+			body: formData,
+		});
+
+		const result = await action({
+			request,
+			params: { groupId: "g1", requestId: "r1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ error: "Invalid response data." });
+		expect(submitAvailabilityResponse).not.toHaveBeenCalled();
+	});
+
+	it("rejects responses with invalid date keys", async () => {
+		const formData = new FormData();
+		formData.set("intent", "respond");
+		formData.set("responses", JSON.stringify({ "not-a-date": "available" }));
+
+		const request = new Request("http://localhost/groups/g1/availability/r1", {
+			method: "POST",
+			body: formData,
+		});
+
+		const result = await action({
+			request,
+			params: { groupId: "g1", requestId: "r1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ error: "Invalid response data." });
+		expect(submitAvailabilityResponse).not.toHaveBeenCalled();
+	});
+
+	it("prevents close/reopen of availability request from another group", async () => {
+		(isGroupAdmin as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+		const { getAvailabilityRequest } = await import("~/services/availability.server");
+		(getAvailabilityRequest as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: "r1",
+			groupId: "other-group",
+			title: "Other Group Request",
+		});
+
+		const formData = new FormData();
+		formData.set("intent", "close");
+
+		const request = new Request("http://localhost/groups/g1/availability/r1", {
+			method: "POST",
+			body: formData,
+		});
+
+		try {
+			await action({
+				request,
+				params: { groupId: "g1", requestId: "r1" },
+				context: {},
+			});
+			expect.fail("Should have thrown 404");
+		} catch (response) {
+			expect(response).toBeInstanceOf(Response);
+			expect((response as Response).status).toBe(404);
+		}
+	});
+
 	it("redirects unauthenticated users to login", async () => {
 		(requireGroupMember as ReturnType<typeof vi.fn>).mockRejectedValue(
 			new Response(null, { status: 302, headers: { Location: "/login" } }),
