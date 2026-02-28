@@ -1,6 +1,7 @@
 name: Deploy
-# Triggered manually until Azure infrastructure is provisioned
 on:
+  push:
+    branches: [master]
   workflow_dispatch:
 
 jobs:

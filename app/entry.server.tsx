@@ -23,27 +23,37 @@ function setSecurityHeaders(responseHeaders: Headers) {
 }
 
 /**
- * Strips content after </html> to prevent React SSR comment markers (<!--$-->)
- * from appearing as visible text on iOS Safari.
+ * Strips React SSR comment markers (<!--$-->, <!--/$-->) after </html>
+ * to prevent them from appearing as visible text on iOS Safari, while
+ * preserving <script> tags that Remix uses for streaming data delivery.
+ *
+ * Without preserving scripts, React hydration fails silently — the app
+ * renders from SSR but interactive elements (onClick handlers, state)
+ * never attach. See: https://github.com/TylerLeonhardt/greenroom/issues/42
  */
-class StripAfterHtmlEnd extends Transform {
-	private ended = false;
+class StripSsrMarkers extends Transform {
+	private afterHtml = false;
 
 	_transform(
 		chunk: Buffer,
 		_encoding: BufferEncoding,
 		callback: (error?: Error | null, data?: Buffer | string) => void,
 	) {
-		if (this.ended) {
+		const str = chunk.toString();
+
+		if (this.afterHtml) {
+			// After </html>: strip SSR comment markers but keep <script> tags
+			this.push(str.replace(/<!--\/?\$\s*-->/g, ""));
 			callback();
 			return;
 		}
 
-		const str = chunk.toString();
 		const idx = str.indexOf("</html>");
 		if (idx !== -1) {
-			this.ended = true;
-			this.push(str.slice(0, idx + "</html>".length));
+			this.afterHtml = true;
+			const before = str.slice(0, idx + "</html>".length);
+			const after = str.slice(idx + "</html>".length);
+			this.push(before + after.replace(/<!--\/?\$\s*-->/g, ""));
 		} else {
 			this.push(chunk);
 		}
@@ -139,7 +149,7 @@ function handleBrowserRequest(
 				onAllReady() {
 					shellRendered = true;
 					const body = new PassThrough();
-					const stripped = body.pipe(new StripAfterHtmlEnd());
+					const stripped = body.pipe(new StripSsrMarkers());
 					const stream = createReadableStreamFromReadable(stripped);
 
 					setSecurityHeaders(responseHeaders);

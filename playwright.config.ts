@@ -24,16 +24,13 @@ export default defineConfig({
 			testMatch: /global\.setup\.ts/,
 		},
 		// Browser projects — depend on setup
-		// Note: We append "HeadlessChrome" to each user agent so the dev server's
-		// entry.server.tsx routes requests through handleBotRequest (which skips
-		// StripAfterHtmlEnd). In Vite dev mode, StripAfterHtmlEnd can strip the
-		// entry client script from streamed chunks, preventing React hydration.
-		// This does NOT affect production builds where scripts are bundled inline.
+		// These use real user agents (no HeadlessChrome override) so that
+		// E2E tests exercise the same handleBrowserRequest code path as
+		// real users — including the StripSsrMarkers transform.
 		{
 			name: "Desktop Chrome",
 			use: {
 				...devices["Desktop Chrome"],
-				userAgent: `${devices["Desktop Chrome"].userAgent} HeadlessChrome`,
 			},
 			dependencies: ["setup"],
 		},
@@ -41,7 +38,6 @@ export default defineConfig({
 			name: "Mobile Safari",
 			use: {
 				...devices["iPhone 14"],
-				userAgent: `${devices["iPhone 14"].userAgent} HeadlessChrome`,
 			},
 			dependencies: ["setup"],
 		},
@@ -49,7 +45,6 @@ export default defineConfig({
 			name: "Mobile Chrome",
 			use: {
 				...devices["Pixel 7"],
-				userAgent: `${devices["Pixel 7"].userAgent} HeadlessChrome`,
 			},
 			dependencies: ["setup"],
 		},
