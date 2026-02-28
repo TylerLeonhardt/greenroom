@@ -78,6 +78,10 @@ export function checkSignupRateLimit(request: Request) {
 	return checkRateLimit(`signup:${ip}`, 5, ONE_MINUTE_MS);
 }
 
+export function checkResendVerificationRateLimit(email: string) {
+	return checkRateLimit(`resend-verification:${email}`, 1, ONE_MINUTE_MS);
+}
+
 /** Visible for testing */
 export function _resetForTests() {
 	windows.clear();

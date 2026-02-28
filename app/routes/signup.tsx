@@ -2,7 +2,13 @@ import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remi
 import { redirect } from "@remix-run/node";
 import { Form, Link, useActionData, useNavigation } from "@remix-run/react";
 import { useState } from "react";
-import { createUserSession, getOptionalUser, registerUser } from "~/services/auth.server";
+import {
+	createUserSession,
+	generateVerificationToken,
+	getOptionalUser,
+	registerUser,
+} from "~/services/auth.server";
+import { sendVerificationEmail } from "~/services/email.server";
 import { checkSignupRateLimit } from "~/services/rate-limit.server";
 
 export const meta: MetaFunction = () => {
@@ -63,21 +69,55 @@ export async function action({ request }: ActionFunctionArgs) {
 	}
 
 	try {
-		const user = await registerUser(email as string, password as string, name as string);
-		return createUserSession(user.id, "/dashboard");
+		const { user, isNew } = await registerUser(email as string, password as string, name as string);
+		if (!isNew) {
+			// Email already exists — show same success message to prevent enumeration
+			return { success: true };
+		}
+		// Generate verification token and send email
+		const appUrl = process.env.APP_URL ?? "http://localhost:5173";
+		const token = await generateVerificationToken(user.id);
+		sendVerificationEmail({
+			email: user.email,
+			name: user.name,
+			verificationUrl: `${appUrl}/verify-email?token=${token}`,
+		});
+		// Create session so check-email page can access user info, then redirect
+		return createUserSession(user.id, "/check-email");
 	} catch (error) {
 		if (error instanceof Response) throw error;
-		const message = error instanceof Error ? error.message : "Registration failed.";
-		return { errors: { form: message } };
+		return { errors: { form: "Registration failed. Please try again." } };
 	}
 }
 
 export default function Signup() {
 	const actionData = useActionData<typeof action>();
-	const errors = actionData?.errors;
+	const errors = actionData && "errors" in actionData ? actionData.errors : undefined;
+	const success = actionData && "success" in actionData ? actionData.success : false;
 	const navigation = useNavigation();
 	const isSubmitting = navigation.state === "submitting";
 	const [password, setPassword] = useState("");
+
+	if (success) {
+		return (
+			<div className="flex min-h-[calc(100vh-8rem)] flex-col items-center justify-center py-12">
+				<div className="w-full max-w-md text-center">
+					<div className="text-3xl">📧</div>
+					<h1 className="mt-3 text-3xl font-bold text-slate-900">Check your email</h1>
+					<p className="mt-2 text-slate-600">
+						If this email isn&apos;t already registered, you&apos;ll receive a verification email
+						shortly.
+					</p>
+					<p className="mt-6 text-sm text-slate-600">
+						Already have an account?{" "}
+						<Link to="/login" className="font-medium text-emerald-600 hover:text-emerald-700">
+							Sign in
+						</Link>
+					</p>
+				</div>
+			</div>
+		);
+	}
 
 	return (
 		<div className="flex min-h-[calc(100vh-8rem)] flex-col items-center justify-center py-12">

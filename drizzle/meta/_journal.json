@@ -1,34 +1,48 @@
 {
-            "version": "7",
-            "dialect": "postgresql",
-            "entries": [
-                        {
-                                    "idx": 0,
-                                    "version": "7",
-                                    "when": 1772213446374,
-                                    "tag": "0000_wise_hammerhead",
-                                    "breakpoints": true
-                        },
-                        {
-                                    "idx": 1,
-                                    "version": "7",
-                                    "when": 1772226542765,
-                                    "tag": "0001_narrow_liz_osborn",
-                                    "breakpoints": true
-                        },
-                        {
-                                    "idx": 2,
-                                    "version": "7",
-                                    "when": 1772239857754,
-                                    "tag": "0002_faulty_blue_shield",
-                                    "breakpoints": true
-                        },
-                        {
-                                    "idx": 3,
-                                    "version": "7",
-                                    "when": 1772251740000,
-                                    "tag": "0003_sturdy_shen",
-                                    "breakpoints": true
-                        }
-            ]
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1772213446374,
+      "tag": "0000_wise_hammerhead",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1772226542765,
+      "tag": "0001_narrow_liz_osborn",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772239857754,
+      "tag": "0002_faulty_blue_shield",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1772251740000,
+      "tag": "0003_sturdy_shen",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1772254884614,
+      "tag": "0004_wet_hercules",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1772255352498,
+      "tag": "0005_puzzling_the_hand",
+      "breakpoints": true
+    }
+  ]
 }

@@ -105,6 +105,31 @@ function ctaButton(url: string, label: string): string {
 
 // --- Notification Senders ---
 
+export async function sendVerificationEmail(options: {
+	email: string;
+	name: string;
+	verificationUrl: string;
+}): Promise<void> {
+	const html = emailLayout(`
+<h1 style="margin:0 0 8px;font-size:20px;color:#0f172a;">Verify Your Email</h1>
+<p style="margin:0 0 20px;font-size:14px;color:#64748b;">
+Hi ${escapeHtml(options.name)}, thanks for signing up! Please verify your email address to get started.
+</p>
+${ctaButton(options.verificationUrl, "Verify Email Address →")}
+<p style="margin:0;font-size:13px;color:#94a3b8;">
+This link expires in 24 hours. If you didn't create an account, you can safely ignore this email.
+</p>`);
+
+	const text = `Verify your email for My Call Time: ${options.verificationUrl}. This link expires in 24 hours.`;
+
+	void sendEmail({
+		to: options.email,
+		subject: "Verify your email — My Call Time",
+		html,
+		text,
+	});
+}
+
 export async function sendAvailabilityRequestNotification(options: {
 	requestId: string;
 	requestTitle: string;
