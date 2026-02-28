@@ -122,7 +122,7 @@ This link expires in 24 hours. If you didn't create an account, you can safely i
 
 	const text = `Verify your email for My Call Time: ${options.verificationUrl}. This link expires in 24 hours.`;
 
-	void sendEmail({
+	await sendEmail({
 		to: options.email,
 		subject: "Verify your email — My Call Time",
 		html,
