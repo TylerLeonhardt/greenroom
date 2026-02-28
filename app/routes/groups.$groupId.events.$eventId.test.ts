@@ -36,13 +36,13 @@ vi.mock("~/services/events.server", () => ({
 	getAvailabilityForEventDate: vi.fn(),
 }));
 
-import { action } from "./groups.$groupId.events.$eventId";
 import {
 	assignToEvent,
 	getEventWithAssignments,
 	updateAssignmentStatus,
 } from "~/services/events.server";
 import { isGroupAdmin, requireGroupMember } from "~/services/groups.server";
+import { action } from "./groups.$groupId.events.$eventId";
 
 describe("event detail action — IDOR prevention", () => {
 	beforeEach(() => {
