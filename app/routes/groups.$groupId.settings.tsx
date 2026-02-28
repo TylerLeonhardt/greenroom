@@ -30,6 +30,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
 			return { error: "Group name is required.", success: false };
 		}
 
+		if (name.trim().length > 100) {
+			return { error: "Group name must be 100 characters or less.", success: false };
+		}
+
+		if (typeof description === "string" && description.trim().length > 2000) {
+			return { error: "Description must be 2000 characters or less.", success: false };
+		}
+
 		try {
 			await updateGroup(groupId, {
 				name,
@@ -104,6 +112,7 @@ export default function GroupSettings() {
 							name="name"
 							type="text"
 							required
+							maxLength={100}
 							defaultValue={group.name}
 							className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 						/>
@@ -116,6 +125,7 @@ export default function GroupSettings() {
 							id="description"
 							name="description"
 							rows={3}
+							maxLength={2000}
 							defaultValue={group.description ?? ""}
 							className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 						/>

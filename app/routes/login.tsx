@@ -30,6 +30,18 @@ export async function action({ request }: ActionFunctionArgs) {
 		);
 	}
 
+	const clonedRequest = request.clone();
+	const formData = await clonedRequest.formData();
+	const email = formData.get("email");
+	const password = formData.get("password");
+
+	if (typeof email !== "string" || !email.trim()) {
+		return { error: "Email is required." };
+	}
+	if (typeof password !== "string" || !password) {
+		return { error: "Password is required." };
+	}
+
 	try {
 		const user = await authenticator.authenticate("form", request);
 

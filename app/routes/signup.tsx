@@ -48,6 +48,8 @@ export async function action({ request }: ActionFunctionArgs) {
 
 	if (typeof name !== "string" || !name.trim()) {
 		errors.name = "Name is required.";
+	} else if (name.trim().length > 100) {
+		errors.name = "Name must be 100 characters or less.";
 	}
 
 	if (typeof email !== "string" || !email.trim()) {
@@ -58,6 +60,8 @@ export async function action({ request }: ActionFunctionArgs) {
 
 	if (typeof password !== "string" || password.length < 8) {
 		errors.password = "Password must be at least 8 characters.";
+	} else if (password.length > 128) {
+		errors.password = "Password must be 128 characters or less.";
 	}
 
 	if (password !== confirmPassword) {
@@ -180,6 +184,7 @@ export default function Signup() {
 								type="text"
 								autoComplete="name"
 								required
+								maxLength={100}
 								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 								placeholder="Your name"
 							/>
@@ -213,6 +218,7 @@ export default function Signup() {
 								autoComplete="new-password"
 								required
 								minLength={8}
+								maxLength={128}
 								value={password}
 								onChange={(e) => setPassword(e.target.value)}
 								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"

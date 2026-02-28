@@ -24,8 +24,12 @@ export async function action({ request }: ActionFunctionArgs) {
 		return { errors: { name: "Group name is required." } };
 	}
 
-	if (name.trim().length > 255) {
-		return { errors: { name: "Group name must be 255 characters or less." } };
+	if (name.trim().length > 100) {
+		return { errors: { name: "Group name must be 100 characters or less." } };
+	}
+
+	if (typeof description === "string" && description.trim().length > 2000) {
+		return { errors: { description: "Description must be 2000 characters or less." } };
 	}
 
 	try {
@@ -71,6 +75,7 @@ export default function NewGroup() {
 								name="name"
 								type="text"
 								required
+								maxLength={100}
 								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 								placeholder="e.g., The Improvables"
 							/>
@@ -85,9 +90,13 @@ export default function NewGroup() {
 								id="description"
 								name="description"
 								rows={3}
+								maxLength={2000}
 								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 								placeholder="Tell your members what this group is about..."
 							/>
+							{errors?.description && (
+								<p className="mt-1 text-sm text-red-600">{errors.description}</p>
+							)}
 						</div>
 
 						<div className="flex gap-3 pt-2">

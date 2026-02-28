@@ -24,7 +24,13 @@ export async function action({ request }: ActionFunctionArgs) {
 		if (typeof name !== "string" || !name.trim()) {
 			return { error: "Group name is required.", intent: "create" };
 		}
+		if (name.trim().length > 100) {
+			return { error: "Group name must be 100 characters or less.", intent: "create" };
+		}
 		const description = formData.get("description");
+		if (typeof description === "string" && description.trim().length > 2000) {
+			return { error: "Description must be 2000 characters or less.", intent: "create" };
+		}
 		const group = await createGroup(user.id, {
 			name,
 			description: typeof description === "string" ? description : undefined,
@@ -36,6 +42,10 @@ export async function action({ request }: ActionFunctionArgs) {
 		const code = formData.get("code");
 		if (typeof code !== "string" || !code.trim()) {
 			return { error: "Invite code is required.", intent: "join" };
+		}
+		const codeStr = code.trim().toUpperCase();
+		if (!/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/.test(codeStr)) {
+			return { error: "Invalid invite code format. Codes are 8 characters.", intent: "join" };
 		}
 		const result = await joinGroup(user.id, code);
 		if (!result.success) {

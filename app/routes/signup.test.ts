@@ -206,5 +206,43 @@ describe("signup route", () => {
 			const data = await (result as Response).json();
 			expect(data.errors.form).toContain("Too many signup attempts");
 		});
+
+		it("returns error when name exceeds 100 characters", async () => {
+			const formData = new FormData();
+			formData.set("name", "A".repeat(101));
+			formData.set("email", "test@example.com");
+			formData.set("password", "password123");
+			formData.set("confirmPassword", "password123");
+
+			const request = new Request("http://localhost/signup", {
+				method: "POST",
+				body: formData,
+			});
+
+			const result = await action({ request, params: {}, context: {} });
+			expect(result).toHaveProperty("errors");
+			expect((result as { errors: Record<string, string> }).errors.name).toBe(
+				"Name must be 100 characters or less.",
+			);
+		});
+
+		it("returns error when password exceeds 128 characters", async () => {
+			const formData = new FormData();
+			formData.set("name", "Test");
+			formData.set("email", "test@example.com");
+			formData.set("password", "A".repeat(129));
+			formData.set("confirmPassword", "A".repeat(129));
+
+			const request = new Request("http://localhost/signup", {
+				method: "POST",
+				body: formData,
+			});
+
+			const result = await action({ request, params: {}, context: {} });
+			expect(result).toHaveProperty("errors");
+			expect((result as { errors: Record<string, string> }).errors.password).toBe(
+				"Password must be 128 characters or less.",
+			);
+		});
 	});
 });

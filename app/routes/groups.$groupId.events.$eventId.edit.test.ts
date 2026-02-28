@@ -159,3 +159,77 @@ describe("event edit action — IDOR prevention", () => {
 		}
 	});
 });
+
+describe("event edit action — validation", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		(requireGroupAdmin as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: "user-1",
+			email: "test@example.com",
+			name: "Test User",
+			profileImage: null,
+		});
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: { id: "event-1", groupId: "g1", title: "My Event" },
+			assignments: [],
+		});
+	});
+
+	function makeUpdateRequest(fields: Record<string, string>) {
+		const formData = new FormData();
+		formData.set("intent", "update");
+		for (const [key, value] of Object.entries(fields)) {
+			formData.set(key, value);
+		}
+		return new Request("http://localhost/groups/g1/events/event-1/edit", {
+			method: "POST",
+			body: formData,
+		});
+	}
+
+	const validFields = {
+		title: "Updated Show",
+		eventType: "show",
+		date: "2099-06-15",
+		startTime: "19:00",
+		endTime: "21:00",
+	};
+
+	it("returns error when title exceeds 200 characters", async () => {
+		const result = await action({
+			request: makeUpdateRequest({ ...validFields, title: "A".repeat(201) }),
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+		expect(result).toEqual({ error: "Title must be 200 characters or less." });
+	});
+
+	it("returns error when call time is after start time", async () => {
+		const result = await action({
+			request: makeUpdateRequest({ ...validFields, callTime: "20:00" }),
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+		expect(result).toEqual({ error: "Call time must be before start time." });
+	});
+
+	it("returns error when location exceeds 200 characters", async () => {
+		const result = await action({
+			request: makeUpdateRequest({ ...validFields, location: "A".repeat(201) }),
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+		expect(result).toEqual({ error: "Location must be 200 characters or less." });
+	});
+
+	it("allows valid update", async () => {
+		const result = await action({
+			request: makeUpdateRequest(validFields),
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+		expect(result).toBeInstanceOf(Response);
+		expect((result as Response).status).toBe(302);
+		expect(updateEvent).toHaveBeenCalled();
+	});
+});
