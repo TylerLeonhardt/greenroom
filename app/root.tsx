@@ -113,7 +113,11 @@ function NavBar() {
 					className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 sm:hidden"
 					aria-label="Toggle menu"
 				>
-					{mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+					{mobileOpen ? (
+						<X className="pointer-events-none h-5 w-5" />
+					) : (
+						<Menu className="pointer-events-none h-5 w-5" />
+					)}
 				</button>
 			</div>
 

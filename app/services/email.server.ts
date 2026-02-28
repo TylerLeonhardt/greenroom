@@ -166,8 +166,10 @@ This link expires in 24 hours. If you didn't create an account, you can safely i
 		text,
 	});
 
-	if (!result.success) {
-		logger.warn({ error: result.error }, "Verification email failed to send");
+	if (result.success) {
+		logger.info("Verification email sent successfully");
+	} else {
+		logger.error({ error: result.error }, "Verification email failed to send");
 	}
 }
 

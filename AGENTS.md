@@ -62,7 +62,8 @@ app/
 │   ├── dashboard.server.ts     # Dashboard data aggregation (parallel queries)
 │   ├── email.server.ts         # Azure Communication Services email with graceful fallback
 │   ├── logger.server.ts        # Pino structured logger, configurable via LOG_LEVEL env var
-│   └── rate-limit.server.ts    # In-memory sliding window rate limiter for auth routes
+│   ├── rate-limit.server.ts    # In-memory sliding window rate limiter for auth routes
+│   └── telemetry.server.ts     # Application Insights SDK init + getTelemetryClient() helper
 └── components/                 # Reusable React components
     ├── availability-grid.tsx   # Date × status grid for submitting availability
     ├── date-selector.tsx       # Calendar-based date picker for creating requests
@@ -356,6 +357,7 @@ pnpm run dev
 | `APP_URL` | ✅ | `http://localhost:5173` locally |
 | `AZURE_COMMUNICATION_CONNECTION_STRING` | Optional | For sending emails (logs to console if missing) |
 | `LOG_LEVEL` | Optional | Pino log level: `trace`, `debug`, `info` (default), `warn`, `error`, `fatal` |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | Optional | Azure Application Insights connection string for production telemetry (graceful no-op if missing) |
 
 ## Build, Test & Deploy Commands
 
@@ -436,6 +438,53 @@ CI runs on every push/PR to `master`: typecheck → lint → build → test
   - `ci.yml` — typecheck + lint + build + test on push/PR to `master`
   - `deploy.yml` — Docker build → Azure Container Registry → Azure Container Apps on push to `master`
 - **Database:** Azure PostgreSQL (SSL in production, `rejectUnauthorized: false`)
+
+## Observability
+
+Production telemetry is powered by Azure Application Insights, initialized in `app/services/telemetry.server.ts`.
+
+### How It Works
+
+- **Auto-instrumentation:** The `applicationinsights` SDK is imported at the very top of `app/entry.server.tsx` (before all other imports) so it can patch Node.js modules for automatic request, exception, dependency, and performance tracking.
+- **Graceful degradation:** If `APPLICATIONINSIGHTS_CONNECTION_STRING` is not set, telemetry is a no-op — the app runs normally without any monitoring overhead.
+- **Custom email telemetry:** `sendEmail()` in `app/services/email.server.ts` tracks `EmailSent` events (with success/failure) and exceptions via `getTelemetryClient()`.
+
+### Azure Resources
+
+| Resource | Name | Resource Group |
+|----------|------|----------------|
+| Application Insights | `mycalltime-insights` | `greenroom-rg` |
+| Log Analytics Workspace | `workspace-greenroomrgLC11` | `greenroom-rg` |
+| Action Group (alerts) | `mycalltime-alerts` | `greenroom-rg` |
+
+### Viewing Telemetry
+
+```bash
+# View recent exceptions
+az monitor app-insights query --apps mycalltime-insights -g greenroom-rg \
+  --analytics-query "exceptions | where timestamp > ago(1h) | project timestamp, problemId, outerMessage | order by timestamp desc | take 20"
+
+# View request performance
+az monitor app-insights query --apps mycalltime-insights -g greenroom-rg \
+  --analytics-query "requests | where timestamp > ago(1h) | summarize avg(duration), count() by name | order by count_ desc"
+
+# View email events
+az monitor app-insights query --apps mycalltime-insights -g greenroom-rg \
+  --analytics-query "customEvents | where name == 'EmailSent' | where timestamp > ago(24h) | summarize count() by tostring(customDimensions.success)"
+
+# Live tail logs
+az containerapp logs show --name greenroom -g greenroom-rg --follow
+```
+
+### Adding Custom Telemetry
+
+```typescript
+import { getTelemetryClient } from "~/services/telemetry.server";
+
+// Track custom events (null-safe — no-op when App Insights is not configured)
+getTelemetryClient()?.trackEvent({ name: "MyEvent", properties: { key: "value" } });
+getTelemetryClient()?.trackException({ exception: error });
+```
 
 ## Available Skills
 

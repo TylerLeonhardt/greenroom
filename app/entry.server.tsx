@@ -1,3 +1,5 @@
+// App Insights must be imported first to patch Node.js modules for auto-instrumentation
+import "~/services/telemetry.server";
 import { PassThrough, Transform } from "node:stream";
 import type { AppLoadContext, EntryContext } from "@remix-run/node";
 import { createReadableStreamFromReadable } from "@remix-run/node";
