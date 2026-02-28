@@ -8,6 +8,18 @@ import { logger } from "~/services/logger.server";
 
 const ABORT_DELAY = 5_000;
 
+function setSecurityHeaders(responseHeaders: Headers) {
+	responseHeaders.set("X-Frame-Options", "DENY");
+	responseHeaders.set("X-Content-Type-Options", "nosniff");
+	responseHeaders.set("Referrer-Policy", "strict-origin-when-cross-origin");
+	responseHeaders.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+	responseHeaders.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+	responseHeaders.set(
+		"Content-Security-Policy-Report-Only",
+		"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'",
+	);
+}
+
 /**
  * Strips content after </html> to prevent React SSR comment markers (<!--$-->)
  * from appearing as visible text on iOS Safari.
@@ -81,6 +93,7 @@ function handleBotRequest(
 					const body = new PassThrough();
 					const stream = createReadableStreamFromReadable(body);
 
+					setSecurityHeaders(responseHeaders);
 					responseHeaders.set("Content-Type", "text/html");
 
 					logRequest(request, responseStatusCode, startMs);
@@ -127,6 +140,7 @@ function handleBrowserRequest(
 					const stripped = body.pipe(new StripAfterHtmlEnd());
 					const stream = createReadableStreamFromReadable(stripped);
 
+					setSecurityHeaders(responseHeaders);
 					responseHeaders.set("Content-Type", "text/html");
 
 					logRequest(request, responseStatusCode, startMs);

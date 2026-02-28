@@ -32,6 +32,9 @@ function toAuthUser(user: UserRecord): AuthUser {
 
 export const authenticator = new Authenticator<AuthUser>();
 
+// Dummy hash for constant-time comparison when user doesn't exist
+const DUMMY_HASH = "$2a$12$000000000000000000000uGPOBOBOBOBOBOBOBOBOBOBOBOBOBOBO";
+
 authenticator.use(
 	new FormStrategy(async ({ form }) => {
 		const email = form.get("email");
@@ -46,16 +49,12 @@ authenticator.use(
 		}
 
 		const user = await getUserByEmail(email);
-		if (!user) {
-			throw new Error("Invalid email or password.");
-		}
 
-		if (!user.passwordHash) {
-			throw new Error("This account uses Google sign-in. Please sign in with Google.");
-		}
+		// Always run bcrypt to prevent timing-based user enumeration
+		const hashToCompare = user?.passwordHash ?? DUMMY_HASH;
+		const isValid = await bcrypt.compare(password, hashToCompare);
 
-		const isValid = await bcrypt.compare(password, user.passwordHash);
-		if (!isValid) {
+		if (!user || !user.passwordHash || !isValid) {
 			throw new Error("Invalid email or password.");
 		}
 
@@ -88,29 +87,39 @@ export async function registerUser(
 	email: string,
 	password: string,
 	name: string,
-): Promise<AuthUser> {
+): Promise<{ user: AuthUser; isNew: boolean }> {
 	const existing = await getUserByEmail(email);
 	if (existing) {
-		throw new Error("An account with this email already exists.");
+		// Don't reveal that the email exists — hash the password anyway for consistent timing
+		await bcrypt.hash(password, 12);
+		return { user: toAuthUser(existing), isNew: false };
 	}
 
 	const passwordHash = await bcrypt.hash(password, 12);
-	const result = await db
-		.insert(users)
-		.values({
-			email: email.toLowerCase().trim(),
-			passwordHash,
-			name: name.trim(),
-			emailVerified: false,
-		})
-		.returning();
+	try {
+		const result = await db
+			.insert(users)
+			.values({
+				email: email.toLowerCase().trim(),
+				passwordHash,
+				name: name.trim(),
+				emailVerified: false,
+			})
+			.returning();
 
-	const user = result[0];
-	if (!user) {
-		throw new Error("Failed to create user.");
+		const user = result[0];
+		if (!user) {
+			throw new Error("Failed to create user.");
+		}
+
+		return { user: toAuthUser(user), isNew: true };
+	} catch (error) {
+		// Handle race condition: concurrent signup with same email hits unique constraint
+		if (error instanceof Error && error.message.includes("unique")) {
+			return { user: { id: "", email, name, profileImage: null, timezone: null }, isNew: false };
+		}
+		throw error;
 	}
-
-	return toAuthUser(user);
 }
 
 // --- Google OAuth (manual implementation) ---
@@ -290,6 +299,71 @@ export async function getOptionalUser(request: Request): Promise<AuthUser | null
 
 export async function updateUserTimezone(userId: string, timezone: string): Promise<void> {
 	await db.update(users).set({ timezone, updatedAt: new Date() }).where(eq(users.id, userId));
+}
+
+// --- Email Verification ---
+
+export async function generateVerificationToken(userId: string): Promise<string> {
+	const token = crypto.randomUUID();
+	const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+	await db
+		.update(users)
+		.set({
+			emailVerificationToken: token,
+			emailVerificationExpiry: expiry,
+			updatedAt: new Date(),
+		})
+		.where(eq(users.id, userId));
+	return token;
+}
+
+export async function verifyEmailToken(
+	token: string,
+): Promise<{ success: true; userId: string } | { success: false; reason: string }> {
+	const result = await db
+		.select()
+		.from(users)
+		.where(eq(users.emailVerificationToken, token))
+		.limit(1);
+	const user = result[0];
+
+	if (!user) {
+		return { success: false, reason: "Invalid verification link." };
+	}
+
+	if (user.emailVerificationExpiry && user.emailVerificationExpiry < new Date()) {
+		return { success: false, reason: "This verification link has expired." };
+	}
+
+	await db
+		.update(users)
+		.set({
+			emailVerified: true,
+			emailVerificationToken: null,
+			emailVerificationExpiry: null,
+			updatedAt: new Date(),
+		})
+		.where(eq(users.id, user.id));
+
+	return { success: true, userId: user.id };
+}
+
+export async function isEmailVerified(userId: string): Promise<boolean> {
+	const result = await db
+		.select({ emailVerified: users.emailVerified })
+		.from(users)
+		.where(eq(users.id, userId))
+		.limit(1);
+	return result[0]?.emailVerified ?? false;
+}
+
+export async function getUserEmailById(userId: string): Promise<string | null> {
+	const result = await db
+		.select({ email: users.email })
+		.from(users)
+		.where(eq(users.id, userId))
+		.limit(1);
+	return result[0]?.email ?? null;
 }
 
 export { createUserSession } from "./session.server.js";

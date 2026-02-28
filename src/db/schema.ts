@@ -37,6 +37,8 @@ export const users = pgTable(
 		profileImage: text("profile_image"),
 		googleId: varchar("google_id", { length: 255 }).unique(),
 		emailVerified: boolean("email_verified").default(false).notNull(),
+		emailVerificationToken: varchar("email_verification_token", { length: 255 }),
+		emailVerificationExpiry: timestamp("email_verification_expiry", { withTimezone: true }),
 		timezone: varchar("timezone", { length: 100 }),
 		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 		updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -44,6 +46,7 @@ export const users = pgTable(
 	(table) => [
 		index("users_email_idx").on(table.email),
 		index("users_google_id_idx").on(table.googleId),
+		index("users_email_verification_token_idx").on(table.emailVerificationToken),
 	],
 );
 

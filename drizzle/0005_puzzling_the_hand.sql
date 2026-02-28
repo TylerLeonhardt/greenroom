@@ -1,0 +1,1 @@
+CREATE INDEX "users_email_verification_token_idx" ON "users" USING btree ("email_verification_token");

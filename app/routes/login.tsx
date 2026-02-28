@@ -1,7 +1,12 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
-import { Form, Link, useActionData, useNavigation } from "@remix-run/react";
-import { authenticator, createUserSession, getOptionalUser } from "~/services/auth.server";
+import { Form, Link, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import {
+	authenticator,
+	createUserSession,
+	getOptionalUser,
+	isEmailVerified,
+} from "~/services/auth.server";
 import { checkLoginRateLimit } from "~/services/rate-limit.server";
 
 export const meta: MetaFunction = () => {
@@ -11,7 +16,9 @@ export const meta: MetaFunction = () => {
 export async function loader({ request }: LoaderFunctionArgs) {
 	const user = await getOptionalUser(request);
 	if (user) throw redirect("/dashboard");
-	return null;
+	const url = new URL(request.url);
+	const verified = url.searchParams.get("verified") === "true";
+	return { verified };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -25,6 +32,13 @@ export async function action({ request }: ActionFunctionArgs) {
 
 	try {
 		const user = await authenticator.authenticate("form", request);
+
+		// Check email verification before creating session
+		const verified = await isEmailVerified(user.id);
+		if (!verified) {
+			return createUserSession(user.id, "/check-email");
+		}
+
 		return createUserSession(user.id, "/dashboard");
 	} catch (error) {
 		if (error instanceof Response) throw error;
@@ -34,6 +48,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Login() {
+	const { verified } = useLoaderData<typeof loader>();
 	const actionData = useActionData<typeof action>();
 	const navigation = useNavigation();
 	const isSubmitting = navigation.state === "submitting";
@@ -48,6 +63,11 @@ export default function Login() {
 				</div>
 
 				<div className="mt-8 rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
+					{verified && (
+						<div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+							Email verified successfully! You can now sign in.
+						</div>
+					)}
 					{actionData?.error && (
 						<div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
 							{actionData.error}
