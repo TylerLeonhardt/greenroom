@@ -55,12 +55,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 	const endTime = new Date(event.endTime);
 
 	const now = new Date();
-	const uid = `${event.id}@greenroom.app`;
+	const uid = `${event.id}@mycalltime.app`;
 
 	const lines: string[] = [
 		"BEGIN:VCALENDAR",
 		"VERSION:2.0",
-		"PRODID:-//GreenRoom//Events//EN",
+		"PRODID:-//My Call Time//Events//EN",
 		"CALSCALE:GREGORIAN",
 		"METHOD:PUBLISH",
 		"BEGIN:VEVENT",

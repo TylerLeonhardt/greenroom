@@ -3,7 +3,7 @@ import { Link, Outlet, useLoaderData, useLocation } from "@remix-run/react";
 import { getGroupById, getUserRole, requireGroupMember } from "~/services/groups.server";
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
-	return [{ title: data ? `${data.group.name} — GreenRoom` : "Group — GreenRoom" }];
+	return [{ title: data ? `${data.group.name} — My Call Time` : "Group — My Call Time" }];
 };
 
 export async function loader({ request, params }: LoaderFunctionArgs) {

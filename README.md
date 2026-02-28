@@ -1,9 +1,9 @@
 [![CI](https://github.com/TylerLeonhardt/greenroom/actions/workflows/ci.yml/badge.svg)](https://github.com/TylerLeonhardt/greenroom/actions/workflows/ci.yml)
 [![Deploy](https://github.com/TylerLeonhardt/greenroom/actions/workflows/deploy.yml/badge.svg)](https://github.com/TylerLeonhardt/greenroom/actions/workflows/deploy.yml)
 
-# 🎭 GreenRoom
+# 🎭 My Call Time
 
-An improv group scheduling platform. Coordinate rehearsals, manage availability, and never miss a show.
+A scheduling platform for improv groups. Coordinate rehearsals, manage availability, and never miss a show.
 
 ## Tech Stack
 
@@ -91,7 +91,7 @@ See `.env.example` for a template.
 
 ## Deployment
 
-GreenRoom deploys on **Azure Container Apps** with CI/CD via GitHub Actions.
+My Call Time deploys on **Azure Container Apps** with CI/CD via GitHub Actions.
 
 See [docs/azure-setup.md](docs/azure-setup.md) for full Azure infrastructure setup instructions.
 

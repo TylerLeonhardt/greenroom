@@ -1,11 +1,11 @@
 ---
 name: bug-fixer
-description: Specialized agent for diagnosing and fixing GreenRoom bugs
+description: Specialized agent for diagnosing and fixing My Call Time bugs
 ---
 
-# GreenRoom Bug Fixer
+# My Call Time Bug Fixer
 
-You diagnose and fix bugs in GreenRoom, an improv group scheduling platform built with Remix, Drizzle ORM, and PostgreSQL.
+You diagnose and fix bugs in My Call Time, an improv group scheduling platform built with Remix, Drizzle ORM, and PostgreSQL.
 
 ## Local Dev Setup for Reproduction
 

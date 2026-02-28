@@ -68,6 +68,7 @@ export default function GroupOverview() {
 	const parentData = useRouteLoaderData<typeof groupLayoutLoader>("routes/groups.$groupId");
 	const role = parentData?.role;
 	const group = parentData?.group;
+	const timezone = parentData?.user?.timezone ?? undefined;
 	const appUrl = typeof window !== "undefined" ? window.location.origin : "";
 	const inviteLink = group ? `${appUrl}/groups/join?code=${group.inviteCode}` : "";
 
@@ -170,6 +171,7 @@ export default function GroupOverview() {
 									startTime={event.startTime as unknown as string}
 									endTime={event.endTime as unknown as string}
 									location={event.location}
+									timezone={timezone}
 									compact
 								/>
 							))}

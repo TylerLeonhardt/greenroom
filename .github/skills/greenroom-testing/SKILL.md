@@ -1,9 +1,9 @@
 ---
 name: greenroom-testing
-description: Testing patterns, Vitest configuration, and how to test GreenRoom code
+description: Testing patterns, Vitest configuration, and how to test My Call Time code
 ---
 
-# GreenRoom Testing Guide
+# My Call Time Testing Guide
 
 ## Vitest Configuration
 
@@ -477,7 +477,7 @@ The email service never throws — it returns `{ success: boolean; error?: strin
 
 ## E2E Testing with Playwright
 
-GreenRoom has the `playwright-cli` skill (`.github/skills/playwright-cli/`) for browser automation.
+My Call Time has the `playwright-cli` skill (`.github/skills/playwright-cli/`) for browser automation.
 
 ### Login Flow
 

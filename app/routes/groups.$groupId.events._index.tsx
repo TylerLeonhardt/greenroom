@@ -4,12 +4,13 @@ import { CalendarDays, List, Plus } from "lucide-react";
 import { useState } from "react";
 import { EventCalendar } from "~/components/event-calendar";
 import { EventCard } from "~/components/event-card";
+import { formatDateLong } from "~/lib/date-utils";
 import { getGroupEvents } from "~/services/events.server";
 import { requireGroupMember } from "~/services/groups.server";
 import type { loader as groupLayoutLoader } from "./groups.$groupId";
 
 export const meta: MetaFunction = () => {
-	return [{ title: "Events — GreenRoom" }];
+	return [{ title: "Events — My Call Time" }];
 };
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -24,6 +25,7 @@ export default function Events() {
 	const parentData = useRouteLoaderData<typeof groupLayoutLoader>("routes/groups.$groupId");
 	const role = parentData?.role;
 	const groupId = parentData?.group?.id ?? "";
+	const timezone = parentData?.user?.timezone ?? undefined;
 	const [searchParams] = useSearchParams();
 
 	const [view, setView] = useState<"list" | "calendar">(
@@ -143,6 +145,7 @@ export default function Events() {
 												location={event.location}
 												assignmentCount={event.assignmentCount}
 												confirmedCount={event.confirmedCount}
+												timezone={timezone}
 											/>
 										))}
 									</div>
@@ -173,6 +176,7 @@ export default function Events() {
 													location={event.location}
 													assignmentCount={event.assignmentCount}
 													confirmedCount={event.confirmedCount}
+													timezone={timezone}
 												/>
 											))}
 										</div>
@@ -202,11 +206,7 @@ export default function Events() {
 						{calendarSelectedDate ? (
 							<div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
 								<h3 className="mb-3 text-sm font-semibold text-slate-900">
-									{new Date(`${calendarSelectedDate}T00:00:00`).toLocaleDateString("en-US", {
-										weekday: "long",
-										month: "long",
-										day: "numeric",
-									})}
+									{formatDateLong(`${calendarSelectedDate}T00:00:00`, timezone)}
 								</h3>
 								{calendarDateEvents.length > 0 ? (
 									<div className="space-y-3">
@@ -220,6 +220,7 @@ export default function Events() {
 												startTime={event.startTime as unknown as string}
 												endTime={event.endTime as unknown as string}
 												location={event.location}
+												timezone={timezone}
 												compact
 											/>
 										))}

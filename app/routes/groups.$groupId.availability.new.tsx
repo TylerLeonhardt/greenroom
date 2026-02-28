@@ -2,12 +2,13 @@ import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remi
 import { Form, Link, redirect, useActionData, useNavigation, useParams } from "@remix-run/react";
 import { useState } from "react";
 import { DateSelector } from "~/components/date-selector";
+import { formatDateShort, formatTimeRange } from "~/lib/date-utils";
 import { createAvailabilityRequest } from "~/services/availability.server";
 import { sendAvailabilityRequestNotification } from "~/services/email.server";
 import { getGroupWithMembers, requireGroupAdmin } from "~/services/groups.server";
 
 export const meta: MetaFunction = () => {
-	return [{ title: "New Availability Request — GreenRoom" }];
+	return [{ title: "New Availability Request — My Call Time" }];
 };
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -27,6 +28,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	const dateRangeEnd = formData.get("dateRangeEnd");
 	const selectedDatesRaw = formData.get("selectedDates");
 	const expiresAt = formData.get("expiresAt");
+	const requestedStartTime = formData.get("requestedStartTime");
+	const requestedEndTime = formData.get("requestedEndTime");
 
 	if (typeof title !== "string" || !title.trim()) {
 		return { error: "Title is required." };
@@ -39,6 +42,15 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	}
 	if (dateRangeStart > dateRangeEnd) {
 		return { error: "Start date must be before end date." };
+	}
+
+	const hasStartTime = typeof requestedStartTime === "string" && requestedStartTime;
+	const hasEndTime = typeof requestedEndTime === "string" && requestedEndTime;
+	if ((hasStartTime && !hasEndTime) || (!hasStartTime && hasEndTime)) {
+		return { error: "Please provide both start and end times, or leave both empty for all-day." };
+	}
+	if (hasStartTime && hasEndTime && requestedStartTime >= requestedEndTime) {
+		return { error: "End time must be after start time." };
 	}
 
 	let selectedDates: string[] = [];
@@ -61,6 +73,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		createdById: user.id,
 		expiresAt:
 			typeof expiresAt === "string" && expiresAt ? new Date(`${expiresAt}T23:59:59`) : undefined,
+		requestedStartTime: hasStartTime ? requestedStartTime : undefined,
+		requestedEndTime: hasEndTime ? requestedEndTime : undefined,
 	});
 
 	// Fire-and-forget email notification to group members
@@ -72,15 +86,19 @@ export async function action({ request, params }: ActionFunctionArgs) {
 			.map((m) => ({ email: m.email, name: m.name }));
 		if (recipients.length === 0) return;
 
-		const startDate = new Date(`${dateRangeStart}T00:00:00`);
-		const endDate = new Date(`${dateRangeEnd}T00:00:00`);
-		const dateRange = `${startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+		const dateRange = `${formatDateShort(`${dateRangeStart}T00:00:00`)} – ${formatDateShort(`${dateRangeEnd}T00:00:00`)}`;
+		const timeRangeStr = formatTimeRange(
+			typeof requestedStartTime === "string" && requestedStartTime ? requestedStartTime : null,
+			typeof requestedEndTime === "string" && requestedEndTime ? requestedEndTime : null,
+		);
+		const dateRangeDisplay =
+			timeRangeStr !== "All day" ? `${dateRange} · ${timeRangeStr}` : dateRange;
 
 		void sendAvailabilityRequestNotification({
 			requestId: req.id,
 			requestTitle: req.title,
 			groupName: groupData.group.name,
-			dateRange,
+			dateRange: dateRangeDisplay,
 			createdByName: user.name,
 			recipients,
 			requestUrl: `${appUrl}/groups/${groupId}/availability/${req.id}`,
@@ -223,6 +241,44 @@ export default function NewAvailabilityRequest() {
 					</div>
 				</div>
 
+				{/* Time Range (optional) */}
+				<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+					<h3 className="mb-1 text-sm font-semibold text-slate-900">Time Range (optional)</h3>
+					<p className="mb-4 text-xs text-slate-500">
+						If your event has a specific time, let members know what hours you&apos;re asking about.
+					</p>
+					<div className="grid gap-4 sm:grid-cols-2">
+						<div>
+							<label
+								htmlFor="requestedStartTime"
+								className="block text-sm font-medium text-slate-700"
+							>
+								Start Time
+							</label>
+							<input
+								id="requestedStartTime"
+								name="requestedStartTime"
+								type="time"
+								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+							/>
+						</div>
+						<div>
+							<label
+								htmlFor="requestedEndTime"
+								className="block text-sm font-medium text-slate-700"
+							>
+								End Time
+							</label>
+							<input
+								id="requestedEndTime"
+								name="requestedEndTime"
+								type="time"
+								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+							/>
+						</div>
+					</div>
+				</div>
+
 				{/* Preview */}
 				{selectedDates.length > 0 && (
 					<div className="rounded-xl border border-emerald-200 bg-emerald-50 p-6">
@@ -237,11 +293,7 @@ export default function NewAvailabilityRequest() {
 									key={d}
 									className="rounded-md bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-800"
 								>
-									{new Date(`${d}T00:00:00`).toLocaleDateString("en-US", {
-										month: "short",
-										day: "numeric",
-										weekday: "short",
-									})}
+									{formatDateShort(`${d}T00:00:00`)}
 								</span>
 							))}
 						</div>

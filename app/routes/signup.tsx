@@ -6,7 +6,7 @@ import { createUserSession, getOptionalUser, registerUser } from "~/services/aut
 import { checkSignupRateLimit } from "~/services/rate-limit.server";
 
 export const meta: MetaFunction = () => {
-	return [{ title: "Sign Up — GreenRoom" }];
+	return [{ title: "Sign Up — My Call Time" }];
 };
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -85,7 +85,7 @@ export default function Signup() {
 				<div className="text-center">
 					<div className="text-3xl">🎭</div>
 					<h1 className="mt-3 text-3xl font-bold text-slate-900">Create your account</h1>
-					<p className="mt-2 text-slate-600">Join GreenRoom and start scheduling</p>
+					<p className="mt-2 text-slate-600">Join My Call Time and start scheduling</p>
 				</div>
 
 				<div className="mt-8 rounded-xl border border-slate-200 bg-white p-8 shadow-sm">

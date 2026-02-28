@@ -7,6 +7,7 @@ import {
 	groupMemberships,
 	groups,
 } from "../../src/db/schema.js";
+import { formatDateRange } from "../lib/date-utils.js";
 
 export async function getDashboardData(userId: string) {
 	const [userGroups, upcomingEvents, pendingRequests, pendingConfirmations] = await Promise.all([
@@ -135,14 +136,4 @@ export async function getDashboardData(userId: string) {
 		pendingRequests: formattedPendingRequests,
 		pendingConfirmations,
 	};
-}
-
-function formatDateRange(start: Date, end: Date): string {
-	const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
-	const startStr = start.toLocaleDateString("en-US", opts);
-	const endStr = end.toLocaleDateString("en-US", {
-		...opts,
-		year: "numeric",
-	});
-	return `${startStr} – ${endStr}`;
 }

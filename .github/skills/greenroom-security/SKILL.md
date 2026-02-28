@@ -1,13 +1,13 @@
 ---
 name: greenroom-security
-description: GreenRoom security patterns, auth guards, multi-tenancy isolation, and rate limiting
+description: My Call Time security patterns, auth guards, multi-tenancy isolation, and rate limiting
 ---
 
-# GreenRoom Security Patterns
+# My Call Time Security Patterns
 
 ## Auth Guard Hierarchy
 
-GreenRoom uses three levels of auth protection. Choose the correct guard based on what the route does:
+My Call Time uses three levels of auth protection. Choose the correct guard based on what the route does:
 
 ### `requireUser(request)` — Any Authenticated User
 
@@ -71,7 +71,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
 ## Multi-Tenancy Isolation
 
-GreenRoom enforces data isolation at the application layer, not through PostgreSQL Row-Level Security. This means every query must explicitly filter by group.
+My Call Time enforces data isolation at the application layer, not through PostgreSQL Row-Level Security. This means every query must explicitly filter by group.
 
 ### Rule 1: Every Group Query Filters by `groupId`
 
@@ -265,7 +265,7 @@ const isValid = await bcrypt.compare(password, user.passwordHash);
 
 ## Google OAuth CSRF Protection
 
-GreenRoom uses the OAuth `state` parameter to prevent CSRF attacks on the callback:
+My Call Time uses the OAuth `state` parameter to prevent CSRF attacks on the callback:
 
 ### Flow
 

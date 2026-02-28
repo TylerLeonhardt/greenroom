@@ -5,7 +5,7 @@ import { requireUser } from "~/services/auth.server";
 import { createGroup, getUserGroups, joinGroup } from "~/services/groups.server";
 
 export const meta: MetaFunction = () => {
-	return [{ title: "Groups — GreenRoom" }];
+	return [{ title: "Groups — My Call Time" }];
 };
 
 export async function loader({ request }: LoaderFunctionArgs) {

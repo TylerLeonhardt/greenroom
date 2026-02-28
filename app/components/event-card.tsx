@@ -1,5 +1,6 @@
 import { Link } from "@remix-run/react";
 import { CalendarDays, Check, MapPin, Users } from "lucide-react";
+import { formatEventTime } from "~/lib/date-utils";
 
 interface EventCardProps {
 	id: string;
@@ -14,6 +15,7 @@ interface EventCardProps {
 	userStatus?: string | null;
 	groupName?: string;
 	compact?: boolean;
+	timezone?: string | null;
 }
 
 const EVENT_TYPE_CONFIG: Record<string, { emoji: string; label: string; color: string }> = {
@@ -21,25 +23,6 @@ const EVENT_TYPE_CONFIG: Record<string, { emoji: string; label: string; color: s
 	rehearsal: { emoji: "🎯", label: "Rehearsal", color: "bg-emerald-100 text-emerald-700" },
 	other: { emoji: "📅", label: "Other", color: "bg-slate-100 text-slate-700" },
 };
-
-function formatEventTime(startTime: string, endTime: string): string {
-	const start = new Date(startTime);
-	const end = new Date(endTime);
-	const dateStr = start.toLocaleDateString("en-US", {
-		weekday: "short",
-		month: "short",
-		day: "numeric",
-	});
-	const startStr = start.toLocaleTimeString("en-US", {
-		hour: "numeric",
-		minute: "2-digit",
-	});
-	const endStr = end.toLocaleTimeString("en-US", {
-		hour: "numeric",
-		minute: "2-digit",
-	});
-	return `${dateStr} · ${startStr} – ${endStr}`;
-}
 
 export function EventCard({
 	id,
@@ -54,6 +37,7 @@ export function EventCard({
 	userStatus,
 	groupName,
 	compact,
+	timezone,
 }: EventCardProps) {
 	const config = EVENT_TYPE_CONFIG[eventType] ?? EVENT_TYPE_CONFIG.other;
 
@@ -78,7 +62,7 @@ export function EventCard({
 					<div className="mt-1.5 space-y-1">
 						<div className="flex items-center gap-1.5 text-xs text-slate-500">
 							<CalendarDays className="h-3.5 w-3.5" />
-							{formatEventTime(startTime, endTime)}
+							{formatEventTime(startTime, endTime, timezone ?? undefined)}
 						</div>
 						{location && (
 							<div className="flex items-center gap-1.5 text-xs text-slate-500">

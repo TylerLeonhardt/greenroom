@@ -1,11 +1,11 @@
 ---
 name: feature-builder
-description: Specialized agent for building new GreenRoom features
+description: Specialized agent for building new My Call Time features
 ---
 
-# GreenRoom Feature Builder
+# My Call Time Feature Builder
 
-You build new features for GreenRoom, an improv group scheduling platform. Follow these patterns exactly to match the existing codebase.
+You build new features for My Call Time, an improv group scheduling platform. Follow these patterns exactly to match the existing codebase.
 
 ## Step-by-Step Workflow
 
@@ -86,7 +86,7 @@ import { requireGroupMember } from "~/services/groups.server";
 import { getRecords } from "~/services/feature.server";
 
 export const meta: MetaFunction = () => {
-  return [{ title: "Feature — GreenRoom" }];
+  return [{ title: "Feature — My Call Time" }];
 };
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -262,5 +262,5 @@ Before committing:
 - [ ] Form actions validate all inputs (check for `typeof x !== "string"` and empty strings)
 - [ ] Error and success states display correctly in the UI
 - [ ] Loading states use `useNavigation().state === "submitting"` for button disabling
-- [ ] New routes have `meta` function returning a `{ title }` with "— GreenRoom" suffix
+- [ ] New routes have `meta` function returning a `{ title }` with "— My Call Time" suffix
 - [ ] Redirects after successful mutations (POST-redirect-GET pattern)

@@ -6,6 +6,7 @@ import {
 	useLoaderData,
 	useNavigation,
 	useParams,
+	useRouteLoaderData,
 } from "@remix-run/react";
 import {
 	ArrowLeft,
@@ -22,6 +23,7 @@ import {
 	X,
 } from "lucide-react";
 import { useState } from "react";
+import { formatDateLong, formatTime } from "~/lib/date-utils";
 import {
 	assignToEvent,
 	bulkAssignToEvent,
@@ -32,9 +34,10 @@ import {
 	updateAssignmentStatus,
 } from "~/services/events.server";
 import { getGroupWithMembers, isGroupAdmin, requireGroupMember } from "~/services/groups.server";
+import type { loader as groupLayoutLoader } from "./groups.$groupId";
 
 export const meta: MetaFunction = () => {
-	return [{ title: "Event Detail — GreenRoom" }];
+	return [{ title: "Event Detail — My Call Time" }];
 };
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -155,6 +158,8 @@ export default function EventDetail() {
 	const { event, assignments, isAdmin, userId, members, availabilityData } =
 		useLoaderData<typeof loader>();
 	const { groupId } = useParams();
+	const parentData = useRouteLoaderData<typeof groupLayoutLoader>("routes/groups.$groupId");
+	const timezone = parentData?.user?.timezone ?? undefined;
 	const actionData = useActionData<typeof action>();
 	const navigation = useNavigation();
 	const isSubmitting = navigation.state === "submitting";
@@ -176,25 +181,11 @@ export default function EventDetail() {
 		: assignments;
 	const canSelfRegister = !myAssignment && !isAdmin;
 
-	const startDate = new Date(event.startTime);
-	const endDate = new Date(event.endTime);
-	const callTimeDate = event.callTime ? new Date(event.callTime as unknown as string) : null;
-	const dateStr = startDate.toLocaleDateString("en-US", {
-		weekday: "long",
-		month: "long",
-		day: "numeric",
-		year: "numeric",
-	});
-	const startTimeStr = startDate.toLocaleTimeString("en-US", {
-		hour: "numeric",
-		minute: "2-digit",
-	});
-	const endTimeStr = endDate.toLocaleTimeString("en-US", {
-		hour: "numeric",
-		minute: "2-digit",
-	});
-	const callTimeStr = callTimeDate
-		? callTimeDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+	const dateStr = formatDateLong(event.startTime, timezone);
+	const startTimeStr = formatTime(event.startTime, timezone);
+	const endTimeStr = formatTime(event.endTime, timezone);
+	const callTimeStr = event.callTime
+		? formatTime(event.callTime as unknown as string, timezone)
 		: null;
 
 	const toggleUser = (id: string) => {

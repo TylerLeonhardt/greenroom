@@ -20,6 +20,8 @@ export async function createAvailabilityRequest(data: {
 	requestedDates: string[];
 	createdById: string;
 	expiresAt?: Date;
+	requestedStartTime?: string;
+	requestedEndTime?: string;
 }): Promise<AvailabilityRequest> {
 	const [request] = await db
 		.insert(availabilityRequests)
@@ -32,6 +34,8 @@ export async function createAvailabilityRequest(data: {
 			requestedDates: data.requestedDates,
 			createdById: data.createdById,
 			expiresAt: data.expiresAt ?? null,
+			requestedStartTime: data.requestedStartTime ?? null,
+			requestedEndTime: data.requestedEndTime ?? null,
 		})
 		.returning();
 	if (!request) throw new Error("Failed to create availability request.");
@@ -58,6 +62,8 @@ export async function getGroupAvailabilityRequests(groupId: string): Promise<
 			dateRangeStart: availabilityRequests.dateRangeStart,
 			dateRangeEnd: availabilityRequests.dateRangeEnd,
 			requestedDates: availabilityRequests.requestedDates,
+			requestedStartTime: availabilityRequests.requestedStartTime,
+			requestedEndTime: availabilityRequests.requestedEndTime,
 			status: availabilityRequests.status,
 			createdById: availabilityRequests.createdById,
 			createdAt: availabilityRequests.createdAt,
@@ -97,6 +103,8 @@ export async function getAvailabilityRequest(
 			dateRangeStart: availabilityRequests.dateRangeStart,
 			dateRangeEnd: availabilityRequests.dateRangeEnd,
 			requestedDates: availabilityRequests.requestedDates,
+			requestedStartTime: availabilityRequests.requestedStartTime,
+			requestedEndTime: availabilityRequests.requestedEndTime,
 			status: availabilityRequests.status,
 			createdById: availabilityRequests.createdById,
 			createdAt: availabilityRequests.createdAt,

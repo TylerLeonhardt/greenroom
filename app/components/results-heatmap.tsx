@@ -1,5 +1,6 @@
 import { Check, ChevronDown, ChevronRight, HelpCircle, Star, X } from "lucide-react";
 import { Fragment, useState } from "react";
+import { formatDateDisplay } from "~/lib/date-utils";
 
 interface DateResult {
 	date: string;
@@ -18,14 +19,8 @@ interface ResultsHeatmapProps {
 	totalResponded: number;
 	groupId: string;
 	requestId?: string;
-}
-
-function formatDateDisplay(dateStr: string): { dayOfWeek: string; display: string } {
-	const date = new Date(`${dateStr}T00:00:00`);
-	return {
-		dayOfWeek: date.toLocaleDateString("en-US", { weekday: "short" }),
-		display: date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-	};
+	timeRange?: string | null;
+	timezone?: string | null;
 }
 
 function getHeatColor(score: number, maxScore: number): string {
@@ -56,6 +51,8 @@ export function ResultsHeatmap({
 	totalResponded,
 	groupId,
 	requestId,
+	timeRange,
+	timezone,
 }: ResultsHeatmapProps) {
 	const [expandedDate, setExpandedDate] = useState<string | null>(null);
 	const [sortBy, setSortBy] = useState<"date" | "score">("date");
@@ -68,6 +65,12 @@ export function ResultsHeatmap({
 
 	return (
 		<div className="space-y-4">
+			{/* Time range indicator */}
+			{timeRange && (
+				<div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+					⏰ Time: <span className="font-medium text-slate-900">{timeRange}</span> each day
+				</div>
+			)}
 			{/* Summary bar */}
 			<div className="flex flex-wrap items-center justify-between gap-4">
 				<div className="flex items-center gap-4 text-sm">
@@ -126,7 +129,7 @@ export function ResultsHeatmap({
 						</thead>
 						<tbody className="divide-y divide-slate-100">
 							{sortedDates.map((row) => {
-								const { dayOfWeek, display } = formatDateDisplay(row.date);
+								const { dayOfWeek, display } = formatDateDisplay(row.date, timezone ?? undefined);
 								const isExpanded = expandedDate === row.date;
 								const isBest = topDateSet.has(row.date) && row.score > 0;
 								return (
@@ -208,7 +211,7 @@ export function ResultsHeatmap({
 			{/* Mobile cards */}
 			<div className="space-y-2 sm:hidden">
 				{sortedDates.map((row) => {
-					const { dayOfWeek, display } = formatDateDisplay(row.date);
+					const { dayOfWeek, display } = formatDateDisplay(row.date, timezone ?? undefined);
 					const isExpanded = expandedDate === row.date;
 					const isBest = topDateSet.has(row.date) && row.score > 0;
 					return (

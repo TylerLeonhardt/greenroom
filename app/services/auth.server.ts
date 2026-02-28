@@ -15,6 +15,7 @@ export interface AuthUser {
 	email: string;
 	name: string;
 	profileImage: string | null;
+	timezone: string | null;
 }
 
 function toAuthUser(user: UserRecord): AuthUser {
@@ -23,6 +24,7 @@ function toAuthUser(user: UserRecord): AuthUser {
 		email: user.email,
 		name: user.name,
 		profileImage: user.profileImage,
+		timezone: user.timezone,
 	};
 }
 
@@ -284,6 +286,10 @@ export async function getOptionalUser(request: Request): Promise<AuthUser | null
 	const userId = await getUserId(request);
 	if (!userId) return null;
 	return getUserById(userId);
+}
+
+export async function updateUserTimezone(userId: string, timezone: string): Promise<void> {
+	await db.update(users).set({ timezone, updatedAt: new Date() }).where(eq(users.id, userId));
 }
 
 export { createUserSession } from "./session.server.js";

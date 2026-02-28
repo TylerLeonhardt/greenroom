@@ -14,7 +14,7 @@ import { deleteEvent, getEventWithAssignments, updateEvent } from "~/services/ev
 import { requireGroupAdmin } from "~/services/groups.server";
 
 export const meta: MetaFunction = () => {
-	return [{ title: "Edit Event — GreenRoom" }];
+	return [{ title: "Edit Event — My Call Time" }];
 };
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
