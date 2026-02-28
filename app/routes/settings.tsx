@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { requireUser, updateUserTimezone } from "~/services/auth.server";
 
 export const meta: MetaFunction = () => {
-	return [{ title: "Settings — GreenRoom" }];
+	return [{ title: "Settings — My Call Time" }];
 };
 
 export async function loader({ request }: LoaderFunctionArgs) {

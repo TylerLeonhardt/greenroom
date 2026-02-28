@@ -1,6 +1,6 @@
-# 🚀 GreenRoom Deployment Guide
+# 🚀 My Call Time Deployment Guide
 
-> **Who this is for:** You have a Mac, an Azure account with ~$150/month credit, and you want GreenRoom running on the internet. No infrastructure experience needed.
+> **Who this is for:** You have a Mac, an Azure account with ~$150/month credit, and you want My Call Time running on the internet. No infrastructure experience needed.
 >
 > **Time:** ~30–60 minutes for Part 1. Parts 2–4 are optional but recommended.
 >
@@ -8,7 +8,7 @@
 
 ---
 
-## Part 1: One-Time Setup (Deploy GreenRoom to Azure)
+## Part 1: One-Time Setup (Deploy My Call Time to Azure)
 
 ### Step 1: Install the Azure CLI
 
@@ -42,7 +42,7 @@ A browser window will open. Sign in with your Azure account, then come back to t
 
 ### Step 3: Create a Resource Group
 
-A resource group is just a folder in Azure that holds all your GreenRoom stuff together.
+A resource group is just a folder in Azure that holds all your My Call Time stuff together.
 
 - [ ] Run:
 
@@ -305,7 +305,7 @@ You should see:
 {"status":"ok","timestamp":"2026-02-27T..."}
 ```
 
-🎉 **Congratulations!** GreenRoom is live on the internet. But Google login won't work yet — do Part 3 to set that up.
+🎉 **Congratulations!** My Call Time is live on the internet. But Google login won't work yet — do Part 3 to set that up.
 
 ---
 
@@ -413,7 +413,7 @@ From now on, every push to `master` automatically deploys your latest code.
 
 - [ ] Click the project dropdown at the top of the page
 - [ ] Click **New Project**
-- [ ] Name it `GreenRoom` and click **Create**
+- [ ] Name it `My Call Time` and click **Create**
 - [ ] Make sure the new project is selected in the dropdown
 
 ### Step 3: Set Up the OAuth Consent Screen
@@ -421,7 +421,7 @@ From now on, every push to `master` automatically deploys your latest code.
 - [ ] In the left sidebar, go to **APIs & Services** → **OAuth consent screen**
 - [ ] Choose **External** and click **Create**
 - [ ] Fill in:
-  - **App name:** `GreenRoom`
+  - **App name:** `My Call Time`
   - **User support email:** your email
   - **Developer contact email:** your email
 - [ ] Click **Save and Continue** through the remaining steps (Scopes, Test Users)
@@ -432,7 +432,7 @@ From now on, every push to `master` automatically deploys your latest code.
 - [ ] In the left sidebar, go to **APIs & Services** → **Credentials**
 - [ ] Click **+ Create Credentials** → **OAuth client ID**
 - [ ] Choose **Web application**
-- [ ] Name it `GreenRoom`
+- [ ] Name it `My Call Time`
 - [ ] Under **Authorized redirect URIs**, click **+ Add URI** and enter:
 
 ```

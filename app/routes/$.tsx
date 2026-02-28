@@ -2,7 +2,7 @@ import type { MetaFunction } from "@remix-run/node";
 import { Link } from "@remix-run/react";
 
 export const meta: MetaFunction = () => {
-	return [{ title: "Page Not Found — GreenRoom" }];
+	return [{ title: "Page Not Found — My Call Time" }];
 };
 
 export default function CatchAll() {

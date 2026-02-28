@@ -4,7 +4,7 @@ import { logger } from "./logger.server.js";
 // --- Core Email Sender ---
 
 let emailClient: EmailClient | null = null;
-const senderAddress = "DoNotReply@greenroom.app";
+const senderAddress = "DoNotReply@mycalltime.app";
 
 function getEmailClient(): EmailClient | null {
 	if (emailClient) return emailClient;
@@ -68,14 +68,14 @@ function emailLayout(content: string): string {
 <tr><td align="center">
 <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background-color:#ffffff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;">
 <tr><td style="background-color:#059669;padding:24px 32px;">
-<span style="font-size:20px;font-weight:700;color:#ffffff;">🎭 GreenRoom</span>
+<span style="font-size:20px;font-weight:700;color:#ffffff;">🎭 My Call Time</span>
 </td></tr>
 <tr><td style="padding:32px;">
 ${content}
 </td></tr>
 <tr><td style="padding:16px 32px 24px;border-top:1px solid #e2e8f0;">
 <p style="margin:0;font-size:12px;color:#94a3b8;text-align:center;">
-You're receiving this because you're a member of a GreenRoom group.<br>
+You're receiving this because you're a member of a group on My Call Time.<br>
 To manage notifications, visit your account settings.
 </p>
 </td></tr>

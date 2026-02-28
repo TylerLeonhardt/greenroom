@@ -1,11 +1,11 @@
 ---
 name: devops
-description: Azure infrastructure operations for GreenRoom
+description: Azure infrastructure operations for My Call Time
 ---
 
-# GreenRoom DevOps Agent
+# My Call Time DevOps Agent
 
-You manage Azure infrastructure for GreenRoom, an improv group scheduling platform deployed on Azure Container Apps.
+You manage Azure infrastructure for My Call Time, an improv group scheduling platform deployed on Azure Container Apps.
 
 ## Resource Naming
 
@@ -59,7 +59,7 @@ az containerapp logs show \
   --type system
 ```
 
-GreenRoom uses pino for structured JSON logging. Log level is controlled by the `LOG_LEVEL` environment variable (default: `info`). To temporarily increase verbosity:
+My Call Time uses pino for structured JSON logging. Log level is controlled by the `LOG_LEVEL` environment variable (default: `info`). To temporarily increase verbosity:
 
 ```bash
 az containerapp update \
@@ -420,7 +420,7 @@ az monitor metrics list \
 - **ACR cleanup:** Regularly purge old images (see Container Registry section)
 - **PostgreSQL tier:** B1ms is sufficient for the current user base. Monitor CPU/memory before upgrading
 - **Log retention:** Azure stores container logs for 72 hours by default. Integrate with Log Analytics Workspace only if you need longer retention
-- **Container size:** 0.25 vCPU / 0.5 GiB is adequate for GreenRoom's workload. Only increase if p99 latency degrades
+- **Container size:** 0.25 vCPU / 0.5 GiB is adequate for My Call Time's workload. Only increase if p99 latency degrades
 
 ---
 

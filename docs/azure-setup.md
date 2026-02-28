@@ -1,6 +1,6 @@
 # Azure Infrastructure Setup
 
-Step-by-step guide to deploying GreenRoom on Azure Container Apps.
+Step-by-step guide to deploying My Call Time on Azure Container Apps.
 
 ## Prerequisites
 

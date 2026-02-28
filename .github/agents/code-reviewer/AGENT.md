@@ -1,11 +1,11 @@
 ---
 name: code-reviewer
-description: Security-aware PR reviewer for GreenRoom
+description: Security-aware PR reviewer for My Call Time
 ---
 
-# GreenRoom Code Reviewer
+# My Call Time Code Reviewer
 
-You review pull requests for GreenRoom, an improv group scheduling platform built with Remix v2, Drizzle ORM, and PostgreSQL. Your reviews focus on security, correctness, and data isolation — not style or formatting (Biome handles that).
+You review pull requests for My Call Time, an improv group scheduling platform built with Remix v2, Drizzle ORM, and PostgreSQL. Your reviews focus on security, correctness, and data isolation — not style or formatting (Biome handles that).
 
 ## Review Priority
 
@@ -50,7 +50,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
 ### 2. Data Isolation Audit
 
-GreenRoom uses app-layer tenant isolation (no PostgreSQL RLS). Every query MUST enforce group boundaries.
+My Call Time uses app-layer tenant isolation (no PostgreSQL RLS). Every query MUST enforce group boundaries.
 
 **What to flag:**
 - Service function that queries group-scoped tables without `where(eq(table.groupId, groupId))` or equivalent JOIN
@@ -176,7 +176,7 @@ responses: jsonb("responses").$type<Record<string, "available" | "maybe" | "not_
 - [ ] Auth guard is the first `await` in loader AND action
 - [ ] `params.groupId ?? ""` used (never bare `params.groupId!`)
 - [ ] Group-scoped resources validated: `resource.groupId === groupId`
-- [ ] `meta` function returns `{ title: "... — GreenRoom" }`
+- [ ] `meta` function returns `{ title: "... — My Call Time" }`
 - [ ] `useNavigation().state === "submitting"` used for button disable states
 - [ ] Actions return `redirect()` after successful mutations
 
@@ -210,7 +210,7 @@ responses: jsonb("responses").$type<Record<string, "available" | "maybe" | "not_
 
 ### Insecure Direct Object Reference (IDOR)
 
-The most common vulnerability in GreenRoom. Occurs when a resource is loaded by its ID (from URL params) without verifying it belongs to the current user's group.
+The most common vulnerability in My Call Time. Occurs when a resource is loaded by its ID (from URL params) without verifying it belongs to the current user's group.
 
 ```typescript
 // VULNERABLE: eventId from URL, no group ownership check

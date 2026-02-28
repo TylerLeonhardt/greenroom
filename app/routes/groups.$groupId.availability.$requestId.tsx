@@ -26,7 +26,7 @@ import type { loader as groupLayoutLoader } from "./groups.$groupId";
 type AvailabilityStatus = "available" | "maybe" | "not_available";
 
 export const meta: MetaFunction = () => {
-	return [{ title: "Availability Request — GreenRoom" }];
+	return [{ title: "Availability Request — My Call Time" }];
 };
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
