@@ -98,84 +98,25 @@ describe("requireUser", () => {
 		}
 	});
 
-	it("redirects unverified user from /dashboard to /check-email", async () => {
-		const record = makeUserRecord({ emailVerified: false });
-		(getUserId as ReturnType<typeof vi.fn>).mockResolvedValue("user-1");
-		// First call: getUserById, second call: isEmailVerified
-		setupDbResponses([record], [{ emailVerified: false }]);
-
-		try {
-			await requireUser(new Request("http://localhost/dashboard"));
-			expect.fail("Should have thrown a redirect");
-		} catch (response) {
-			expect(response).toBeInstanceOf(Response);
-			expect((response as Response).status).toBe(302);
-			expect((response as Response).headers.get("Location")).toBe("/check-email");
-		}
-	});
-
-	it("redirects unverified user from /groups to /check-email", async () => {
-		const record = makeUserRecord({ emailVerified: false });
-		(getUserId as ReturnType<typeof vi.fn>).mockResolvedValue("user-1");
-		setupDbResponses([record], [{ emailVerified: false }]);
-
-		try {
-			await requireUser(new Request("http://localhost/groups"));
-			expect.fail("Should have thrown a redirect");
-		} catch (response) {
-			expect(response).toBeInstanceOf(Response);
-			expect((response as Response).status).toBe(302);
-			expect((response as Response).headers.get("Location")).toBe("/check-email");
-		}
-	});
-
-	it("allows unverified user on /check-email", async () => {
-		const record = makeUserRecord({ emailVerified: false });
-		(getUserId as ReturnType<typeof vi.fn>).mockResolvedValue("user-1");
-		setupDbResponses([record], [{ emailVerified: false }]);
-
-		const result = await requireUser(new Request("http://localhost/check-email"));
-		expect(result).toEqual(expectedAuthUser(record));
-	});
-
-	it("allows unverified user on /verify-email", async () => {
-		const record = makeUserRecord({ emailVerified: false });
-		(getUserId as ReturnType<typeof vi.fn>).mockResolvedValue("user-1");
-		setupDbResponses([record], [{ emailVerified: false }]);
-
-		const result = await requireUser(new Request("http://localhost/verify-email?token=abc123"));
-		expect(result).toEqual(expectedAuthUser(record));
-	});
-
-	it("allows unverified user on /logout", async () => {
-		const record = makeUserRecord({ emailVerified: false });
-		(getUserId as ReturnType<typeof vi.fn>).mockResolvedValue("user-1");
-		setupDbResponses([record], [{ emailVerified: false }]);
-
-		const result = await requireUser(new Request("http://localhost/logout"));
-		expect(result).toEqual(expectedAuthUser(record));
-	});
-
-	it("allows unverified user on /settings", async () => {
-		const record = makeUserRecord({ emailVerified: false });
-		(getUserId as ReturnType<typeof vi.fn>).mockResolvedValue("user-1");
-		setupDbResponses([record], [{ emailVerified: false }]);
-
-		const result = await requireUser(new Request("http://localhost/settings"));
-		expect(result).toEqual(expectedAuthUser(record));
-	});
-
-	it("allows verified user on any path", async () => {
+	it("returns user when session is valid (no email verification check)", async () => {
 		const record = makeUserRecord({ emailVerified: true });
 		(getUserId as ReturnType<typeof vi.fn>).mockResolvedValue("user-1");
-		// isEmailVerified returns true — only one extra DB call
-		setupDbResponses([record], [{ emailVerified: true }]);
+		setupDbResponses([record]);
 
 		const result = await requireUser(new Request("http://localhost/dashboard"));
 		expect(result).toEqual(expectedAuthUser(record));
 	});
 
-	it("allows verified Google OAuth user on any path", async () => {
+	it("returns user on any path when session is valid", async () => {
+		const record = makeUserRecord({ emailVerified: true });
+		(getUserId as ReturnType<typeof vi.fn>).mockResolvedValue("user-1");
+		setupDbResponses([record]);
+
+		const result = await requireUser(new Request("http://localhost/groups/some-id/events"));
+		expect(result).toEqual(expectedAuthUser(record));
+	});
+
+	it("returns verified Google OAuth user", async () => {
 		const record = makeUserRecord({
 			id: "user-2",
 			email: "google@example.com",
@@ -186,7 +127,7 @@ describe("requireUser", () => {
 			timezone: "America/Los_Angeles",
 		});
 		(getUserId as ReturnType<typeof vi.fn>).mockResolvedValue("user-2");
-		setupDbResponses([record], [{ emailVerified: true }]);
+		setupDbResponses([record]);
 
 		const result = await requireUser(new Request("http://localhost/groups/some-id/events"));
 		expect(result).toEqual(expectedAuthUser(record));

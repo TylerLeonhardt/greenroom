@@ -93,13 +93,10 @@ describe("login route", () => {
 			expect(createUserSession).toHaveBeenCalledWith("user-1", "/dashboard");
 		});
 
-		it("redirects to /check-email when email is not verified", async () => {
+		it("returns error when email is not verified (no session created)", async () => {
 			const user = { id: "user-1", email: "test@example.com", name: "Test", profileImage: null };
 			(authenticator.authenticate as ReturnType<typeof vi.fn>).mockResolvedValue(user);
 			(isEmailVerified as ReturnType<typeof vi.fn>).mockResolvedValue(false);
-			(createUserSession as ReturnType<typeof vi.fn>).mockResolvedValue(
-				new Response(null, { status: 302, headers: { Location: "/check-email" } }),
-			);
 
 			const formData = new FormData();
 			formData.set("email", "test@example.com");
@@ -110,8 +107,12 @@ describe("login route", () => {
 				body: formData,
 			});
 
-			await action({ request, params: {}, context: {} });
-			expect(createUserSession).toHaveBeenCalledWith("user-1", "/check-email");
+			const result = await action({ request, params: {}, context: {} });
+			expect(result).toEqual({
+				error:
+					"Please verify your email first. Check your inbox or request a new verification link.",
+			});
+			expect(createUserSession).not.toHaveBeenCalled();
 		});
 
 		it("returns error on invalid credentials", async () => {

@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("~/services/auth.server", () => ({
 	getOptionalUser: vi.fn().mockResolvedValue(null),
 	registerUser: vi.fn(),
-	createUserSession: vi.fn(),
 	generateVerificationToken: vi.fn().mockResolvedValue("test-token-123"),
 }));
 
@@ -24,12 +23,7 @@ vi.mock("~/services/csrf.server", () => ({
 }));
 
 import { action, loader } from "~/routes/signup";
-import {
-	createUserSession,
-	generateVerificationToken,
-	getOptionalUser,
-	registerUser,
-} from "~/services/auth.server";
+import { generateVerificationToken, getOptionalUser, registerUser } from "~/services/auth.server";
 import { sendVerificationEmail } from "~/services/email.server";
 import { checkSignupRateLimit } from "~/services/rate-limit.server";
 
@@ -68,7 +62,7 @@ describe("signup route", () => {
 	});
 
 	describe("action", () => {
-		it("creates user, generates token, sends verification email, and redirects to /check-email", async () => {
+		it("creates user, generates token, sends verification email, and redirects to check-email", async () => {
 			const user = {
 				id: "new-user",
 				email: "new@example.com",
@@ -76,9 +70,6 @@ describe("signup route", () => {
 				profileImage: null,
 			};
 			(registerUser as ReturnType<typeof vi.fn>).mockResolvedValue({ user, isNew: true });
-			(createUserSession as ReturnType<typeof vi.fn>).mockResolvedValue(
-				new Response(null, { status: 302, headers: { Location: "/check-email" } }),
-			);
 
 			const formData = new FormData();
 			formData.set("name", "New User");
@@ -91,7 +82,12 @@ describe("signup route", () => {
 				body: formData,
 			});
 
-			await action({ request, params: {}, context: {} });
+			const result = await action({ request, params: {}, context: {} });
+			expect(result).toBeInstanceOf(Response);
+			expect((result as Response).status).toBe(302);
+			expect((result as Response).headers.get("Location")).toBe(
+				"/check-email?email=new%40example.com",
+			);
 			expect(registerUser).toHaveBeenCalledWith("new@example.com", "securepassword", "New User");
 			expect(generateVerificationToken).toHaveBeenCalledWith("new-user");
 			expect(sendVerificationEmail).toHaveBeenCalledWith({
@@ -99,10 +95,9 @@ describe("signup route", () => {
 				name: "New User",
 				verificationUrl: "http://localhost:5173/verify-email?token=test-token-123",
 			});
-			expect(createUserSession).toHaveBeenCalledWith("new-user", "/check-email");
 		});
 
-		it("returns generic success for duplicate email (prevents enumeration)", async () => {
+		it("redirects to check-email for duplicate email (prevents enumeration)", async () => {
 			const existingUser = {
 				id: "existing-user",
 				email: "existing@example.com",
@@ -126,11 +121,13 @@ describe("signup route", () => {
 			});
 
 			const result = await action({ request, params: {}, context: {} });
-			expect(result).toEqual({ success: true });
+			expect(result).toBeInstanceOf(Response);
+			expect((result as Response).status).toBe(302);
+			expect((result as Response).headers.get("Location")).toBe(
+				"/check-email?email=existing%40example.com",
+			);
 			// Should NOT send a verification email for existing accounts
 			expect(sendVerificationEmail).not.toHaveBeenCalled();
-			// Should NOT create a session for existing accounts
-			expect(createUserSession).not.toHaveBeenCalled();
 		});
 
 		it("returns error when passwords do not match", async () => {
