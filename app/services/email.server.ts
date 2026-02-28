@@ -1,5 +1,6 @@
 import { EmailClient } from "@azure/communication-email";
 import { logger } from "./logger.server.js";
+import { getTelemetryClient } from "./telemetry.server.js";
 
 // --- Core Email Sender ---
 
@@ -54,10 +55,38 @@ export async function sendEmail(options: {
 			"Email sent successfully",
 		);
 
+		getTelemetryClient()?.trackEvent({
+			name: "EmailSent",
+			properties: {
+				success: "true",
+				recipientCount: String(recipients.length),
+				subject: options.subject,
+			},
+		});
+
 		return { success: true };
 	} catch (error) {
 		const message = error instanceof Error ? error.message : "Unknown email error";
 		logger.error({ err: error, to: recipients }, "Failed to send email");
+
+		const telemetry = getTelemetryClient();
+		if (telemetry) {
+			telemetry.trackEvent({
+				name: "EmailSent",
+				properties: {
+					success: "false",
+					recipientCount: String(recipients.length),
+					subject: options.subject,
+				},
+			});
+			telemetry.trackException({
+				exception: error instanceof Error ? error : new Error(message),
+				properties: {
+					emailSubject: options.subject,
+					recipientCount: String(recipients.length),
+				},
+			});
+		}
 
 		return { success: false, error: message };
 	}
