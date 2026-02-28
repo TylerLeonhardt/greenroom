@@ -456,6 +456,30 @@ Production telemetry is powered by Azure Application Insights, initialized in `a
 | Application Insights | `mycalltime-insights` | `greenroom-rg` |
 | Log Analytics Workspace | `workspace-greenroomrgLC11` | `greenroom-rg` |
 | Action Group (alerts) | `mycalltime-alerts` | `greenroom-rg` |
+| Availability Test | `mycalltime-health-ping` | `greenroom-rg` |
+
+### Alert Rules
+
+| Alert | Type | Condition | Severity | Window |
+|-------|------|-----------|----------|--------|
+| `mycalltime-exception-spike` | Scheduled Query | >5 exceptions in 5 min | Sev 1 | 5 min |
+| `mycalltime-slow-response` | Metric | Avg response time >5s | Sev 2 | 5 min |
+| `mycalltime-availability-alert` | Webtest Availability | ≥2 locations fail | Sev 1 | 3 min |
+
+All alerts notify the `mycalltime-alerts` action group (tylerl0706@gmail.com).
+
+The **availability test** (`mycalltime-health-ping`) pings `https://mycalltime.app/api/health` every 5 minutes from 5 locations (US East, US West, UK, Netherlands, Hong Kong). It validates HTTP 200 and SSL certificate validity (7-day expiry warning).
+
+```bash
+# List alert rules
+az monitor scheduled-query list -g greenroom-rg -o table
+az monitor metrics alert list -g greenroom-rg -o table
+
+# Check availability test status
+az rest --method GET \
+  --url "https://management.azure.com/subscriptions/b37965f1-4da2-4202-889d-82322392b4d5/resourceGroups/greenroom-rg/providers/Microsoft.Insights/webtests?api-version=2022-06-15" \
+  --query "value[].{name:name, enabled:properties.Enabled}" -o table
+```
 
 ### Viewing Telemetry
 
@@ -500,6 +524,5 @@ getTelemetryClient()?.trackException({ exception: error });
 
 ## Known Issues / Tech Debt
 
-- **No CSRF tokens on mutations:** Form actions rely on `sameSite: "lax"` cookies but do not include CSRF tokens. While `sameSite` mitigates most CSRF vectors, explicit tokens would provide defense-in-depth for state-changing operations.
 - **Date serialization workarounds:** Remix serializes `Date` objects to strings when passing from loader to component. The codebase uses `as unknown as string` casts (e.g., in `groups.$groupId._index.tsx` for `startTime`/`endTime`). This is a known Remix limitation — consider a serialization helper or using ISO strings from the service layer.
 - **In-memory rate limiting:** Rate limiting uses an in-memory sliding window (`app/services/rate-limit.server.ts`). This works for single-instance deployments but does not share state across multiple container replicas. For multi-instance deployments, consider Redis-backed rate limiting.
