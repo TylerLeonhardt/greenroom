@@ -307,13 +307,13 @@ My Call Time uses the OAuth `state` parameter to prevent CSRF attacks on the cal
 
 4. **No account lockout:** Failed login attempts are rate-limited by IP, but there's no per-account lockout after N failed attempts. An attacker using distributed IPs can still brute-force a specific account.
 
-5. **No email verification on signup:** `emailVerified` defaults to `false` for email/password users, but there's no verification flow. Users can sign up with any email address.
+5. ~~**No email verification on signup:** Fixed in PR #36. Email verification flow with 24-hour token expiry, resend functionality, and login enforcement.~~
 
-6. **No security headers:** Missing X-Frame-Options, X-Content-Type-Options, Strict-Transport-Security, CSP, Referrer-Policy. ([#22](https://github.com/TylerLeonhardt/greenroom/issues/22))
+6. ~~**No security headers:** Fixed in PR #36. Added X-Frame-Options, X-Content-Type-Options, HSTS, CSP-Report-Only, Referrer-Policy, Permissions-Policy.~~
 
 7. **No account deletion / GDPR path:** Users cannot delete their accounts or request data deletion. ([#25](https://github.com/TylerLeonhardt/greenroom/issues/25))
 
-8. **Email enumeration on signup:** Registration reveals whether an email is already registered. ([#26](https://github.com/TylerLeonhardt/greenroom/issues/26))
+8. ~~**Email enumeration on signup:** Fixed in PR #36. Generic success messages, timing-safe bcrypt with dummy hash.~~
 
 ---
 
