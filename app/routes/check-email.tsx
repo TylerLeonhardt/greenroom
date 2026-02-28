@@ -1,10 +1,10 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
-import { Form, Link, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
 import { generateVerificationToken, getUserEmailById } from "~/services/auth.server";
 import { sendVerificationEmail } from "~/services/email.server";
 import { checkResendVerificationRateLimit } from "~/services/rate-limit.server";
-import { getUserId } from "~/services/session.server";
+import { destroyUserSession, getUserId } from "~/services/session.server";
 
 export const meta: MetaFunction = () => {
 	return [{ title: "Check Your Email — My Call Time" }];
@@ -25,6 +25,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+	const formData = await request.formData();
+	const intent = formData.get("intent");
+
+	// "Wrong email?" — destroy session and redirect to signup
+	if (intent === "change-email") {
+		return destroyUserSession(request, "/signup");
+	}
+
 	const userId = await getUserId(request);
 	if (!userId) {
 		return redirect("/login");
@@ -96,12 +104,15 @@ export default function CheckEmail() {
 					</Form>
 				</div>
 
-				<p className="mt-6 text-sm text-slate-600">
-					Wrong email?{" "}
-					<Link to="/signup" className="font-medium text-emerald-600 hover:text-emerald-700">
-						Sign up with a different email
-					</Link>
-				</p>
+				<Form method="post" className="mt-6">
+					<input type="hidden" name="intent" value="change-email" />
+					<p className="text-sm text-slate-600">
+						Wrong email?{" "}
+						<button type="submit" className="font-medium text-emerald-600 hover:text-emerald-700">
+							Sign up with a different email
+						</button>
+					</p>
+				</Form>
 			</div>
 		</div>
 	);
