@@ -22,7 +22,7 @@ export async function getDashboardData(userId: string) {
 				createdAt: groups.createdAt,
 				updatedAt: groups.updatedAt,
 				role: groupMemberships.role,
-				memberCount: sql<number>`cast(count(*) over (partition by ${groups.id}) as int)`,
+				memberCount: sql<number>`cast((select count(*) from ${groupMemberships} gm where gm.group_id = ${groups.id}) as int)`,
 			})
 			.from(groupMemberships)
 			.innerJoin(groups, eq(groupMemberships.groupId, groups.id))
