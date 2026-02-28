@@ -110,7 +110,7 @@ function NavBar() {
 				<button
 					type="button"
 					onClick={() => setMobileOpen(!mobileOpen)}
-					className="rounded-lg p-2 text-slate-600 transition-colors hover:bg-slate-100 sm:hidden"
+					className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 sm:hidden"
 					aria-label="Toggle menu"
 				>
 					{mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}

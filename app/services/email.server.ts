@@ -1,5 +1,6 @@
 import { EmailClient } from "@azure/communication-email";
 import { logger } from "./logger.server.js";
+import { getTelemetryClient } from "./telemetry.server.js";
 
 // --- Core Email Sender ---
 
@@ -49,10 +50,44 @@ export async function sendEmail(options: {
 			},
 		});
 		await poller.pollUntilDone();
+		logger.info(
+			{ recipientCount: recipients.length, subject: options.subject },
+			"Email sent successfully",
+		);
+
+		getTelemetryClient()?.trackEvent({
+			name: "EmailSent",
+			properties: {
+				success: "true",
+				recipientCount: String(recipients.length),
+				subject: options.subject,
+			},
+		});
+
 		return { success: true };
 	} catch (error) {
 		const message = error instanceof Error ? error.message : "Unknown email error";
 		logger.error({ err: error, to: recipients }, "Failed to send email");
+
+		const telemetry = getTelemetryClient();
+		if (telemetry) {
+			telemetry.trackEvent({
+				name: "EmailSent",
+				properties: {
+					success: "false",
+					recipientCount: String(recipients.length),
+					subject: options.subject,
+				},
+			});
+			telemetry.trackException({
+				exception: error instanceof Error ? error : new Error(message),
+				properties: {
+					emailSubject: options.subject,
+					recipientCount: String(recipients.length),
+				},
+			});
+		}
+
 		return { success: false, error: message };
 	}
 }
@@ -110,6 +145,8 @@ export async function sendVerificationEmail(options: {
 	name: string;
 	verificationUrl: string;
 }): Promise<void> {
+	logger.info("Sending verification email");
+
 	const html = emailLayout(`
 <h1 style="margin:0 0 8px;font-size:20px;color:#0f172a;">Verify Your Email</h1>
 <p style="margin:0 0 20px;font-size:14px;color:#64748b;">
@@ -122,12 +159,16 @@ This link expires in 24 hours. If you didn't create an account, you can safely i
 
 	const text = `Verify your email for My Call Time: ${options.verificationUrl}. This link expires in 24 hours.`;
 
-	await sendEmail({
+	const result = await sendEmail({
 		to: options.email,
 		subject: "Verify your email — My Call Time",
 		html,
 		text,
 	});
+
+	if (!result.success) {
+		logger.warn({ error: result.error }, "Verification email failed to send");
+	}
 }
 
 export async function sendAvailabilityRequestNotification(options: {
