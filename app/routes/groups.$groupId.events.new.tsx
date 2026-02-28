@@ -10,6 +10,7 @@ import {
 } from "@remix-run/react";
 import { ArrowLeft, Clock, Users } from "lucide-react";
 import { useState } from "react";
+import { InlineTimezoneSelector } from "~/components/timezone-selector";
 import { formatEventTime } from "~/lib/date-utils";
 import { getAvailabilityRequest } from "~/services/availability.server";
 import {
@@ -29,7 +30,7 @@ export const meta: MetaFunction = () => {
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
 	const groupId = params.groupId ?? "";
-	await requireGroupAdmin(request, groupId);
+	const user = await requireGroupAdmin(request, groupId);
 
 	const url = new URL(request.url);
 	const fromRequestId = url.searchParams.get("fromRequest");
@@ -50,7 +51,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 	const groupData = await getGroupWithMembers(groupId);
 	const members = groupData?.members ?? [];
 
-	return { fromRequest, prefillDate, members, availabilityData };
+	return { fromRequest, prefillDate, members, availabilityData, userTimezone: user.timezone };
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -200,7 +201,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
 export default function NewEvent() {
 	const { groupId } = useParams();
-	const { fromRequest, prefillDate, members, availabilityData } = useLoaderData<typeof loader>();
+	const { fromRequest, prefillDate, members, availabilityData, userTimezone } =
+		useLoaderData<typeof loader>();
 	const actionData = useActionData<typeof action>();
 	const navigation = useNavigation();
 	const isSubmitting = navigation.state === "submitting";
@@ -333,6 +335,9 @@ export default function NewEvent() {
 				{/* Date & Time */}
 				<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
 					<h3 className="mb-4 text-sm font-semibold text-slate-900">Date & Time</h3>
+					<div className="mb-4">
+						<InlineTimezoneSelector timezone={userTimezone} />
+					</div>
 					<div className="grid gap-4 sm:grid-cols-3">
 						<div>
 							<label htmlFor="date" className="block text-sm font-medium text-slate-700">

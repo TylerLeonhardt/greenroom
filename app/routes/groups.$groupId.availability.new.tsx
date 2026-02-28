@@ -1,7 +1,16 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
-import { Form, Link, redirect, useActionData, useNavigation, useParams } from "@remix-run/react";
+import {
+	Form,
+	Link,
+	redirect,
+	useActionData,
+	useLoaderData,
+	useNavigation,
+	useParams,
+} from "@remix-run/react";
 import { useState } from "react";
 import { DateSelector } from "~/components/date-selector";
+import { InlineTimezoneSelector } from "~/components/timezone-selector";
 import { formatDateShort, formatTimeRange } from "~/lib/date-utils";
 import { createAvailabilityRequest } from "~/services/availability.server";
 import { sendAvailabilityRequestNotification } from "~/services/email.server";
@@ -13,8 +22,8 @@ export const meta: MetaFunction = () => {
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
 	const groupId = params.groupId ?? "";
-	await requireGroupAdmin(request, groupId);
-	return {};
+	const user = await requireGroupAdmin(request, groupId);
+	return { userTimezone: user.timezone };
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -110,6 +119,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
 export default function NewAvailabilityRequest() {
 	const { groupId } = useParams();
+	const { userTimezone } = useLoaderData<typeof loader>();
 	const actionData = useActionData<typeof action>();
 	const navigation = useNavigation();
 	const isSubmitting = navigation.state === "submitting";
@@ -247,6 +257,9 @@ export default function NewAvailabilityRequest() {
 					<p className="mb-4 text-xs text-slate-500">
 						If your event has a specific time, let members know what hours you&apos;re asking about.
 					</p>
+					<div className="mb-4">
+						<InlineTimezoneSelector timezone={userTimezone} />
+					</div>
 					<div className="grid gap-4 sm:grid-cols-2">
 						<div>
 							<label
