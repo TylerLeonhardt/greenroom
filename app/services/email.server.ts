@@ -136,7 +136,7 @@ export async function sendVerificationEmail(options: {
 
 	const result = await sendEmail({
 		to: options.email,
-		subject: "Verify your email — My Call Time",
+		subject: "Verify your email - My Call Time",
 		html,
 		text,
 	});
