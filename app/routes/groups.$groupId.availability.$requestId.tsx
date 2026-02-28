@@ -10,6 +10,7 @@ import {
 import { ArrowLeft, Clock, Lock, LockOpen, Users } from "lucide-react";
 import { useState } from "react";
 import { AvailabilityGrid } from "~/components/availability-grid";
+import { CsrfInput } from "~/components/csrf-input";
 import { ResultsHeatmap } from "~/components/results-heatmap";
 import { formatDateMedium, formatTimeRange } from "~/lib/date-utils";
 import {
@@ -20,6 +21,7 @@ import {
 	reopenAvailabilityRequest,
 	submitAvailabilityResponse,
 } from "~/services/availability.server";
+import { validateCsrfToken } from "~/services/csrf.server";
 import { isGroupAdmin, requireGroupMember } from "~/services/groups.server";
 import type { loader as groupLayoutLoader } from "./groups.$groupId";
 
@@ -52,6 +54,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	const user = await requireGroupMember(request, groupId);
 
 	const formData = await request.formData();
+	await validateCsrfToken(request, formData);
 	const intent = formData.get("intent");
 
 	if (intent === "respond") {
@@ -173,6 +176,7 @@ export default function AvailabilityRequestDetail() {
 					</div>
 					{isAdmin && (
 						<Form method="post">
+							<CsrfInput />
 							<input type="hidden" name="intent" value={isClosed ? "reopen" : "close"} />
 							<button
 								type="submit"
@@ -248,6 +252,7 @@ export default function AvailabilityRequestDetail() {
 					/>
 					{!isClosed && (
 						<Form method="post" className="mt-6">
+							<CsrfInput />
 							<input type="hidden" name="intent" value="respond" />
 							<input type="hidden" name="responses" value={JSON.stringify(responses)} />
 							<button

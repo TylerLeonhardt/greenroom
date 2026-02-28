@@ -39,6 +39,11 @@ vi.mock("~/services/email.server", () => ({
 	sendEventFromAvailabilityNotification: vi.fn(),
 }));
 
+// Mock CSRF validation — allow all by default
+vi.mock("~/services/csrf.server", () => ({
+	validateCsrfToken: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { action } from "~/routes/groups.$groupId.events.new";
 
 function makeRequest(fields: Record<string, string | string[]>) {

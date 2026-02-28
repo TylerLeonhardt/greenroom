@@ -195,6 +195,57 @@ export async function action({ request }: ActionFunctionArgs) {
 
 ---
 
+## CSRF Token Protection
+
+All POST forms include CSRF tokens for defense-in-depth (on top of `sameSite: "lax"` cookies).
+
+### How It Works
+
+1. **Token generation:** `generateCsrfToken(request)` in `app/services/csrf.server.ts` creates a 32-byte random token per session, stored in the session cookie under `csrfToken`.
+2. **Hidden input:** `<CsrfInput />` from `app/components/csrf-input.tsx` reads the token from the root loader data and renders `<input type="hidden" name="_csrf" value={token} />`.
+3. **Validation:** `validateCsrfToken(request, formData)` compares the `_csrf` form field against the session token. Throws 403 on mismatch.
+
+### Usage in Routes
+
+```typescript
+// In root.tsx loader — generate and expose the token
+const { token: csrfToken, cookie } = await generateCsrfToken(request);
+return Response.json({ user, csrfToken }, { headers: { "Set-Cookie": cookie } });
+
+// In any action — validate before processing
+const formData = await request.formData();
+await validateCsrfToken(request, formData);
+
+// In any Form component — include the hidden input
+<Form method="post">
+  <CsrfInput />
+  {/* form fields */}
+</Form>
+```
+
+### Programmatic Form Submissions
+
+For `useSubmit()` calls (e.g., auto-detect timezone in settings), include the token manually:
+
+```typescript
+const rootData = useRouteLoaderData("root") as { csrfToken?: string } | undefined;
+const formData = new FormData();
+formData.set("_csrf", rootData?.csrfToken ?? "");
+submit(formData, { method: "post" });
+```
+
+### Testing
+
+Mock the CSRF validation in tests to avoid needing real session tokens:
+
+```typescript
+vi.mock("~/services/csrf.server", () => ({
+  validateCsrfToken: vi.fn().mockResolvedValue(undefined),
+}));
+```
+
+---
+
 ## Session Security
 
 ### Cookie Configuration
@@ -299,7 +350,7 @@ My Call Time uses the OAuth `state` parameter to prevent CSRF attacks on the cal
 
 ## Known Security Tech Debt
 
-1. **No CSRF tokens on form mutations:** Relies on `sameSite: "lax"` cookies. While this mitigates most CSRF vectors, explicit tokens would provide defense-in-depth. ([#24](https://github.com/TylerLeonhardt/greenroom/issues/24))
+1. ~~**No CSRF tokens on form mutations:** Fixed in PR for #24. All POST forms now include a hidden `_csrf` token validated in every action via `validateCsrfToken()`.~~
 
 2. **`rejectUnauthorized: false` in production SSL:** The PostgreSQL connection skips certificate validation (`src/db/index.ts`). Vulnerable to MITM attacks between the app container and database. Fix: bundle the Azure CA certificate. ([#23](https://github.com/TylerLeonhardt/greenroom/issues/23))
 

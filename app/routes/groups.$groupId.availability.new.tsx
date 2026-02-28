@@ -9,10 +9,12 @@ import {
 	useParams,
 } from "@remix-run/react";
 import { useState } from "react";
+import { CsrfInput } from "~/components/csrf-input";
 import { DateSelector } from "~/components/date-selector";
 import { InlineTimezoneSelector } from "~/components/timezone-selector";
 import { formatDateShort, formatTimeRange } from "~/lib/date-utils";
 import { createAvailabilityRequest } from "~/services/availability.server";
+import { validateCsrfToken } from "~/services/csrf.server";
 import { sendAvailabilityRequestNotification } from "~/services/email.server";
 import { getGroupWithMembers, requireGroupAdminOrPermission } from "~/services/groups.server";
 
@@ -30,6 +32,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	const groupId = params.groupId ?? "";
 	const user = await requireGroupAdminOrPermission(request, groupId, "membersCanCreateRequests");
 	const formData = await request.formData();
+	await validateCsrfToken(request, formData);
 
 	const title = formData.get("title");
 	const description = formData.get("description");
@@ -172,6 +175,7 @@ export default function NewAvailabilityRequest() {
 			)}
 
 			<Form method="post" className="space-y-6">
+				<CsrfInput />
 				<input type="hidden" name="selectedDates" value={JSON.stringify(selectedDates)} />
 
 				{/* Title */}

@@ -1,9 +1,18 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
-import { Form, useActionData, useLoaderData, useNavigation, useSubmit } from "@remix-run/react";
+import {
+	Form,
+	useActionData,
+	useLoaderData,
+	useNavigation,
+	useRouteLoaderData,
+	useSubmit,
+} from "@remix-run/react";
 import { Globe, Save } from "lucide-react";
 import { useEffect, useRef } from "react";
+import { CsrfInput } from "~/components/csrf-input";
 import { COMMON_TIMEZONES, getTimezoneLabel } from "~/components/timezone-selector";
 import { requireUser, updateUserTimezone } from "~/services/auth.server";
+import { validateCsrfToken } from "~/services/csrf.server";
 
 export const meta: MetaFunction = () => {
 	return [{ title: "Settings — My Call Time" }];
@@ -17,6 +26,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 export async function action({ request }: ActionFunctionArgs) {
 	const user = await requireUser(request);
 	const formData = await request.formData();
+	await validateCsrfToken(request, formData);
 	const intent = formData.get("intent");
 
 	if (intent === "update-timezone") {
@@ -44,6 +54,7 @@ export default function Settings() {
 	const isSubmitting = navigation.state === "submitting";
 	const submit = useSubmit();
 	const autoDetectDone = useRef(false);
+	const rootData = useRouteLoaderData("root") as { csrfToken?: string } | undefined;
 
 	// Auto-detect timezone on first visit if not set
 	useEffect(() => {
@@ -54,10 +65,11 @@ export default function Settings() {
 				const formData = new FormData();
 				formData.set("intent", "update-timezone");
 				formData.set("timezone", detected);
+				formData.set("_csrf", rootData?.csrfToken ?? "");
 				submit(formData, { method: "post" });
 			}
 		}
-	}, [user.timezone, submit]);
+	}, [user.timezone, submit, rootData?.csrfToken]);
 
 	return (
 		<div className="mx-auto max-w-2xl">
@@ -88,6 +100,7 @@ export default function Settings() {
 					Set your timezone so dates and times display correctly.
 				</p>
 				<Form method="post" className="mt-4">
+					<CsrfInput />
 					<input type="hidden" name="intent" value="update-timezone" />
 					<div className="flex items-end gap-3">
 						<div className="flex-1">

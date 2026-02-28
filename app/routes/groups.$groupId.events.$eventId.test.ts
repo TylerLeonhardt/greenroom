@@ -36,6 +36,11 @@ vi.mock("~/services/events.server", () => ({
 	getAvailabilityForEventDate: vi.fn(),
 }));
 
+// Mock CSRF validation — allow all by default
+vi.mock("~/services/csrf.server", () => ({
+	validateCsrfToken: vi.fn().mockResolvedValue(undefined),
+}));
+
 import {
 	assignToEvent,
 	getEventWithAssignments,

@@ -31,6 +31,11 @@ vi.mock("~/services/availability.server", () => ({
 	reopenAvailabilityRequest: vi.fn(),
 }));
 
+// Mock CSRF validation — allow all by default
+vi.mock("~/services/csrf.server", () => ({
+	validateCsrfToken: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { action } from "~/routes/groups.$groupId.availability.$requestId";
 import { submitAvailabilityResponse } from "~/services/availability.server";
 import { isGroupAdmin, requireGroupMember } from "~/services/groups.server";

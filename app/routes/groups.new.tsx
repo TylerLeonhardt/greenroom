@@ -1,7 +1,9 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
 import { Form, Link, useActionData, useNavigation } from "@remix-run/react";
+import { CsrfInput } from "~/components/csrf-input";
 import { requireUser } from "~/services/auth.server";
+import { validateCsrfToken } from "~/services/csrf.server";
 import { createGroup } from "~/services/groups.server";
 
 export const meta: MetaFunction = () => {
@@ -16,6 +18,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 export async function action({ request }: ActionFunctionArgs) {
 	const user = await requireUser(request);
 	const formData = await request.formData();
+	await validateCsrfToken(request, formData);
 
 	const name = formData.get("name");
 	const description = formData.get("description");
@@ -66,6 +69,7 @@ export default function NewGroup() {
 					)}
 
 					<Form method="post" className="space-y-4">
+						<CsrfInput />
 						<div>
 							<label htmlFor="name" className="block text-sm font-medium text-slate-700">
 								Group Name

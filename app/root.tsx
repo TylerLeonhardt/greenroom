@@ -15,7 +15,9 @@ import {
 } from "@remix-run/react";
 import { Menu, X } from "lucide-react";
 import { useState } from "react";
+import { CsrfInput } from "~/components/csrf-input";
 import { getOptionalUser } from "~/services/auth.server";
+import { generateCsrfToken } from "~/services/csrf.server";
 import stylesheet from "./tailwind.css?url";
 
 export const links: LinksFunction = () => [
@@ -28,7 +30,8 @@ export const links: LinksFunction = () => [
 
 export async function loader({ request }: LoaderFunctionArgs) {
 	const user = await getOptionalUser(request);
-	return { user };
+	const { token: csrfToken, cookie } = await generateCsrfToken(request);
+	return Response.json({ user, csrfToken }, { headers: { "Set-Cookie": cookie } });
 }
 
 function NavLink({ to, children }: { to: string; children: React.ReactNode }) {
@@ -82,6 +85,7 @@ function NavBar() {
 								<UserAvatar name={user.name} />
 								<span className="text-sm font-medium text-slate-700">{user.name}</span>
 								<Form method="post" action="/logout">
+									<CsrfInput />
 									<button
 										type="submit"
 										className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 transition-colors hover:bg-slate-50"
@@ -152,6 +156,7 @@ function NavBar() {
 								Settings
 							</Link>
 							<Form method="post" action="/logout">
+								<CsrfInput />
 								<button
 									type="submit"
 									className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-50"

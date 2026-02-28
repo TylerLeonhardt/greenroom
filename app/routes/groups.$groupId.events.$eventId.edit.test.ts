@@ -32,6 +32,11 @@ vi.mock("~/services/events.server", () => ({
 	updateEvent: vi.fn().mockResolvedValue({}),
 }));
 
+// Mock CSRF validation — allow all by default
+vi.mock("~/services/csrf.server", () => ({
+	validateCsrfToken: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { action } from "~/routes/groups.$groupId.events.$eventId.edit";
 import { deleteEvent, getEventWithAssignments, updateEvent } from "~/services/events.server";
 import { requireGroupAdmin } from "~/services/groups.server";

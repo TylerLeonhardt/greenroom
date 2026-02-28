@@ -1,7 +1,9 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
 import { Form, Link, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { CsrfInput } from "~/components/csrf-input";
 import { getOptionalUser, requireUser } from "~/services/auth.server";
+import { validateCsrfToken } from "~/services/csrf.server";
 import { joinGroup } from "~/services/groups.server";
 
 export const meta: MetaFunction = () => {
@@ -18,6 +20,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 export async function action({ request }: ActionFunctionArgs) {
 	const user = await requireUser(request);
 	const formData = await request.formData();
+	await validateCsrfToken(request, formData);
 	const code = formData.get("code");
 
 	if (typeof code !== "string" || !code.trim()) {
@@ -82,6 +85,7 @@ export default function JoinGroup() {
 					)}
 
 					<Form method="post" className="space-y-4">
+						<CsrfInput />
 						<div>
 							<label htmlFor="code" className="block text-sm font-medium text-slate-700">
 								Invite Code

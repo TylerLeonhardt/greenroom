@@ -2,12 +2,14 @@ import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remi
 import { redirect } from "@remix-run/node";
 import { Form, Link, useActionData, useNavigation } from "@remix-run/react";
 import { useState } from "react";
+import { CsrfInput } from "~/components/csrf-input";
 import {
 	createUserSession,
 	generateVerificationToken,
 	getOptionalUser,
 	registerUser,
 } from "~/services/auth.server";
+import { validateCsrfToken } from "~/services/csrf.server";
 import { sendVerificationEmail } from "~/services/email.server";
 import { checkSignupRateLimit } from "~/services/rate-limit.server";
 
@@ -39,6 +41,7 @@ export async function action({ request }: ActionFunctionArgs) {
 	}
 
 	const formData = await request.formData();
+	await validateCsrfToken(request, formData);
 	const name = formData.get("name");
 	const email = formData.get("email");
 	const password = formData.get("password");
@@ -174,6 +177,7 @@ export default function Signup() {
 					</div>
 
 					<Form method="post" className="space-y-4">
+						<CsrfInput />
 						<div>
 							<label htmlFor="name" className="block text-sm font-medium text-slate-700">
 								Name

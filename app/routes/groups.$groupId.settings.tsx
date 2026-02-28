@@ -1,5 +1,7 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { CsrfInput } from "~/components/csrf-input";
+import { validateCsrfToken } from "~/services/csrf.server";
 import {
 	getGroupById,
 	regenerateInviteCode,
@@ -20,6 +22,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	const groupId = params.groupId ?? "";
 	await requireGroupAdmin(request, groupId);
 	const formData = await request.formData();
+	await validateCsrfToken(request, formData);
 	const intent = formData.get("intent");
 
 	if (intent === "update") {
@@ -102,6 +105,7 @@ export default function GroupSettings() {
 					</p>
 				</div>
 				<Form method="post" className="space-y-4 p-6">
+					<CsrfInput />
 					<input type="hidden" name="intent" value="update" />
 					<div>
 						<label htmlFor="name" className="block text-sm font-medium text-slate-700">
@@ -162,6 +166,7 @@ export default function GroupSettings() {
 						</button>
 					</div>
 					<Form method="post" className="mt-4">
+						<CsrfInput />
 						<input type="hidden" name="intent" value="regenerate-code" />
 						<button
 							type="submit"
@@ -191,6 +196,7 @@ export default function GroupSettings() {
 					</p>
 				</div>
 				<Form method="post" className="p-6">
+					<CsrfInput />
 					<input type="hidden" name="intent" value="update-permissions" />
 					<div className="space-y-4">
 						<label className="flex items-center justify-between gap-4">

@@ -10,9 +10,11 @@ import {
 } from "@remix-run/react";
 import { ArrowLeft, Clock, Users } from "lucide-react";
 import { useState } from "react";
+import { CsrfInput } from "~/components/csrf-input";
 import { InlineTimezoneSelector } from "~/components/timezone-selector";
 import { formatEventTime, localTimeToUTC } from "~/lib/date-utils";
 import { getAvailabilityRequest } from "~/services/availability.server";
+import { validateCsrfToken } from "~/services/csrf.server";
 import {
 	sendEventCreatedNotification,
 	sendEventFromAvailabilityNotification,
@@ -58,6 +60,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	const groupId = params.groupId ?? "";
 	const user = await requireGroupAdminOrPermission(request, groupId, "membersCanCreateEvents");
 	const formData = await request.formData();
+	await validateCsrfToken(request, formData);
 
 	const title = formData.get("title");
 	const eventType = formData.get("eventType");
@@ -278,6 +281,7 @@ export default function NewEvent() {
 			)}
 
 			<Form method="post" className="space-y-6">
+				<CsrfInput />
 				{fromRequest && <input type="hidden" name="fromRequestId" value={fromRequest.id} />}
 				{Array.from(selectedPerformers).map((id) => (
 					<input key={id} type="hidden" name="performerIds" value={id} />

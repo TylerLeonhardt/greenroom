@@ -10,7 +10,9 @@ import {
 } from "@remix-run/react";
 import { ArrowLeft, Clock, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { CsrfInput } from "~/components/csrf-input";
 import { localTimeToUTC, utcToLocalParts } from "~/lib/date-utils";
+import { validateCsrfToken } from "~/services/csrf.server";
 import { deleteEvent, getEventWithAssignments, updateEvent } from "~/services/events.server";
 import { requireGroupAdmin } from "~/services/groups.server";
 
@@ -58,6 +60,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	}
 
 	const formData = await request.formData();
+	await validateCsrfToken(request, formData);
 	const intent = formData.get("intent");
 
 	if (intent === "delete") {
@@ -155,6 +158,7 @@ export default function EditEvent() {
 			)}
 
 			<Form method="post" className="space-y-6">
+				<CsrfInput />
 				{/* Title */}
 				<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
 					<div className="space-y-4">
@@ -341,6 +345,7 @@ export default function EditEvent() {
 					Deleting this event will remove all assignments and cannot be undone.
 				</p>
 				<Form method="post" className="mt-4">
+					<CsrfInput />
 					<input type="hidden" name="intent" value="delete" />
 					<button
 						type="submit"
