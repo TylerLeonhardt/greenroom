@@ -29,8 +29,7 @@ export async function action({ request }: ActionFunctionArgs) {
 		return { error: "Invalid invite code format. Codes are 8 characters." };
 	}
 
-	const result = await joinGroup(user.id, code);
-
+	const result = await joinGroup(user.id, codeStr);
 	if (!result.success) {
 		if (result.groupId) {
 			return redirect(`/groups/${result.groupId}`);

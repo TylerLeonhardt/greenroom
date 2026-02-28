@@ -47,7 +47,7 @@ export async function action({ request }: ActionFunctionArgs) {
 		if (!/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/.test(codeStr)) {
 			return { error: "Invalid invite code format. Codes are 8 characters.", intent: "join" };
 		}
-		const result = await joinGroup(user.id, code);
+		const result = await joinGroup(user.id, codeStr);
 		if (!result.success) {
 			return { error: result.error, intent: "join" };
 		}
