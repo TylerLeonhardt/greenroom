@@ -30,7 +30,7 @@ export async function sendEmail(options: {
 
 	if (!client) {
 		logger.info(
-			{ to: recipients, subject: options.subject },
+			{ recipientCount: recipients.length, subject: options.subject },
 			"Azure Communication Services not configured — email not sent",
 		);
 		return { success: true };
@@ -58,6 +58,15 @@ export async function sendEmail(options: {
 }
 
 // --- Email Templates ---
+
+function escapeHtml(text: string): string {
+	return text
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#39;");
+}
 
 function emailLayout(content: string): string {
 	return `<!DOCTYPE html>
@@ -109,17 +118,17 @@ export async function sendAvailabilityRequestNotification(options: {
 		const html = emailLayout(`
 <h1 style="margin:0 0 8px;font-size:20px;color:#0f172a;">New Availability Request</h1>
 <p style="margin:0 0 20px;font-size:14px;color:#64748b;">
-${options.createdByName} is asking when you're free.
+${escapeHtml(options.createdByName)} is asking when you're free.
 </p>
 <table cellpadding="0" cellspacing="0" width="100%" style="background-color:#f0fdf4;border-radius:8px;padding:16px;margin-bottom:8px;">
 <tr><td>
-<p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0f172a;">${options.requestTitle}</p>
-<p style="margin:0 0 4px;font-size:13px;color:#64748b;">${options.groupName} · ${options.dateRange}</p>
+<p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0f172a;">${escapeHtml(options.requestTitle)}</p>
+<p style="margin:0 0 4px;font-size:13px;color:#64748b;">${escapeHtml(options.groupName)} · ${escapeHtml(options.dateRange)}</p>
 </td></tr>
 </table>
 ${ctaButton(options.requestUrl, "Submit Your Availability →")}
 <p style="margin:0;font-size:13px;color:#94a3b8;">
-Hi ${recipient.name}, please respond so your group can plan around everyone's schedule.
+Hi ${escapeHtml(recipient.name)}, please respond so your group can plan around everyone's schedule.
 </p>`);
 
 		const text = `New availability request: "${options.requestTitle}" from ${options.createdByName} (${options.groupName}). Date range: ${options.dateRange}. Respond at: ${options.requestUrl}`;
@@ -145,7 +154,7 @@ export async function sendEventCreatedNotification(options: {
 	const typeEmoji =
 		options.eventType === "show" ? "🎭" : options.eventType === "rehearsal" ? "🎯" : "📅";
 	const locationLine = options.location
-		? `<p style="margin:0 0 4px;font-size:13px;color:#64748b;">📍 ${options.location}</p>`
+		? `<p style="margin:0 0 4px;font-size:13px;color:#64748b;">📍 ${escapeHtml(options.location)}</p>`
 		: "";
 
 	for (const recipient of options.recipients) {
@@ -156,14 +165,14 @@ You've been assigned to an upcoming event.
 </p>
 <table cellpadding="0" cellspacing="0" width="100%" style="background-color:#f0fdf4;border-radius:8px;padding:16px;margin-bottom:8px;">
 <tr><td>
-<p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0f172a;">${typeEmoji} ${options.eventTitle}</p>
-<p style="margin:0 0 4px;font-size:13px;color:#64748b;">${options.groupName} · ${options.dateTime}</p>
+<p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0f172a;">${typeEmoji} ${escapeHtml(options.eventTitle)}</p>
+<p style="margin:0 0 4px;font-size:13px;color:#64748b;">${escapeHtml(options.groupName)} · ${escapeHtml(options.dateTime)}</p>
 ${locationLine}
 </td></tr>
 </table>
 ${ctaButton(options.eventUrl, "View Event Details →")}
 <p style="margin:0;font-size:13px;color:#94a3b8;">
-Hi ${recipient.name}, please confirm your attendance.
+Hi ${escapeHtml(recipient.name)}, please confirm your attendance.
 </p>`);
 
 		const text = `New event: "${options.eventTitle}" (${options.groupName}). ${options.dateTime}${options.location ? ` at ${options.location}` : ""}. View: ${options.eventUrl}`;
@@ -191,12 +200,12 @@ export async function sendEventAssignmentNotification(options: {
 	const html = emailLayout(`
 <h1 style="margin:0 0 8px;font-size:20px;color:#0f172a;">You've Been Added to a ${options.eventType === "show" ? "Show" : options.eventType === "rehearsal" ? "Rehearsal" : "Event"}</h1>
 <p style="margin:0 0 20px;font-size:14px;color:#64748b;">
-Hi ${options.recipient.name}, you've been assigned to an event.
+Hi ${escapeHtml(options.recipient.name)}, you've been assigned to an event.
 </p>
 <table cellpadding="0" cellspacing="0" width="100%" style="background-color:#f0fdf4;border-radius:8px;padding:16px;margin-bottom:8px;">
 <tr><td>
-<p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0f172a;">${typeEmoji} ${options.eventTitle}</p>
-<p style="margin:0 0 4px;font-size:13px;color:#64748b;">${options.groupName} · ${options.dateTime}</p>
+<p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0f172a;">${typeEmoji} ${escapeHtml(options.eventTitle)}</p>
+<p style="margin:0 0 4px;font-size:13px;color:#64748b;">${escapeHtml(options.groupName)} · ${escapeHtml(options.dateTime)}</p>
 </td></tr>
 </table>
 ${ctaButton(options.eventUrl, "Confirm Attendance →")}
@@ -228,13 +237,13 @@ export async function sendEventFromAvailabilityNotification(options: {
 	const typeEmoji =
 		options.eventType === "show" ? "🎭" : options.eventType === "rehearsal" ? "🎯" : "📅";
 	const locationLine = options.location
-		? `<p style="margin:0 0 4px;font-size:13px;color:#64748b;">📍 ${options.location}</p>`
+		? `<p style="margin:0 0 4px;font-size:13px;color:#64748b;">📍 ${escapeHtml(options.location)}</p>`
 		: "";
 
 	const eventBlock = `<table cellpadding="0" cellspacing="0" width="100%" style="background-color:#f0fdf4;border-radius:8px;padding:16px;margin-bottom:8px;">
 <tr><td>
-<p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0f172a;">${typeEmoji} ${options.eventTitle}</p>
-<p style="margin:0 0 4px;font-size:13px;color:#64748b;">${options.groupName} · ${options.dateTime}</p>
+<p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0f172a;">${typeEmoji} ${escapeHtml(options.eventTitle)}</p>
+<p style="margin:0 0 4px;font-size:13px;color:#64748b;">${escapeHtml(options.groupName)} · ${escapeHtml(options.dateTime)}</p>
 ${locationLine}
 </td></tr>
 </table>`;
@@ -244,7 +253,7 @@ ${locationLine}
 		const html = emailLayout(`
 <h1 style="margin:0 0 8px;font-size:20px;color:#0f172a;">You're Confirmed! 🎉</h1>
 <p style="margin:0 0 20px;font-size:14px;color:#64748b;">
-Great news, ${recipient.name} — the event you said you were available for is happening!
+Great news, ${escapeHtml(recipient.name)} — the event you said you were available for is happening!
 </p>
 ${eventBlock}
 ${ctaButton(options.eventUrl, "View Event Details →")}
@@ -267,7 +276,7 @@ You indicated you were available for this date. See you there!
 		const html = emailLayout(`
 <h1 style="margin:0 0 8px;font-size:20px;color:#0f172a;">Can You Make It?</h1>
 <p style="margin:0 0 20px;font-size:14px;color:#64748b;">
-Hi ${recipient.name}, you said you might be free — the event is now scheduled!
+Hi ${escapeHtml(recipient.name)}, you said you might be free — the event is now scheduled!
 </p>
 ${eventBlock}
 ${ctaButton(options.eventUrl, "Confirm Attendance →")}
@@ -290,7 +299,7 @@ Please let your group know if you can make it.
 		const html = emailLayout(`
 <h1 style="margin:0 0 8px;font-size:20px;color:#0f172a;">New Event Scheduled</h1>
 <p style="margin:0 0 20px;font-size:14px;color:#64748b;">
-Hi ${recipient.name}, a new event has been scheduled for your group.
+Hi ${escapeHtml(recipient.name)}, a new event has been scheduled for your group.
 </p>
 ${eventBlock}
 ${ctaButton(options.eventUrl, "View Event Details →")}

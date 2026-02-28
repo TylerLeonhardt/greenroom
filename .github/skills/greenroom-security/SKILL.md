@@ -299,12 +299,92 @@ My Call Time uses the OAuth `state` parameter to prevent CSRF attacks on the cal
 
 ## Known Security Tech Debt
 
-1. **No CSRF tokens on form mutations:** Relies on `sameSite: "lax"` cookies. While this mitigates most CSRF vectors, explicit tokens would provide defense-in-depth.
+1. **No CSRF tokens on form mutations:** Relies on `sameSite: "lax"` cookies. While this mitigates most CSRF vectors, explicit tokens would provide defense-in-depth. ([#24](https://github.com/TylerLeonhardt/greenroom/issues/24))
 
-2. **`rejectUnauthorized: false` in production SSL:** The PostgreSQL connection skips certificate validation (`src/db/index.ts`). Vulnerable to MITM attacks between the app container and database. Fix: bundle the Azure CA certificate.
+2. **`rejectUnauthorized: false` in production SSL:** The PostgreSQL connection skips certificate validation (`src/db/index.ts`). Vulnerable to MITM attacks between the app container and database. Fix: bundle the Azure CA certificate. ([#23](https://github.com/TylerLeonhardt/greenroom/issues/23))
 
-3. **In-memory rate limiting:** State not shared across replicas. An attacker could distribute requests across multiple app instances. Fix: Redis-backed rate limiter.
+3. **In-memory rate limiting:** State not shared across replicas. An attacker could distribute requests across multiple app instances. Fix: Redis-backed rate limiter. ([#27](https://github.com/TylerLeonhardt/greenroom/issues/27))
 
 4. **No account lockout:** Failed login attempts are rate-limited by IP, but there's no per-account lockout after N failed attempts. An attacker using distributed IPs can still brute-force a specific account.
 
 5. **No email verification on signup:** `emailVerified` defaults to `false` for email/password users, but there's no verification flow. Users can sign up with any email address.
+
+6. **No security headers:** Missing X-Frame-Options, X-Content-Type-Options, Strict-Transport-Security, CSP, Referrer-Policy. ([#22](https://github.com/TylerLeonhardt/greenroom/issues/22))
+
+7. **No account deletion / GDPR path:** Users cannot delete their accounts or request data deletion. ([#25](https://github.com/TylerLeonhardt/greenroom/issues/25))
+
+8. **Email enumeration on signup:** Registration reveals whether an email is already registered. ([#26](https://github.com/TylerLeonhardt/greenroom/issues/26))
+
+---
+
+## Security Patterns to Follow
+
+### Action IDOR Prevention
+
+Every route action that mutates a group-scoped resource MUST verify the resource belongs to the group before performing the mutation. The loader verification is not sufficient — actions must independently verify.
+
+```typescript
+// ✅ CORRECT: verify ownership in action before mutation
+export async function action({ request, params }) {
+  const groupId = params.groupId ?? "";
+  const eventId = params.eventId ?? "";
+  await requireGroupAdmin(request, groupId);
+
+  // Verify event belongs to this group BEFORE any mutation
+  const data = await getEventWithAssignments(eventId);
+  if (!data || data.event.groupId !== groupId) {
+    throw new Response("Not Found", { status: 404 });
+  }
+
+  // Now safe to mutate
+  await deleteEvent(eventId);
+}
+```
+
+### Email HTML Escaping
+
+All user-controlled content interpolated into HTML email templates must be escaped with `escapeHtml()`:
+
+```typescript
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// In email templates:
+const html = emailLayout(`
+  <p>${escapeHtml(options.groupName)}</p>
+  <p>${escapeHtml(options.eventTitle)}</p>
+  <p>${escapeHtml(recipient.name)}</p>
+`);
+```
+
+### JSON Input Validation
+
+Always validate JSONB data from user input before storing:
+
+```typescript
+const validStatuses = new Set(["available", "maybe", "not_available"]);
+const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+for (const [key, value] of Object.entries(responses)) {
+  if (!datePattern.test(key) || !validStatuses.has(value)) {
+    return { error: "Invalid response data." };
+  }
+}
+```
+
+### PII in Logs
+
+Never log email addresses or other PII. Log counts or anonymized identifiers instead:
+
+```typescript
+// ❌ BAD: logs email addresses
+logger.info({ to: recipients }, "Email not sent");
+
+// ✅ GOOD: logs count only
+logger.info({ recipientCount: recipients.length }, "Email not sent");
+```

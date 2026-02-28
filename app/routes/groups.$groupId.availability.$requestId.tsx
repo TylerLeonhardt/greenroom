@@ -67,6 +67,15 @@ export async function action({ request, params }: ActionFunctionArgs) {
 			return { error: "Please respond to at least one date." };
 		}
 
+		// Validate response values are valid availability statuses
+		const validStatuses: Set<string> = new Set(["available", "maybe", "not_available"]);
+		const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+		for (const [key, value] of Object.entries(responses)) {
+			if (!datePattern.test(key) || !validStatuses.has(value)) {
+				return { error: "Invalid response data." };
+			}
+		}
+
 		await submitAvailabilityResponse({
 			requestId,
 			userId: user.id,
@@ -79,6 +88,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	if (intent === "close" || intent === "reopen") {
 		const admin = await isGroupAdmin(user.id, groupId);
 		if (!admin) throw new Response("Forbidden", { status: 403 });
+
+		// Verify the availability request belongs to this group
+		const availRequest = await getAvailabilityRequest(requestId);
+		if (!availRequest || availRequest.groupId !== groupId) {
+			throw new Response("Not Found", { status: 404 });
+		}
 
 		if (intent === "close") {
 			await closeAvailabilityRequest(requestId);
