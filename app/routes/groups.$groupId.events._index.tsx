@@ -4,6 +4,7 @@ import { CalendarDays, List, Plus } from "lucide-react";
 import { useState } from "react";
 import { EventCalendar } from "~/components/event-calendar";
 import { EventCard } from "~/components/event-card";
+import { formatDateLong } from "~/lib/date-utils";
 import { getGroupEvents } from "~/services/events.server";
 import { requireGroupMember } from "~/services/groups.server";
 import type { loader as groupLayoutLoader } from "./groups.$groupId";
@@ -202,11 +203,7 @@ export default function Events() {
 						{calendarSelectedDate ? (
 							<div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
 								<h3 className="mb-3 text-sm font-semibold text-slate-900">
-									{new Date(`${calendarSelectedDate}T00:00:00`).toLocaleDateString("en-US", {
-										weekday: "long",
-										month: "long",
-										day: "numeric",
-									})}
+									{formatDateLong(`${calendarSelectedDate}T00:00:00`)}
 								</h3>
 								{calendarDateEvents.length > 0 ? (
 									<div className="space-y-3">

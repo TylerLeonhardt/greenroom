@@ -77,6 +77,7 @@ function NavBar() {
 						<>
 							<NavLink to="/dashboard">Dashboard</NavLink>
 							<NavLink to="/groups">Groups</NavLink>
+							<NavLink to="/settings">Settings</NavLink>
 							<div className="ml-2 flex items-center gap-3 border-l border-slate-200 pl-4">
 								<UserAvatar name={user.name} />
 								<span className="text-sm font-medium text-slate-700">{user.name}</span>
@@ -138,6 +139,13 @@ function NavBar() {
 								onClick={() => setMobileOpen(false)}
 							>
 								Groups
+							</Link>
+							<Link
+								to="/settings"
+								className="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+								onClick={() => setMobileOpen(false)}
+							>
+								Settings
 							</Link>
 							<Form method="post" action="/logout">
 								<button

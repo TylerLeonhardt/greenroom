@@ -15,6 +15,13 @@
       "when": 1772226542765,
       "tag": "0001_narrow_liz_osborn",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772239857754,
+      "tag": "0002_faulty_blue_shield",
+      "breakpoints": true
     }
   ]
 }

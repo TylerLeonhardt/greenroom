@@ -48,7 +48,8 @@ app/
 │   ├── groups.$groupId.events.new.tsx    # Create event (admin, supports ?fromRequest=)
 │   ├── groups.$groupId.events.$eventId.tsx      # Event detail: cast list, confirm/decline
 │   ├── groups.$groupId.events.$eventId.edit.tsx # Edit/delete event (admin)
-│   └── groups.$groupId.settings.tsx      # Group settings: edit name, regenerate invite code
+│   ├── groups.$groupId.settings.tsx      # Group settings: edit name, regenerate invite code
+│   └── settings.tsx              # User settings: timezone preference
 ├── services/                   # Server-side business logic (*.server.ts)
 │   ├── auth.server.ts          # Authentication: form strategy, Google OAuth, requireUser()
 │   ├── session.server.ts       # Cookie session storage, getUserId(), createUserSession()
@@ -72,6 +73,9 @@ src/
 │   └── index.ts                # Database connection (pg Pool + drizzle)
 └── lib/
     └── utils.ts                # cn() utility (clsx + tailwind-merge)
+
+app/lib/
+└── date-utils.ts               # Centralized date/time formatting (Intl.DateTimeFormat)
 ```
 
 ## Key Patterns
@@ -152,6 +156,29 @@ await assignToEvent(eventId, user.id, "Viewer");
 await updateAssignmentStatus(eventId, user.id, "confirmed");
 ```
 
+### Date & Time Formatting
+
+All date/time formatting goes through `app/lib/date-utils.ts` — the **single source of truth** for formatting. Never use inline `toLocaleDateString()`, `toLocaleTimeString()`, or manual date string manipulation.
+
+```typescript
+import {
+  formatDate,        // "Wed, Mar 4, 2026"
+  formatTime,        // "7:00 PM"
+  formatDateTime,    // "Wed, Mar 4 · 7:00 PM"
+  formatDateRange,   // "Mar 1 – Mar 28, 2026"
+  formatEventTime,   // "Wed, Mar 4 · 7:00 PM – 9:00 PM" (with callTime support)
+  formatDateDisplay, // "Sat Mar 15" (short, for grids)
+  formatDateLong,    // "Saturday, March 15, 2025" (full)
+  formatDateMedium,  // "Mar 15, 2025"
+  formatDateShort,   // "Mar 15"
+  formatTimeRange,   // "7:00 PM – 9:00 PM" (from "HH:MM" strings)
+} from "~/lib/date-utils";
+```
+
+All functions accept an optional `timezone?: string` parameter (IANA timezone, e.g., `"America/Los_Angeles"`). When omitted, uses the runtime's default timezone. For server-side rendering, pass the user's stored timezone from `user.timezone`.
+
+**User timezone preference:** Stored in `users.timezone` column (nullable varchar). Auto-detected on first visit via `Intl.DateTimeFormat().resolvedOptions().timeZone` and saved via the settings page (`/settings`). Falls back to UTC if not set.
+
 ### Logging
 
 Structured logging via [pino](https://getpino.io/). Import the singleton logger from `app/services/logger.server.ts`:
@@ -226,6 +253,7 @@ export async function action({ request }: ActionFunctionArgs) {
 | `/api/health` | Public | Returns `{ status: "ok", timestamp }` |
 | `/api/events/:eventId/ics` | `requireUser` + `requireGroupMember` | Downloads .ics file (role-aware start times for performers) |
 | `/dashboard` | `requireUser` | Action items, upcoming events, group list |
+| `/settings` | `requireUser` | Timezone preference, auto-detects on first visit |
 | `/groups` | `requireUser` | List user's groups + inline join form |
 | `/groups/new` | `requireUser` | Create group form |
 | `/groups/join` | `requireUser` | Join via invite code (supports `?code=` query param) |
@@ -248,10 +276,10 @@ export async function action({ request }: ActionFunctionArgs) {
 
 | Table | Key Columns | Notes |
 |-------|-------------|-------|
-| `users` | id, email (unique), passwordHash, name, googleId (unique), emailVerified | Supports email/password + Google OAuth. `passwordHash` is null for Google-only users |
+| `users` | id, email (unique), passwordHash, name, googleId (unique), emailVerified, timezone | Supports email/password + Google OAuth. `passwordHash` is null for Google-only users. `timezone` is IANA timezone string, auto-detected on first visit |
 | `groups` | id, name, inviteCode (unique, 8 chars), createdById → users | Invite code uses chars `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (no ambiguous I/O/0/1) |
 | `group_memberships` | id, groupId → groups, userId → users, role (admin/member) | Unique on (groupId, userId). Creator gets admin role |
-| `availability_requests` | id, groupId → groups, title, requestedDates (JSONB `string[]`), status (open/closed), expiresAt | `requestedDates` is a JSON array of ISO date strings |
+| `availability_requests` | id, groupId → groups, title, requestedDates (JSONB `string[]`), status (open/closed), expiresAt, requestedStartTime, requestedEndTime | `requestedDates` is a JSON array of ISO date strings. `requestedStartTime`/`requestedEndTime` are nullable "HH:MM" strings for time range (null = all day) |
 | `availability_responses` | id, requestId → availability_requests, userId → users, responses (JSONB) | `responses` is `Record<string, "available" | "maybe" | "not_available">`. Upsert on (requestId, userId) |
 | `events` | id, groupId → groups, title, eventType, startTime, endTime, callTime, location, createdFromRequestId | Links back to availability request if created from one. `callTime` is nullable (only for shows — performer arrival time) |
 | `event_assignments` | id, eventId → events, userId → users, role, status (pending/confirmed/declined) | Unique on (eventId, userId). `onConflictDoNothing` for bulk assigns. Role values: "Performer" (shows), "Viewer" (self-registered attendees) |
@@ -382,11 +410,9 @@ CI runs on every push/PR to `master`: typecheck → lint → build → test
 
 ## Known MVP Limitations
 
-- No time slot selection (availability is per-date, not per-hour)
 - No recurring availability requests
 - No push notifications / reminder emails (button exists but disabled)
 - No payments / subscription tiers
-- No profile editing
 - No group deletion
 - No member role changes (admin can only remove members)
 - Calendar view is read-only (no drag-to-create)

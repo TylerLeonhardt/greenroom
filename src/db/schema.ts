@@ -37,6 +37,7 @@ export const users = pgTable(
 		profileImage: text("profile_image"),
 		googleId: varchar("google_id", { length: 255 }).unique(),
 		emailVerified: boolean("email_verified").default(false).notNull(),
+		timezone: varchar("timezone", { length: 100 }),
 		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 		updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 	},
@@ -96,6 +97,8 @@ export const availabilityRequests = pgTable(
 		dateRangeStart: timestamp("date_range_start", { withTimezone: true }).notNull(),
 		dateRangeEnd: timestamp("date_range_end", { withTimezone: true }).notNull(),
 		requestedDates: jsonb("requested_dates").$type<string[]>().notNull(),
+		requestedStartTime: varchar("requested_start_time", { length: 5 }),
+		requestedEndTime: varchar("requested_end_time", { length: 5 }),
 		status: availabilityStatusEnum("status").default("open").notNull(),
 		createdById: uuid("created_by_id")
 			.notNull()

@@ -10,6 +10,7 @@ import {
 } from "@remix-run/react";
 import { ArrowLeft, Clock, Users } from "lucide-react";
 import { useState } from "react";
+import { formatEventTime } from "~/lib/date-utils";
 import { getAvailabilityRequest } from "~/services/availability.server";
 import {
 	sendEventCreatedNotification,
@@ -130,9 +131,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		const groupData = await getGroupWithMembers(groupId);
 		if (!groupData) return;
 
-		const eventStart = new Date(`${date}T${startTime}:00`);
-		const eventEnd = new Date(`${date}T${endTime}:00`);
-		const dateTime = `${eventStart.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} · ${eventStart.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} – ${eventEnd.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+		const dateTime = formatEventTime(`${date}T${startTime}:00`, `${date}T${endTime}:00`);
 
 		if (validFromRequestId && typeof date === "string") {
 			// Availability-aware notifications

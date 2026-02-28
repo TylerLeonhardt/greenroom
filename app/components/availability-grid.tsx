@@ -1,5 +1,6 @@
 import { Check, HelpCircle, X } from "lucide-react";
 import { useCallback } from "react";
+import { formatDateDisplay } from "~/lib/date-utils";
 
 type AvailabilityStatus = "available" | "maybe" | "not_available";
 
@@ -8,14 +9,7 @@ interface AvailabilityGridProps {
 	responses: Record<string, AvailabilityStatus>;
 	onChange: (responses: Record<string, AvailabilityStatus>) => void;
 	disabled?: boolean;
-}
-
-function formatDateDisplay(dateStr: string): { dayOfWeek: string; display: string } {
-	const date = new Date(`${dateStr}T00:00:00`);
-	return {
-		dayOfWeek: date.toLocaleDateString("en-US", { weekday: "short" }),
-		display: date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-	};
+	timeRange?: string | null;
 }
 
 const statusConfig = {
@@ -39,7 +33,13 @@ const statusConfig = {
 	},
 } as const;
 
-export function AvailabilityGrid({ dates, responses, onChange, disabled }: AvailabilityGridProps) {
+export function AvailabilityGrid({
+	dates,
+	responses,
+	onChange,
+	disabled,
+	timeRange,
+}: AvailabilityGridProps) {
 	const setStatus = useCallback(
 		(date: string, status: AvailabilityStatus) => {
 			onChange({ ...responses, [date]: status });
@@ -64,6 +64,11 @@ export function AvailabilityGrid({ dates, responses, onChange, disabled }: Avail
 
 	return (
 		<div className="space-y-4">
+			{timeRange && (
+				<div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+					⏰ Time: <span className="font-medium text-slate-900">{timeRange}</span> each day
+				</div>
+			)}
 			{!disabled && (
 				<div className="flex flex-wrap gap-2">
 					<button

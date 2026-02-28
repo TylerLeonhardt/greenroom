@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { Link, useLoaderData, useRouteLoaderData } from "@remix-run/react";
 import { Calendar, Users } from "lucide-react";
+import { formatDateRange, formatTimeRange } from "~/lib/date-utils";
 import { getGroupAvailabilityRequests } from "~/services/availability.server";
 import { requireGroupMember } from "~/services/groups.server";
 import type { loader as groupLayoutLoader } from "./groups.$groupId";
@@ -14,17 +15,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 	await requireGroupMember(request, groupId);
 	const requests = await getGroupAvailabilityRequests(groupId);
 	return { requests };
-}
-
-function formatDateRange(start: string, end: string): string {
-	const s = new Date(start);
-	const e = new Date(end);
-	const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
-	const yearOpts: Intl.DateTimeFormatOptions = { ...opts, year: "numeric" };
-	if (s.getFullYear() === e.getFullYear()) {
-		return `${s.toLocaleDateString("en-US", opts)} – ${e.toLocaleDateString("en-US", yearOpts)}`;
-	}
-	return `${s.toLocaleDateString("en-US", yearOpts)} – ${e.toLocaleDateString("en-US", yearOpts)}`;
 }
 
 export default function Availability() {
@@ -92,6 +82,11 @@ export default function Availability() {
 											{formatDateRange(
 												req.dateRangeStart as unknown as string,
 												req.dateRangeEnd as unknown as string,
+											)}
+											{(req.requestedStartTime || req.requestedEndTime) && (
+												<span className="ml-2 text-xs text-slate-400">
+													· {formatTimeRange(req.requestedStartTime, req.requestedEndTime)}
+												</span>
 											)}
 										</p>
 									</div>

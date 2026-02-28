@@ -4,6 +4,7 @@ import { ArrowLeft, Clock, Lock, LockOpen, Users } from "lucide-react";
 import { useState } from "react";
 import { AvailabilityGrid } from "~/components/availability-grid";
 import { ResultsHeatmap } from "~/components/results-heatmap";
+import { formatDateMedium, formatTimeRange } from "~/lib/date-utils";
 import {
 	closeAvailabilityRequest,
 	getAggregatedResults,
@@ -82,14 +83,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	return { error: "Invalid action." };
 }
 
-function formatDate(dateStr: string): string {
-	return new Date(dateStr).toLocaleDateString("en-US", {
-		month: "long",
-		day: "numeric",
-		year: "numeric",
-	});
-}
-
 export default function AvailabilityRequestDetail() {
 	const { availRequest, userResponse, results, isAdmin } = useLoaderData<typeof loader>();
 	const actionData = useActionData<typeof action>();
@@ -102,6 +95,8 @@ export default function AvailabilityRequestDetail() {
 	);
 	const [view, setView] = useState<"respond" | "results">("respond");
 	const isClosed = availRequest.status === "closed";
+	const timeRange = formatTimeRange(availRequest.requestedStartTime, availRequest.requestedEndTime);
+	const hasTimeRange = timeRange !== "All day";
 
 	return (
 		<div className="max-w-4xl">
@@ -133,14 +128,20 @@ export default function AvailabilityRequestDetail() {
 						)}
 						<div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-slate-500">
 							<span>
-								{formatDate(availRequest.dateRangeStart as unknown as string)} –{" "}
-								{formatDate(availRequest.dateRangeEnd as unknown as string)}
+								{formatDateMedium(availRequest.dateRangeStart as unknown as string)} –{" "}
+								{formatDateMedium(availRequest.dateRangeEnd as unknown as string)}
 							</span>
+							{(availRequest.requestedStartTime || availRequest.requestedEndTime) && (
+								<span className="inline-flex items-center gap-1">
+									⏰{" "}
+									{formatTimeRange(availRequest.requestedStartTime, availRequest.requestedEndTime)}
+								</span>
+							)}
 							<span>Created by {availRequest.createdByName}</span>
 							{availRequest.expiresAt && (
 								<span className="inline-flex items-center gap-1">
 									<Clock className="h-3 w-3" />
-									Due {formatDate(availRequest.expiresAt as unknown as string)}
+									Due {formatDateMedium(availRequest.expiresAt as unknown as string)}
 								</span>
 							)}
 						</div>
@@ -217,6 +218,7 @@ export default function AvailabilityRequestDetail() {
 						responses={responses}
 						onChange={setResponses}
 						disabled={isClosed}
+						timeRange={hasTimeRange ? timeRange : null}
 					/>
 					{!isClosed && (
 						<Form method="post" className="mt-6">
@@ -250,6 +252,7 @@ export default function AvailabilityRequestDetail() {
 							totalResponded={results.totalResponded}
 							groupId={availRequest.groupId}
 							requestId={availRequest.id}
+							timeRange={hasTimeRange ? timeRange : null}
 						/>
 					</div>
 

@@ -22,6 +22,7 @@ import {
 	X,
 } from "lucide-react";
 import { useState } from "react";
+import { formatDateLong, formatTime } from "~/lib/date-utils";
 import {
 	assignToEvent,
 	bulkAssignToEvent,
@@ -176,26 +177,10 @@ export default function EventDetail() {
 		: assignments;
 	const canSelfRegister = !myAssignment && !isAdmin;
 
-	const startDate = new Date(event.startTime);
-	const endDate = new Date(event.endTime);
-	const callTimeDate = event.callTime ? new Date(event.callTime as unknown as string) : null;
-	const dateStr = startDate.toLocaleDateString("en-US", {
-		weekday: "long",
-		month: "long",
-		day: "numeric",
-		year: "numeric",
-	});
-	const startTimeStr = startDate.toLocaleTimeString("en-US", {
-		hour: "numeric",
-		minute: "2-digit",
-	});
-	const endTimeStr = endDate.toLocaleTimeString("en-US", {
-		hour: "numeric",
-		minute: "2-digit",
-	});
-	const callTimeStr = callTimeDate
-		? callTimeDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
-		: null;
+	const dateStr = formatDateLong(event.startTime);
+	const startTimeStr = formatTime(event.startTime);
+	const endTimeStr = formatTime(event.endTime);
+	const callTimeStr = event.callTime ? formatTime(event.callTime as unknown as string) : null;
 
 	const toggleUser = (id: string) => {
 		const next = new Set(selectedUserIds);

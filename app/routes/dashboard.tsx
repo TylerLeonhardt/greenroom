@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { Link, useLoaderData } from "@remix-run/react";
 import { AlertCircle, CalendarDays, Clock, Plus, Users } from "lucide-react";
 import { EventCard } from "~/components/event-card";
+import { formatDateShort } from "~/lib/date-utils";
 import { requireUser } from "~/services/auth.server";
 import { getDashboardData } from "~/services/dashboard.server";
 
@@ -55,11 +56,7 @@ export default function Dashboard() {
 												<span>·</span>
 												<span className="flex items-center gap-1 text-amber-600">
 													<Clock className="h-3 w-3" />
-													Due{" "}
-													{new Date(req.expiresAt).toLocaleDateString("en-US", {
-														month: "short",
-														day: "numeric",
-													})}
+													Due {formatDateShort(req.expiresAt)}
 												</span>
 											</>
 										)}
@@ -92,13 +89,7 @@ export default function Dashboard() {
 									<div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
 										<span>{evt.groupName}</span>
 										<span>·</span>
-										<span>
-											{new Date(evt.startTime).toLocaleDateString("en-US", {
-												weekday: "short",
-												month: "short",
-												day: "numeric",
-											})}
-										</span>
+										<span>{formatDateShort(evt.startTime)}</span>
 									</div>
 								</div>
 								<span className="ml-4 shrink-0 text-sm font-medium text-emerald-600">

@@ -1,5 +1,6 @@
 import { Link } from "@remix-run/react";
 import { CalendarDays, Check, MapPin, Users } from "lucide-react";
+import { formatEventTime } from "~/lib/date-utils";
 
 interface EventCardProps {
 	id: string;
@@ -21,25 +22,6 @@ const EVENT_TYPE_CONFIG: Record<string, { emoji: string; label: string; color: s
 	rehearsal: { emoji: "🎯", label: "Rehearsal", color: "bg-emerald-100 text-emerald-700" },
 	other: { emoji: "📅", label: "Other", color: "bg-slate-100 text-slate-700" },
 };
-
-function formatEventTime(startTime: string, endTime: string): string {
-	const start = new Date(startTime);
-	const end = new Date(endTime);
-	const dateStr = start.toLocaleDateString("en-US", {
-		weekday: "short",
-		month: "short",
-		day: "numeric",
-	});
-	const startStr = start.toLocaleTimeString("en-US", {
-		hour: "numeric",
-		minute: "2-digit",
-	});
-	const endStr = end.toLocaleTimeString("en-US", {
-		hour: "numeric",
-		minute: "2-digit",
-	});
-	return `${dateStr} · ${startStr} – ${endStr}`;
-}
 
 export function EventCard({
 	id,
