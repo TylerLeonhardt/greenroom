@@ -107,7 +107,7 @@ export function formatDateDisplay(
 	dateStr: string,
 	timezone?: string,
 ): { dayOfWeek: string; display: string } {
-	const date = new Date(`${dateStr}T00:00:00`);
+	const date = new Date(`${dateStr}T12:00:00Z`);
 	return {
 		dayOfWeek: date.toLocaleDateString("en-US", { weekday: "short", timeZone: timezone }),
 		display: date.toLocaleDateString("en-US", {

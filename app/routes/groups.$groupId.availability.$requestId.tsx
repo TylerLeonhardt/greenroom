@@ -1,5 +1,12 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
-import { Form, Link, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import {
+	Form,
+	Link,
+	useActionData,
+	useLoaderData,
+	useNavigation,
+	useRouteLoaderData,
+} from "@remix-run/react";
 import { ArrowLeft, Clock, Lock, LockOpen, Users } from "lucide-react";
 import { useState } from "react";
 import { AvailabilityGrid } from "~/components/availability-grid";
@@ -14,6 +21,7 @@ import {
 	submitAvailabilityResponse,
 } from "~/services/availability.server";
 import { isGroupAdmin, requireGroupMember } from "~/services/groups.server";
+import type { loader as groupLayoutLoader } from "./groups.$groupId";
 
 type AvailabilityStatus = "available" | "maybe" | "not_available";
 
@@ -85,6 +93,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
 export default function AvailabilityRequestDetail() {
 	const { availRequest, userResponse, results, isAdmin } = useLoaderData<typeof loader>();
+	const parentData = useRouteLoaderData<typeof groupLayoutLoader>("routes/groups.$groupId");
+	const timezone = parentData?.user?.timezone ?? undefined;
 	const actionData = useActionData<typeof action>();
 	const navigation = useNavigation();
 	const isSubmitting = navigation.state === "submitting";
@@ -128,8 +138,8 @@ export default function AvailabilityRequestDetail() {
 						)}
 						<div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-slate-500">
 							<span>
-								{formatDateMedium(availRequest.dateRangeStart as unknown as string)} –{" "}
-								{formatDateMedium(availRequest.dateRangeEnd as unknown as string)}
+								{formatDateMedium(availRequest.dateRangeStart as unknown as string, timezone)} –{" "}
+								{formatDateMedium(availRequest.dateRangeEnd as unknown as string, timezone)}
 							</span>
 							{(availRequest.requestedStartTime || availRequest.requestedEndTime) && (
 								<span className="inline-flex items-center gap-1">
@@ -141,7 +151,7 @@ export default function AvailabilityRequestDetail() {
 							{availRequest.expiresAt && (
 								<span className="inline-flex items-center gap-1">
 									<Clock className="h-3 w-3" />
-									Due {formatDateMedium(availRequest.expiresAt as unknown as string)}
+									Due {formatDateMedium(availRequest.expiresAt as unknown as string, timezone)}
 								</span>
 							)}
 						</div>
@@ -219,6 +229,7 @@ export default function AvailabilityRequestDetail() {
 						onChange={setResponses}
 						disabled={isClosed}
 						timeRange={hasTimeRange ? timeRange : null}
+						timezone={timezone}
 					/>
 					{!isClosed && (
 						<Form method="post" className="mt-6">
@@ -253,6 +264,7 @@ export default function AvailabilityRequestDetail() {
 							groupId={availRequest.groupId}
 							requestId={availRequest.id}
 							timeRange={hasTimeRange ? timeRange : null}
+							timezone={timezone}
 						/>
 					</div>
 

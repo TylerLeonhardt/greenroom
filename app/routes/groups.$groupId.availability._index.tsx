@@ -22,6 +22,7 @@ export default function Availability() {
 	const parentData = useRouteLoaderData<typeof groupLayoutLoader>("routes/groups.$groupId");
 	const role = parentData?.role;
 	const groupId = parentData?.group?.id;
+	const timezone = parentData?.user?.timezone ?? undefined;
 
 	return (
 		<div>
@@ -82,6 +83,7 @@ export default function Availability() {
 											{formatDateRange(
 												req.dateRangeStart as unknown as string,
 												req.dateRangeEnd as unknown as string,
+												timezone,
 											)}
 											{(req.requestedStartTime || req.requestedEndTime) && (
 												<span className="ml-2 text-xs text-slate-400">

@@ -44,6 +44,15 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		return { error: "Start date must be before end date." };
 	}
 
+	const hasStartTime = typeof requestedStartTime === "string" && requestedStartTime;
+	const hasEndTime = typeof requestedEndTime === "string" && requestedEndTime;
+	if ((hasStartTime && !hasEndTime) || (!hasStartTime && hasEndTime)) {
+		return { error: "Please provide both start and end times, or leave both empty for all-day." };
+	}
+	if (hasStartTime && hasEndTime && requestedStartTime >= requestedEndTime) {
+		return { error: "End time must be after start time." };
+	}
+
 	let selectedDates: string[] = [];
 	try {
 		selectedDates = JSON.parse(typeof selectedDatesRaw === "string" ? selectedDatesRaw : "[]");
@@ -64,10 +73,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		createdById: user.id,
 		expiresAt:
 			typeof expiresAt === "string" && expiresAt ? new Date(`${expiresAt}T23:59:59`) : undefined,
-		requestedStartTime:
-			typeof requestedStartTime === "string" && requestedStartTime ? requestedStartTime : undefined,
-		requestedEndTime:
-			typeof requestedEndTime === "string" && requestedEndTime ? requestedEndTime : undefined,
+		requestedStartTime: hasStartTime ? requestedStartTime : undefined,
+		requestedEndTime: hasEndTime ? requestedEndTime : undefined,
 	});
 
 	// Fire-and-forget email notification to group members

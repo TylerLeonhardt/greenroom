@@ -95,7 +95,13 @@ describe("date-utils", () => {
 
 	describe("formatDateDisplay", () => {
 		it("returns day of week and short display", () => {
-			const result = formatDateDisplay("2026-03-04");
+			const result = formatDateDisplay("2026-03-04", "UTC");
+			expect(result.dayOfWeek).toBe("Wed");
+			expect(result.display).toBe("Mar 4");
+		});
+
+		it("respects timezone parameter", () => {
+			const result = formatDateDisplay("2026-03-04", "America/New_York");
 			expect(result.dayOfWeek).toBe("Wed");
 			expect(result.display).toBe("Mar 4");
 		});

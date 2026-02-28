@@ -25,6 +25,7 @@ export default function Events() {
 	const parentData = useRouteLoaderData<typeof groupLayoutLoader>("routes/groups.$groupId");
 	const role = parentData?.role;
 	const groupId = parentData?.group?.id ?? "";
+	const timezone = parentData?.user?.timezone ?? undefined;
 	const [searchParams] = useSearchParams();
 
 	const [view, setView] = useState<"list" | "calendar">(
@@ -144,6 +145,7 @@ export default function Events() {
 												location={event.location}
 												assignmentCount={event.assignmentCount}
 												confirmedCount={event.confirmedCount}
+												timezone={timezone}
 											/>
 										))}
 									</div>
@@ -174,6 +176,7 @@ export default function Events() {
 													location={event.location}
 													assignmentCount={event.assignmentCount}
 													confirmedCount={event.confirmedCount}
+													timezone={timezone}
 												/>
 											))}
 										</div>
@@ -203,7 +206,7 @@ export default function Events() {
 						{calendarSelectedDate ? (
 							<div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
 								<h3 className="mb-3 text-sm font-semibold text-slate-900">
-									{formatDateLong(`${calendarSelectedDate}T00:00:00`)}
+									{formatDateLong(`${calendarSelectedDate}T00:00:00`, timezone)}
 								</h3>
 								{calendarDateEvents.length > 0 ? (
 									<div className="space-y-3">
@@ -217,6 +220,7 @@ export default function Events() {
 												startTime={event.startTime as unknown as string}
 												endTime={event.endTime as unknown as string}
 												location={event.location}
+												timezone={timezone}
 												compact
 											/>
 										))}

@@ -10,6 +10,7 @@ interface AvailabilityGridProps {
 	onChange: (responses: Record<string, AvailabilityStatus>) => void;
 	disabled?: boolean;
 	timeRange?: string | null;
+	timezone?: string | null;
 }
 
 const statusConfig = {
@@ -39,6 +40,7 @@ export function AvailabilityGrid({
 	onChange,
 	disabled,
 	timeRange,
+	timezone,
 }: AvailabilityGridProps) {
 	const setStatus = useCallback(
 		(date: string, status: AvailabilityStatus) => {
@@ -108,7 +110,7 @@ export function AvailabilityGrid({
 						</thead>
 						<tbody className="divide-y divide-slate-100">
 							{dates.map((date) => {
-								const { dayOfWeek, display } = formatDateDisplay(date);
+								const { dayOfWeek, display } = formatDateDisplay(date, timezone ?? undefined);
 								const current = responses[date];
 								return (
 									<tr key={date} className="transition-colors hover:bg-slate-50/50">
@@ -151,7 +153,7 @@ export function AvailabilityGrid({
 			{/* Mobile cards */}
 			<div className="space-y-2 sm:hidden">
 				{dates.map((date) => {
-					const { dayOfWeek, display } = formatDateDisplay(date);
+					const { dayOfWeek, display } = formatDateDisplay(date, timezone ?? undefined);
 					const current = responses[date];
 					return (
 						<div key={date} className="rounded-xl border border-slate-200 bg-white p-4">

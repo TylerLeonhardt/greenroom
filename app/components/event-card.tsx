@@ -15,6 +15,7 @@ interface EventCardProps {
 	userStatus?: string | null;
 	groupName?: string;
 	compact?: boolean;
+	timezone?: string | null;
 }
 
 const EVENT_TYPE_CONFIG: Record<string, { emoji: string; label: string; color: string }> = {
@@ -36,6 +37,7 @@ export function EventCard({
 	userStatus,
 	groupName,
 	compact,
+	timezone,
 }: EventCardProps) {
 	const config = EVENT_TYPE_CONFIG[eventType] ?? EVENT_TYPE_CONFIG.other;
 
@@ -60,7 +62,7 @@ export function EventCard({
 					<div className="mt-1.5 space-y-1">
 						<div className="flex items-center gap-1.5 text-xs text-slate-500">
 							<CalendarDays className="h-3.5 w-3.5" />
-							{formatEventTime(startTime, endTime)}
+							{formatEventTime(startTime, endTime, timezone ?? undefined)}
 						</div>
 						{location && (
 							<div className="flex items-center gap-1.5 text-xs text-slate-500">

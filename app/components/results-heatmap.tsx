@@ -20,6 +20,7 @@ interface ResultsHeatmapProps {
 	groupId: string;
 	requestId?: string;
 	timeRange?: string | null;
+	timezone?: string | null;
 }
 
 function getHeatColor(score: number, maxScore: number): string {
@@ -51,6 +52,7 @@ export function ResultsHeatmap({
 	groupId,
 	requestId,
 	timeRange,
+	timezone,
 }: ResultsHeatmapProps) {
 	const [expandedDate, setExpandedDate] = useState<string | null>(null);
 	const [sortBy, setSortBy] = useState<"date" | "score">("date");
@@ -127,7 +129,7 @@ export function ResultsHeatmap({
 						</thead>
 						<tbody className="divide-y divide-slate-100">
 							{sortedDates.map((row) => {
-								const { dayOfWeek, display } = formatDateDisplay(row.date);
+								const { dayOfWeek, display } = formatDateDisplay(row.date, timezone ?? undefined);
 								const isExpanded = expandedDate === row.date;
 								const isBest = topDateSet.has(row.date) && row.score > 0;
 								return (
@@ -209,7 +211,7 @@ export function ResultsHeatmap({
 			{/* Mobile cards */}
 			<div className="space-y-2 sm:hidden">
 				{sortedDates.map((row) => {
-					const { dayOfWeek, display } = formatDateDisplay(row.date);
+					const { dayOfWeek, display } = formatDateDisplay(row.date, timezone ?? undefined);
 					const isExpanded = expandedDate === row.date;
 					const isBest = topDateSet.has(row.date) && row.score > 0;
 					return (

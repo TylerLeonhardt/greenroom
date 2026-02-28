@@ -56,7 +56,7 @@ export default function Dashboard() {
 												<span>·</span>
 												<span className="flex items-center gap-1 text-amber-600">
 													<Clock className="h-3 w-3" />
-													Due {formatDateShort(req.expiresAt)}
+													Due {formatDateShort(req.expiresAt, user.timezone ?? undefined)}
 												</span>
 											</>
 										)}
@@ -89,7 +89,7 @@ export default function Dashboard() {
 									<div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
 										<span>{evt.groupName}</span>
 										<span>·</span>
-										<span>{formatDateShort(evt.startTime)}</span>
+										<span>{formatDateShort(evt.startTime, user.timezone ?? undefined)}</span>
 									</div>
 								</div>
 								<span className="ml-4 shrink-0 text-sm font-medium text-emerald-600">
@@ -138,6 +138,7 @@ export default function Dashboard() {
 								location={event.location}
 								groupName={event.groupName}
 								userStatus={event.userStatus}
+								timezone={user.timezone}
 								compact
 							/>
 						))}
