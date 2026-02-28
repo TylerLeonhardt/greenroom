@@ -41,6 +41,9 @@ export async function action({ request }: ActionFunctionArgs) {
 	if (typeof password !== "string" || !password) {
 		return { error: "Password is required." };
 	}
+	if (password.length > 128) {
+		return { error: "Password is too long." };
+	}
 
 	try {
 		const user = await authenticator.authenticate("form", request);
