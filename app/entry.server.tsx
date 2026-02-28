@@ -17,7 +17,7 @@ function setSecurityHeaders(responseHeaders: Headers) {
 	responseHeaders.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
 	responseHeaders.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
 	responseHeaders.set(
-		"Content-Security-Policy-Report-Only",
+		"Content-Security-Policy",
 		"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'",
 	);
 }

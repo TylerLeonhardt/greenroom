@@ -16,7 +16,7 @@ describe("security headers", () => {
 		headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
 		headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
 		headers.set(
-			"Content-Security-Policy-Report-Only",
+			"Content-Security-Policy",
 			"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'",
 		);
 
@@ -25,7 +25,7 @@ describe("security headers", () => {
 		expect(headers.get("Referrer-Policy")).toBe("strict-origin-when-cross-origin");
 		expect(headers.get("Permissions-Policy")).toBe("camera=(), microphone=(), geolocation=()");
 		expect(headers.get("Strict-Transport-Security")).toBe("max-age=31536000; includeSubDomains");
-		expect(headers.get("Content-Security-Policy-Report-Only")).toContain("default-src 'self'");
-		expect(headers.get("Content-Security-Policy-Report-Only")).toContain("frame-ancestors 'none'");
+		expect(headers.get("Content-Security-Policy")).toContain("default-src 'self'");
+		expect(headers.get("Content-Security-Policy")).toContain("frame-ancestors 'none'");
 	});
 });
