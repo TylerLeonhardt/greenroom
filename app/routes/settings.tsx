@@ -2,6 +2,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remi
 import { Form, useActionData, useLoaderData, useNavigation, useSubmit } from "@remix-run/react";
 import { Globe, Save } from "lucide-react";
 import { useEffect, useRef } from "react";
+import { COMMON_TIMEZONES, getTimezoneLabel } from "~/components/timezone-selector";
 import { requireUser, updateUserTimezone } from "~/services/auth.server";
 
 export const meta: MetaFunction = () => {
@@ -34,51 +35,6 @@ export async function action({ request }: ActionFunctionArgs) {
 	}
 
 	return { error: "Invalid action." };
-}
-
-const COMMON_TIMEZONES = [
-	"America/New_York",
-	"America/Chicago",
-	"America/Denver",
-	"America/Los_Angeles",
-	"America/Anchorage",
-	"Pacific/Honolulu",
-	"America/Phoenix",
-	"America/Toronto",
-	"America/Vancouver",
-	"America/Mexico_City",
-	"America/Sao_Paulo",
-	"America/Argentina/Buenos_Aires",
-	"Europe/London",
-	"Europe/Paris",
-	"Europe/Berlin",
-	"Europe/Amsterdam",
-	"Europe/Madrid",
-	"Europe/Rome",
-	"Europe/Moscow",
-	"Asia/Dubai",
-	"Asia/Kolkata",
-	"Asia/Singapore",
-	"Asia/Shanghai",
-	"Asia/Tokyo",
-	"Asia/Seoul",
-	"Australia/Sydney",
-	"Australia/Melbourne",
-	"Pacific/Auckland",
-	"UTC",
-];
-
-function getTimezoneLabel(tz: string): string {
-	try {
-		const now = new Date();
-		const offsetStr = now.toLocaleString("en-US", { timeZone: tz, timeZoneName: "short" });
-		const match = offsetStr.match(/[A-Z]{2,5}$/);
-		const abbrev = match ? match[0] : "";
-		const city = tz.split("/").pop()?.replace(/_/g, " ") ?? tz;
-		return `${city}${abbrev ? ` (${abbrev})` : ""}`;
-	} catch {
-		return tz;
-	}
 }
 
 export default function Settings() {
