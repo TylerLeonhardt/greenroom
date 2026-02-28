@@ -15,6 +15,11 @@ vi.mock("~/services/rate-limit.server", () => ({
 	checkLoginRateLimit: vi.fn().mockReturnValue({ limited: false }),
 }));
 
+// Mock CSRF validation — allow all by default
+vi.mock("~/services/csrf.server", () => ({
+	validateCsrfToken: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { action, loader } from "~/routes/login";
 import {
 	authenticator,

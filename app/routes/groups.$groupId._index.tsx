@@ -1,8 +1,10 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { Form, Link, useLoaderData, useRouteLoaderData } from "@remix-run/react";
 import { CalendarDays } from "lucide-react";
+import { CsrfInput } from "~/components/csrf-input";
 import { EventCard } from "~/components/event-card";
 import { getOpenAvailabilityRequestCount } from "~/services/availability.server";
+import { validateCsrfToken } from "~/services/csrf.server";
 import { getGroupEvents } from "~/services/events.server";
 import {
 	getGroupWithMembers,
@@ -29,6 +31,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	await requireGroupAdmin(request, groupId);
 
 	const formData = await request.formData();
+	await validateCsrfToken(request, formData);
 	const intent = formData.get("intent");
 
 	if (intent === "remove-member") {
@@ -103,6 +106,7 @@ export default function GroupOverview() {
 									)}
 									{role === "admin" && member.id !== parentData?.user.id && (
 										<Form method="post">
+											<CsrfInput />
 											<input type="hidden" name="intent" value="remove-member" />
 											<input type="hidden" name="userId" value={member.id} />
 											<button

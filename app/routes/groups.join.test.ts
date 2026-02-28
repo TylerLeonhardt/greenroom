@@ -21,6 +21,11 @@ vi.mock("~/services/groups.server", () => ({
 	joinGroup: vi.fn(),
 }));
 
+// Mock CSRF validation — allow all by default
+vi.mock("~/services/csrf.server", () => ({
+	validateCsrfToken: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { action } from "~/routes/groups.join";
 import { requireUser } from "~/services/auth.server";
 import { joinGroup } from "~/services/groups.server";

@@ -1,7 +1,9 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
 import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { CsrfInput } from "~/components/csrf-input";
 import { generateVerificationToken, getUserEmailById } from "~/services/auth.server";
+import { validateCsrfToken } from "~/services/csrf.server";
 import { sendVerificationEmail } from "~/services/email.server";
 import { checkResendVerificationRateLimit } from "~/services/rate-limit.server";
 import { destroyUserSession, getUserId } from "~/services/session.server";
@@ -26,6 +28,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export async function action({ request }: ActionFunctionArgs) {
 	const formData = await request.formData();
+	await validateCsrfToken(request, formData);
 	const intent = formData.get("intent");
 
 	// "Wrong email?" — destroy session and redirect to signup
@@ -94,6 +97,7 @@ export default function CheckEmail() {
 
 					<p className="mb-3 text-sm text-slate-600">Didn&apos;t receive the email?</p>
 					<Form method="post">
+						<CsrfInput />
 						<button
 							type="submit"
 							disabled={isSubmitting}
@@ -105,6 +109,7 @@ export default function CheckEmail() {
 				</div>
 
 				<Form method="post" className="mt-6">
+					<CsrfInput />
 					<input type="hidden" name="intent" value="change-email" />
 					<p className="text-sm text-slate-600">
 						Wrong email?{" "}

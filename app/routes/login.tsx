@@ -1,12 +1,14 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
 import { Form, Link, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { CsrfInput } from "~/components/csrf-input";
 import {
 	authenticator,
 	createUserSession,
 	getOptionalUser,
 	isEmailVerified,
 } from "~/services/auth.server";
+import { validateCsrfToken } from "~/services/csrf.server";
 import { checkLoginRateLimit } from "~/services/rate-limit.server";
 
 export const meta: MetaFunction = () => {
@@ -32,6 +34,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
 	const clonedRequest = request.clone();
 	const formData = await clonedRequest.formData();
+	await validateCsrfToken(request, formData);
 	const email = formData.get("email");
 	const password = formData.get("password");
 
@@ -124,6 +127,7 @@ export default function Login() {
 					</div>
 
 					<Form method="post" className="space-y-4">
+						<CsrfInput />
 						<div>
 							<label htmlFor="email" className="block text-sm font-medium text-slate-700">
 								Email

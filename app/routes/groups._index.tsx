@@ -1,7 +1,9 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
 import { Form, Link, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { CsrfInput } from "~/components/csrf-input";
 import { requireUser } from "~/services/auth.server";
+import { validateCsrfToken } from "~/services/csrf.server";
 import { createGroup, getUserGroups, joinGroup } from "~/services/groups.server";
 
 export const meta: MetaFunction = () => {
@@ -17,6 +19,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 export async function action({ request }: ActionFunctionArgs) {
 	const user = await requireUser(request);
 	const formData = await request.formData();
+	await validateCsrfToken(request, formData);
 	const intent = formData.get("intent");
 
 	if (intent === "create") {
@@ -95,6 +98,7 @@ export default function Groups() {
 			{/* Join Group Section */}
 			<div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
 				<Form method="post" className="flex items-end gap-3">
+					<CsrfInput />
 					<input type="hidden" name="intent" value="join" />
 					<div className="flex-1">
 						<label htmlFor="join-code" className="block text-sm font-medium text-slate-700">

@@ -23,7 +23,9 @@ import {
 	X,
 } from "lucide-react";
 import { useState } from "react";
+import { CsrfInput } from "~/components/csrf-input";
 import { formatDateLong, formatTime, utcToLocalParts } from "~/lib/date-utils";
+import { validateCsrfToken } from "~/services/csrf.server";
 import {
 	assignToEvent,
 	bulkAssignToEvent,
@@ -98,6 +100,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	}
 
 	const formData = await request.formData();
+	await validateCsrfToken(request, formData);
 	const intent = formData.get("intent");
 
 	if (intent === "confirm" || intent === "decline") {
@@ -362,6 +365,7 @@ export default function EventDetail() {
 													</span>
 													{isAdmin && (
 														<Form method="post">
+															<CsrfInput />
 															<input type="hidden" name="intent" value="remove-assignment" />
 															<input type="hidden" name="userId" value={a.userId} />
 															<button
@@ -390,6 +394,7 @@ export default function EventDetail() {
 											setSelectedUserIds(new Set());
 										}}
 									>
+										<CsrfInput />
 										<input type="hidden" name="intent" value="assign" />
 										<input type="hidden" name="role" value="Performer" />
 										{Array.from(selectedUserIds).map((id) => (
@@ -557,6 +562,7 @@ export default function EventDetail() {
 															</span>
 															{isAdmin && (
 																<Form method="post">
+																	<CsrfInput />
 																	<input type="hidden" name="intent" value="remove-assignment" />
 																	<input type="hidden" name="userId" value={a.userId} />
 																	<button
@@ -577,6 +583,7 @@ export default function EventDetail() {
 									{canSelfRegister && (
 										<div className="border-t border-slate-100 p-4">
 											<Form method="post">
+												<CsrfInput />
 												<input type="hidden" name="intent" value="attend" />
 												<button
 													type="submit"
@@ -643,6 +650,7 @@ export default function EventDetail() {
 													</span>
 													{isAdmin && (
 														<Form method="post">
+															<CsrfInput />
 															<input type="hidden" name="intent" value="remove-assignment" />
 															<input type="hidden" name="userId" value={a.userId} />
 															<button
@@ -671,6 +679,7 @@ export default function EventDetail() {
 											setSelectedUserIds(new Set());
 										}}
 									>
+										<CsrfInput />
 										<input type="hidden" name="intent" value="assign" />
 										{Array.from(selectedUserIds).map((id) => (
 											<input key={id} type="hidden" name="userIds" value={id} />
@@ -851,6 +860,7 @@ export default function EventDetail() {
 												</span>
 												{isAdmin && (
 													<Form method="post">
+														<CsrfInput />
 														<input type="hidden" name="intent" value="remove-assignment" />
 														<input type="hidden" name="userId" value={a.userId} />
 														<button
@@ -891,6 +901,7 @@ export default function EventDetail() {
 										<Check className="h-4 w-4" /> Confirmed
 									</span>
 									<Form method="post" className="mt-3">
+										<CsrfInput />
 										<input type="hidden" name="intent" value="decline" />
 										<button type="submit" className="text-xs text-slate-500 hover:text-red-600">
 											Change to Declined
@@ -903,6 +914,7 @@ export default function EventDetail() {
 										<X className="h-4 w-4" /> Declined
 									</span>
 									<Form method="post" className="mt-3">
+										<CsrfInput />
 										<input type="hidden" name="intent" value="confirm" />
 										<button type="submit" className="text-xs text-slate-500 hover:text-emerald-600">
 											Change to Confirmed
@@ -912,6 +924,7 @@ export default function EventDetail() {
 							) : (
 								<div className="mt-3 flex gap-2">
 									<Form method="post">
+										<CsrfInput />
 										<input type="hidden" name="intent" value="confirm" />
 										<button
 											type="submit"
@@ -922,6 +935,7 @@ export default function EventDetail() {
 										</button>
 									</Form>
 									<Form method="post">
+										<CsrfInput />
 										<input type="hidden" name="intent" value="decline" />
 										<button
 											type="submit"
@@ -942,6 +956,7 @@ export default function EventDetail() {
 							<h3 className="text-sm font-semibold text-slate-900">Attending?</h3>
 							<p className="mt-1 text-xs text-slate-500">Let your group know you'll be there.</p>
 							<Form method="post" className="mt-3">
+								<CsrfInput />
 								<input type="hidden" name="intent" value="attend" />
 								<button
 									type="submit"

@@ -31,6 +31,11 @@ vi.mock("~/services/email.server", () => ({
 	sendAvailabilityRequestNotification: vi.fn(),
 }));
 
+// Mock CSRF validation — allow all by default
+vi.mock("~/services/csrf.server", () => ({
+	validateCsrfToken: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { action } from "~/routes/groups.$groupId.availability.new";
 import { requireGroupAdminOrPermission } from "~/services/groups.server";
 

@@ -24,6 +24,11 @@ vi.mock("~/services/session.server", () => ({
 		.mockReturnValue(new Response(null, { status: 302, headers: { Location: "/signup" } })),
 }));
 
+// Mock CSRF validation — allow all by default
+vi.mock("~/services/csrf.server", () => ({
+	validateCsrfToken: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { action, loader } from "~/routes/check-email";
 import { generateVerificationToken, getUserEmailById } from "~/services/auth.server";
 import { sendVerificationEmail } from "~/services/email.server";
