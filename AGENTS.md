@@ -36,24 +36,27 @@ app/
 │   ├── api.events.$eventId.ics.tsx # iCal export (GET, role-aware start times)
 │   ├── $.tsx                   # Catch-all 404 page
 │   ├── dashboard.tsx           # Authenticated dashboard (requires login)
-│   ├── groups.tsx              # Groups list with inline join form
+│   ├── groups.tsx              # Groups layout (Outlet wrapper)
+│   ├── groups._index.tsx       # Groups list with inline join/create forms
 │   ├── groups.new.tsx          # Create group form
 │   ├── groups.join.tsx         # Join group via invite code (supports ?code= param)
 │   ├── groups.$groupId.tsx     # Group layout with tab navigation (Outlet)
 │   ├── groups.$groupId._index.tsx        # Group overview: members, stats, upcoming events
-│   ├── groups.$groupId.availability.tsx  # Availability request list
-│   ├── groups.$groupId.availability.new.tsx     # Create availability request (admin)
+│   ├── groups.$groupId.availability.tsx  # Availability layout (Outlet wrapper)
+│   ├── groups.$groupId.availability._index.tsx  # Availability request list with progress bars
+│   ├── groups.$groupId.availability.new.tsx     # Create availability request (admin or permitted member)
 │   ├── groups.$groupId.availability.$requestId.tsx  # View/respond to request + results heatmap
-│   ├── groups.$groupId.events.tsx        # Event list + calendar view
-│   ├── groups.$groupId.events.new.tsx    # Create event (admin, supports ?fromRequest=)
+│   ├── groups.$groupId.events.tsx        # Events layout (Outlet wrapper)
+│   ├── groups.$groupId.events._index.tsx # Event list (list/calendar toggle) with type filter
+│   ├── groups.$groupId.events.new.tsx    # Create event (admin or permitted member, supports ?fromRequest=)
 │   ├── groups.$groupId.events.$eventId.tsx      # Event detail: cast list, confirm/decline
 │   ├── groups.$groupId.events.$eventId.edit.tsx # Edit/delete event (admin)
-│   ├── groups.$groupId.settings.tsx      # Group settings: edit name, regenerate invite code
+│   ├── groups.$groupId.settings.tsx      # Group settings: edit name, permissions, regenerate invite code
 │   └── settings.tsx              # User settings: timezone preference
 ├── services/                   # Server-side business logic (*.server.ts)
 │   ├── auth.server.ts          # Authentication: form strategy, Google OAuth, requireUser()
 │   ├── session.server.ts       # Cookie session storage, getUserId(), createUserSession()
-│   ├── groups.server.ts        # Group CRUD, membership, invite codes, requireGroupMember/Admin
+│   ├── groups.server.ts        # Group CRUD, membership, invite codes, permissions, requireGroupMember/Admin/AdminOrPermission
 │   ├── availability.server.ts  # Availability requests, responses, aggregation
 │   ├── events.server.ts        # Events CRUD, assignments, bulk assign, cross-group queries
 │   ├── dashboard.server.ts     # Dashboard data aggregation (parallel queries)
@@ -65,7 +68,8 @@ app/
     ├── date-selector.tsx       # Calendar-based date picker for creating requests
     ├── event-calendar.tsx      # Monthly calendar view with event dots
     ├── event-card.tsx          # Reusable event card (used in dashboard, lists, sidebar)
-    └── results-heatmap.tsx     # Aggregated availability results with scoring
+    ├── results-heatmap.tsx     # Aggregated availability results with scoring
+    └── timezone-selector.tsx   # Inline timezone picker (used in availability/event creation)
 
 src/
 ├── db/
@@ -93,6 +97,9 @@ const user = await requireGroupMember(request, groupId);
 
 // Must be an admin of the specific group — throws 403 if not admin
 const user = await requireGroupAdmin(request, groupId);
+
+// Admin OR member with a specific group-level permission enabled — throws 403 if neither
+const user = await requireGroupAdminOrPermission(request, groupId, "membersCanCreateRequests");
 ```
 
 - `getOptionalUser(request)` returns `AuthUser | null` (used in root loader for nav)
@@ -254,16 +261,19 @@ export async function action({ request }: ActionFunctionArgs) {
 | `/api/events/:eventId/ics` | `requireUser` + `requireGroupMember` | Downloads .ics file (role-aware start times for performers) |
 | `/dashboard` | `requireUser` | Action items, upcoming events, group list |
 | `/settings` | `requireUser` | Timezone preference, auto-detects on first visit |
-| `/groups` | `requireUser` | List user's groups + inline join form |
+| `/groups` | `requireUser` | Layout (Outlet wrapper) |
+| `/groups` (index) | `requireUser` | List user's groups + inline join form |
 | `/groups/new` | `requireUser` | Create group form |
 | `/groups/join` | `requireUser` | Join via invite code (supports `?code=` query param) |
 | `/groups/:groupId` | `requireGroupMember` | Layout with tabs: Overview, Availability, Events, Settings |
 | `/groups/:groupId` (index) | `requireGroupMember` | Member list, quick stats, upcoming events sidebar |
-| `/groups/:groupId/availability` | `requireGroupMember` | List availability requests with progress bars |
-| `/groups/:groupId/availability/new` | `requireGroupAdmin` | Create availability request with date picker |
+| `/groups/:groupId/availability` | `requireGroupMember` | Layout (Outlet wrapper) |
+| `/groups/:groupId/availability` (index) | `requireGroupMember` | List availability requests with progress bars |
+| `/groups/:groupId/availability/new` | `requireGroupAdminOrPermission` | Create availability request with date picker |
 | `/groups/:groupId/availability/:requestId` | `requireGroupMember` | Submit response + admin results heatmap |
-| `/groups/:groupId/events` | `requireGroupMember` | Event list (list/calendar toggle) with type filter |
-| `/groups/:groupId/events/new` | `requireGroupAdmin` | Create event (supports `?fromRequest=&date=`) |
+| `/groups/:groupId/events` | `requireGroupMember` | Layout (Outlet wrapper) |
+| `/groups/:groupId/events` (index) | `requireGroupMember` | Event list (list/calendar toggle) with type filter |
+| `/groups/:groupId/events/new` | `requireGroupAdminOrPermission` | Create event (supports `?fromRequest=&date=`) |
 | `/groups/:groupId/events/:eventId` | `requireGroupMember` | Event detail, cast list, confirm/decline |
 | `/groups/:groupId/events/:eventId/edit` | `requireGroupAdmin` | Edit/delete event |
 | `/groups/:groupId/settings` | `requireGroupAdmin` | Edit group name/description, regenerate invite code |
@@ -277,7 +287,7 @@ export async function action({ request }: ActionFunctionArgs) {
 | Table | Key Columns | Notes |
 |-------|-------------|-------|
 | `users` | id, email (unique), passwordHash, name, googleId (unique), emailVerified, timezone | Supports email/password + Google OAuth. `passwordHash` is null for Google-only users. `timezone` is IANA timezone string, auto-detected on first visit |
-| `groups` | id, name, inviteCode (unique, 8 chars), createdById → users | Invite code uses chars `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (no ambiguous I/O/0/1) |
+| `groups` | id, name, description, inviteCode (unique, 8 chars), createdById → users, membersCanCreateRequests, membersCanCreateEvents | Invite code uses chars `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (no ambiguous I/O/0/1). Permission booleans default to `false` (admin-only). |
 | `group_memberships` | id, groupId → groups, userId → users, role (admin/member) | Unique on (groupId, userId). Creator gets admin role |
 | `availability_requests` | id, groupId → groups, title, requestedDates (JSONB `string[]`), status (open/closed), expiresAt, requestedStartTime, requestedEndTime | `requestedDates` is a JSON array of ISO date strings. `requestedStartTime`/`requestedEndTime` are nullable "HH:MM" strings for time range (null = all day) |
 | `availability_responses` | id, requestId → availability_requests, userId → users, responses (JSONB) | `responses` is `Record<string, "available" | "maybe" | "not_available">`. Upsert on (requestId, userId) |
@@ -402,7 +412,8 @@ CI runs on every push/PR to `master`: typecheck → lint → build → test
 
 - **Every protected route** calls `requireUser()`, `requireGroupMember()`, or `requireGroupAdmin()` — never skip this
 - **Cross-group isolation:** Always verify `resource.groupId === params.groupId` before returning data
-- **Admin-only actions:** Settings, creating availability requests, creating events, managing assignments
+- **Admin-only actions:** Settings, managing assignments, editing/deleting events, closing/reopening availability requests
+- **Configurable member permissions:** Admins can enable `membersCanCreateRequests` and `membersCanCreateEvents` per group (default: disabled). Routes use `requireGroupAdminOrPermission()` for these actions.
 - **Member verification for assignments:** `bulkAssignToEvent` verifies all userIds are group members before assigning
 - **Invite codes:** 8 chars from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`, collision retry (up to 5 attempts)
 - **Passwords:** bcrypt with 12 rounds, min 8 characters
