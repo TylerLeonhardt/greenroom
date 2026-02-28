@@ -92,7 +92,7 @@ function handleBrowserRequest(
 		const { pipe, abort } = renderToPipeableStream(
 			<RemixServer context={remixContext} url={request.url} abortDelay={ABORT_DELAY} />,
 			{
-				onShellReady() {
+				onAllReady() {
 					shellRendered = true;
 					const body = new PassThrough();
 					const stream = createReadableStreamFromReadable(body);
