@@ -277,6 +277,9 @@ export async function exchangeGoogleCode(code: string): Promise<{
 
 // --- Session helpers ---
 
+// Paths that unverified users can access (no email verification required)
+const VERIFICATION_EXEMPT_PATHS = ["/check-email", "/verify-email", "/logout", "/settings"];
+
 export async function requireUser(request: Request): Promise<AuthUser> {
 	const userId = await getUserId(request);
 	if (!userId) {
@@ -286,6 +289,18 @@ export async function requireUser(request: Request): Promise<AuthUser> {
 	const user = await getUserById(userId);
 	if (!user) {
 		throw redirect("/login");
+	}
+
+	// Enforce email verification — redirect unverified users to /check-email
+	const verified = await isEmailVerified(userId);
+	if (!verified) {
+		const url = new URL(request.url);
+		const isExempt = VERIFICATION_EXEMPT_PATHS.some(
+			(path) => url.pathname === path || url.pathname.startsWith(`${path}/`),
+		);
+		if (!isExempt) {
+			throw redirect("/check-email");
+		}
 	}
 
 	return user;
