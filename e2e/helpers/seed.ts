@@ -200,28 +200,32 @@ export async function seedTestData(prefix: string): Promise<TestData> {
 		],
 	);
 
+	// Close the seeding pool — cleanup will create its own if needed
+	await pool.end();
+
 	const cleanup = async () => {
+		const cleanupPool = getPool();
 		try {
 			// Clean up in reverse dependency order
-			await pool.query(
+			await cleanupPool.query(
 				`DELETE FROM availability_responses WHERE request_id IN (
 					SELECT id FROM availability_requests WHERE group_id = $1
 				)`,
 				[groupId],
 			);
-			await pool.query(
+			await cleanupPool.query(
 				`DELETE FROM event_assignments WHERE event_id IN (
 					SELECT id FROM events WHERE group_id = $1
 				)`,
 				[groupId],
 			);
-			await pool.query(`DELETE FROM events WHERE group_id = $1`, [groupId]);
-			await pool.query(`DELETE FROM availability_requests WHERE group_id = $1`, [groupId]);
-			await pool.query(`DELETE FROM group_memberships WHERE group_id = $1`, [groupId]);
-			await pool.query(`DELETE FROM groups WHERE id = $1`, [groupId]);
-			await pool.query(`DELETE FROM users WHERE id IN ($1, $2)`, [adminId, memberId]);
+			await cleanupPool.query(`DELETE FROM events WHERE group_id = $1`, [groupId]);
+			await cleanupPool.query(`DELETE FROM availability_requests WHERE group_id = $1`, [groupId]);
+			await cleanupPool.query(`DELETE FROM group_memberships WHERE group_id = $1`, [groupId]);
+			await cleanupPool.query(`DELETE FROM groups WHERE id = $1`, [groupId]);
+			await cleanupPool.query(`DELETE FROM users WHERE id IN ($1, $2)`, [adminId, memberId]);
 		} finally {
-			await pool.end();
+			await cleanupPool.end();
 		}
 	};
 
@@ -271,12 +275,16 @@ export async function seedStandaloneUser(
 		[userId, user.email, passwordHash, user.name],
 	);
 
+	// Close the seeding pool — cleanup will create its own if needed
+	await pool.end();
+
 	const cleanup = async () => {
+		const cleanupPool = getPool();
 		try {
-			await pool.query(`DELETE FROM group_memberships WHERE user_id = $1`, [userId]);
-			await pool.query(`DELETE FROM users WHERE id = $1`, [userId]);
+			await cleanupPool.query(`DELETE FROM group_memberships WHERE user_id = $1`, [userId]);
+			await cleanupPool.query(`DELETE FROM users WHERE id = $1`, [userId]);
 		} finally {
-			await pool.end();
+			await cleanupPool.end();
 		}
 	};
 
