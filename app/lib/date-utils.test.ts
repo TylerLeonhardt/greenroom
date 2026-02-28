@@ -10,6 +10,8 @@ import {
 	formatEventTime,
 	formatTime,
 	formatTimeRange,
+	localTimeToUTC,
+	utcToLocalParts,
 } from "./date-utils";
 
 describe("date-utils", () => {
@@ -153,6 +155,126 @@ describe("date-utils", () => {
 		it("handles midnight", () => {
 			const result = formatTimeRange("00:00", "02:00");
 			expect(result).toBe("12:00 AM – 2:00 AM");
+		});
+	});
+
+	describe("localTimeToUTC", () => {
+		it("converts LA PDT time to UTC correctly", () => {
+			const result = localTimeToUTC("2026-03-15", "19:00", "America/Los_Angeles");
+			const displayed = result.toLocaleTimeString("en-US", {
+				hour: "numeric",
+				minute: "2-digit",
+				timeZone: "America/Los_Angeles",
+			});
+			expect(displayed).toBe("7:00 PM");
+		});
+
+		it("converts LA PST time to UTC correctly", () => {
+			const result = localTimeToUTC("2026-01-15", "19:00", "America/Los_Angeles");
+			const displayed = result.toLocaleTimeString("en-US", {
+				hour: "numeric",
+				minute: "2-digit",
+				timeZone: "America/Los_Angeles",
+			});
+			expect(displayed).toBe("7:00 PM");
+		});
+
+		it("converts New York EDT time to UTC correctly", () => {
+			const result = localTimeToUTC("2026-07-15", "20:00", "America/New_York");
+			const displayed = result.toLocaleTimeString("en-US", {
+				hour: "numeric",
+				minute: "2-digit",
+				timeZone: "America/New_York",
+			});
+			expect(displayed).toBe("8:00 PM");
+		});
+
+		it("handles UTC timezone", () => {
+			const result = localTimeToUTC("2026-03-15", "19:00", "UTC");
+			expect(result.getUTCHours()).toBe(19);
+			expect(result.getUTCMinutes()).toBe(0);
+		});
+
+		it("falls back to server-local time when no timezone", () => {
+			const result = localTimeToUTC("2026-03-15", "19:00", null);
+			const expected = new Date("2026-03-15T19:00:00");
+			expect(result.getTime()).toBe(expected.getTime());
+		});
+
+		it("handles positive offset timezones (Asia/Tokyo UTC+9)", () => {
+			const result = localTimeToUTC("2026-03-15", "19:00", "Asia/Tokyo");
+			const displayed = result.toLocaleTimeString("en-US", {
+				hour: "numeric",
+				minute: "2-digit",
+				timeZone: "Asia/Tokyo",
+			});
+			expect(displayed).toBe("7:00 PM");
+		});
+
+		it("preserves minutes correctly", () => {
+			const result = localTimeToUTC("2026-03-15", "19:30", "America/Los_Angeles");
+			const displayed = result.toLocaleTimeString("en-US", {
+				hour: "numeric",
+				minute: "2-digit",
+				timeZone: "America/Los_Angeles",
+			});
+			expect(displayed).toBe("7:30 PM");
+		});
+
+		it("handles DST spring forward correctly", () => {
+			// 2026-03-08: 2 AM PST → 3 AM PDT (02:xx doesn't exist)
+			const result = localTimeToUTC("2026-03-08", "03:00", "America/Los_Angeles");
+			const displayed = result.toLocaleTimeString("en-US", {
+				hour: "numeric",
+				minute: "2-digit",
+				timeZone: "America/Los_Angeles",
+			});
+			expect(displayed).toBe("3:00 AM");
+		});
+
+		it("handles DST fall back correctly", () => {
+			// 2026-11-01: 2 AM PDT → 1 AM PST (01:xx repeats)
+			const result = localTimeToUTC("2026-11-01", "01:30", "America/Los_Angeles");
+			const displayed = result.toLocaleTimeString("en-US", {
+				hour: "numeric",
+				minute: "2-digit",
+				timeZone: "America/Los_Angeles",
+			});
+			expect(displayed).toBe("1:30 AM");
+		});
+	});
+
+	describe("utcToLocalParts", () => {
+		it("converts UTC date to LA timezone parts", () => {
+			// 2 AM UTC on Mar 16 = 7 PM PDT on Mar 15 in LA
+			const utcDate = new Date("2026-03-16T02:00:00Z");
+			const parts = utcToLocalParts(utcDate, "America/Los_Angeles");
+			expect(parts.date).toBe("2026-03-15");
+			expect(parts.time).toBe("19:00");
+		});
+
+		it("converts UTC date to NY timezone parts", () => {
+			// Midnight UTC on Jul 16 = 8 PM EDT on Jul 15 in NY
+			const utcDate = new Date("2026-07-16T00:00:00Z");
+			const parts = utcToLocalParts(utcDate, "America/New_York");
+			expect(parts.date).toBe("2026-07-15");
+			expect(parts.time).toBe("20:00");
+		});
+
+		it("round-trips correctly with localTimeToUTC", () => {
+			const tz = "America/Los_Angeles";
+			const original = localTimeToUTC("2026-06-20", "14:30", tz);
+			const parts = utcToLocalParts(original, tz);
+			expect(parts.date).toBe("2026-06-20");
+			expect(parts.time).toBe("14:30");
+		});
+
+		it("round-trips correctly for Tokyo timezone", () => {
+			const tz = "Asia/Tokyo";
+			const original = localTimeToUTC("2026-06-20", "08:15", tz);
+			const parts = utcToLocalParts(original, tz);
+			expect(parts.date).toBe("2026-06-20");
+			expect(parts.time).toBe("08:15");
 		});
 	});
 });

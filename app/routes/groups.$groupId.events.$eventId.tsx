@@ -23,7 +23,7 @@ import {
 	X,
 } from "lucide-react";
 import { useState } from "react";
-import { formatDateLong, formatTime } from "~/lib/date-utils";
+import { formatDateLong, formatTime, utcToLocalParts } from "~/lib/date-utils";
 import {
 	assignToEvent,
 	bulkAssignToEvent,
@@ -67,8 +67,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 			// Verify the availability request belongs to this group before exposing its data
 			const requestGroupId = await getAvailabilityRequestGroupId(data.event.createdFromRequestId);
 			if (requestGroupId === groupId) {
-				const eventDate = new Date(data.event.startTime);
-				const dateKey = `${eventDate.getFullYear()}-${String(eventDate.getMonth() + 1).padStart(2, "0")}-${String(eventDate.getDate()).padStart(2, "0")}`;
+				const dateKey = utcToLocalParts(new Date(data.event.startTime), user.timezone).date;
 				availabilityData = await getAvailabilityForEventDate(
 					data.event.createdFromRequestId,
 					dateKey,

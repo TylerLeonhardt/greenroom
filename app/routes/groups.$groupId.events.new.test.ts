@@ -16,6 +16,7 @@ vi.mock("~/services/groups.server", () => ({
 		email: "test@example.com",
 		name: "Test User",
 		profileImage: null,
+		timezone: "America/New_York",
 	}),
 	getGroupWithMembers: vi.fn().mockResolvedValue({
 		group: { id: "g1", name: "Test Group" },

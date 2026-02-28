@@ -64,12 +64,19 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		return { error: "Start date must be before end date." };
 	}
 
-	const hasStartTime = typeof requestedStartTime === "string" && requestedStartTime;
-	const hasEndTime = typeof requestedEndTime === "string" && requestedEndTime;
-	if ((hasStartTime && !hasEndTime) || (!hasStartTime && hasEndTime)) {
+	const timePattern = /^\d{2}:\d{2}$/;
+	const startTimeVal =
+		typeof requestedStartTime === "string" && timePattern.test(requestedStartTime.trim())
+			? requestedStartTime.trim()
+			: null;
+	const endTimeVal =
+		typeof requestedEndTime === "string" && timePattern.test(requestedEndTime.trim())
+			? requestedEndTime.trim()
+			: null;
+	if ((startTimeVal && !endTimeVal) || (!startTimeVal && endTimeVal)) {
 		return { error: "Please provide both start and end times, or leave both empty for all-day." };
 	}
-	if (hasStartTime && hasEndTime && requestedStartTime >= requestedEndTime) {
+	if (startTimeVal && endTimeVal && startTimeVal >= endTimeVal) {
 		return { error: "End time must be after start time." };
 	}
 
@@ -99,8 +106,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		createdById: user.id,
 		expiresAt:
 			typeof expiresAt === "string" && expiresAt ? new Date(`${expiresAt}T23:59:59`) : undefined,
-		requestedStartTime: hasStartTime ? requestedStartTime : undefined,
-		requestedEndTime: hasEndTime ? requestedEndTime : undefined,
+		requestedStartTime: startTimeVal ?? undefined,
+		requestedEndTime: endTimeVal ?? undefined,
 	});
 
 	// Fire-and-forget email notification to group members
@@ -113,10 +120,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		if (recipients.length === 0) return;
 
 		const dateRange = `${formatDateShort(`${dateRangeStart}T00:00:00`)} – ${formatDateShort(`${dateRangeEnd}T00:00:00`)}`;
-		const timeRangeStr = formatTimeRange(
-			typeof requestedStartTime === "string" && requestedStartTime ? requestedStartTime : null,
-			typeof requestedEndTime === "string" && requestedEndTime ? requestedEndTime : null,
-		);
+		const timeRangeStr = formatTimeRange(startTimeVal, endTimeVal);
 		const dateRangeDisplay =
 			timeRangeStr !== "All day" ? `${dateRange} · ${timeRangeStr}` : dateRange;
 

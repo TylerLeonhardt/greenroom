@@ -10,6 +10,7 @@ import {
 } from "@remix-run/react";
 import { ArrowLeft, Clock, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { localTimeToUTC, utcToLocalParts } from "~/lib/date-utils";
 import { deleteEvent, getEventWithAssignments, updateEvent } from "~/services/events.server";
 import { requireGroupAdmin } from "~/services/groups.server";
 
@@ -20,26 +21,27 @@ export const meta: MetaFunction = () => {
 export async function loader({ request, params }: LoaderFunctionArgs) {
 	const groupId = params.groupId ?? "";
 	const eventId = params.eventId ?? "";
-	await requireGroupAdmin(request, groupId);
+	const user = await requireGroupAdmin(request, groupId);
 
 	const data = await getEventWithAssignments(eventId);
 	if (!data || data.event.groupId !== groupId) {
 		throw new Response("Not Found", { status: 404 });
 	}
 
-	const start = new Date(data.event.startTime);
-	const end = new Date(data.event.endTime);
-	const ct = data.event.callTime ? new Date(data.event.callTime) : null;
+	const startParts = utcToLocalParts(new Date(data.event.startTime), user.timezone);
+	const endParts = utcToLocalParts(new Date(data.event.endTime), user.timezone);
+	const ctParts = data.event.callTime
+		? utcToLocalParts(new Date(data.event.callTime), user.timezone)
+		: null;
 
 	return {
 		event: data.event,
+		userTimezone: user.timezone,
 		prefill: {
-			date: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`,
-			startTime: `${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}`,
-			endTime: `${String(end.getHours()).padStart(2, "0")}:${String(end.getMinutes()).padStart(2, "0")}`,
-			callTime: ct
-				? `${String(ct.getHours()).padStart(2, "0")}:${String(ct.getMinutes()).padStart(2, "0")}`
-				: "",
+			date: startParts.date,
+			startTime: startParts.time,
+			endTime: endParts.time,
+			callTime: ctParts?.time ?? "",
 		},
 	};
 }
@@ -47,7 +49,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 export async function action({ request, params }: ActionFunctionArgs) {
 	const groupId = params.groupId ?? "";
 	const eventId = params.eventId ?? "";
-	await requireGroupAdmin(request, groupId);
+	const user = await requireGroupAdmin(request, groupId);
 
 	// Verify the event belongs to this group before any mutation
 	const data = await getEventWithAssignments(eventId);
@@ -111,11 +113,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		title: title.trim(),
 		description: typeof description === "string" ? description : undefined,
 		eventType,
-		startTime: new Date(`${date}T${startTime}:00`),
-		endTime: new Date(`${date}T${endTime}:00`),
+		startTime: localTimeToUTC(date, startTime, user.timezone),
+		endTime: localTimeToUTC(date, endTime, user.timezone),
 		location: typeof location === "string" ? location : undefined,
 		callTime: hasCallTime
-			? new Date(`${date}T${callTime}:00`)
+			? localTimeToUTC(date, callTime.trim(), user.timezone)
 			: eventType === "show"
 				? undefined
 				: null,

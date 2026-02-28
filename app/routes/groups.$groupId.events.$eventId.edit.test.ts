@@ -17,6 +17,7 @@ vi.mock("~/services/groups.server", () => ({
 		email: "test@example.com",
 		name: "Test User",
 		profileImage: null,
+		timezone: "America/New_York",
 	}),
 	getGroupWithMembers: vi.fn().mockResolvedValue({
 		group: { id: "g1", name: "Test Group" },
@@ -43,6 +44,7 @@ describe("event edit action — IDOR prevention", () => {
 			email: "test@example.com",
 			name: "Test User",
 			profileImage: null,
+			timezone: "America/New_York",
 		});
 	});
 
@@ -168,6 +170,7 @@ describe("event edit action — validation", () => {
 			email: "test@example.com",
 			name: "Test User",
 			profileImage: null,
+			timezone: "America/New_York",
 		});
 		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
 			event: { id: "event-1", groupId: "g1", title: "My Event" },
