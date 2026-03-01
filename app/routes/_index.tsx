@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
-import { Link, useLoaderData } from "@remix-run/react";
+import { Link, useRouteLoaderData } from "@remix-run/react";
+import type { loader as rootLoader } from "~/root";
 import { getOptionalUser } from "~/services/auth.server";
 
 export const meta: MetaFunction = () => {
@@ -55,8 +56,8 @@ const features = [
 ];
 
 export default function Index() {
-	const { supportUrl } = useLoaderData<typeof loader>();
-
+	const rootData = useRouteLoaderData<typeof rootLoader>("root");
+	const supportUrl = rootData?.supportUrl;
 	return (
 		<div>
 			{/* Hero */}
