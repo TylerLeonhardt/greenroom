@@ -4,7 +4,7 @@ build
 .env.local
 *.log
 .DS_Store
-drizzle
+
 .playwright-cli/
 e2e/.auth/
 test-results/
