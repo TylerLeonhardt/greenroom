@@ -21,6 +21,8 @@ vi.mock("~/services/groups.server", () => ({
 		group: { id: "g1", name: "Test" },
 		members: [],
 	}),
+	getGroupById: vi.fn().mockResolvedValue({ id: "g1", name: "Test" }),
+	getGroupMembersWithPreferences: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("~/services/availability.server", () => ({

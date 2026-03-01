@@ -43,6 +43,13 @@
       "when": 1772255352498,
       "tag": "0005_puzzling_the_hand",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1772329406527,
+      "tag": "0006_overconfident_black_tom",
+      "breakpoints": true
     }
   ]
 }

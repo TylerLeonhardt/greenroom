@@ -69,6 +69,23 @@ export const groups = pgTable(
 	(table) => [index("groups_invite_code_idx").on(table.inviteCode)],
 );
 
+// Notification Preferences
+export type NotificationChannelPreferences = {
+	email: boolean;
+};
+
+export type NotificationPreferences = {
+	availabilityRequests: NotificationChannelPreferences;
+	eventNotifications: NotificationChannelPreferences;
+	showReminders: NotificationChannelPreferences;
+};
+
+export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+	availabilityRequests: { email: true },
+	eventNotifications: { email: true },
+	showReminders: { email: true },
+};
+
 // Group Memberships
 export const groupMemberships = pgTable(
 	"group_memberships",
@@ -81,6 +98,14 @@ export const groupMemberships = pgTable(
 			.notNull()
 			.references(() => users.id, { onDelete: "cascade" }),
 		role: groupRoleEnum("role").default("member").notNull(),
+		notificationPreferences: jsonb("notification_preferences")
+			.$type<NotificationPreferences>()
+			.default({
+				availabilityRequests: { email: true },
+				eventNotifications: { email: true },
+				showReminders: { email: true },
+			})
+			.notNull(),
 		joinedAt: timestamp("joined_at", { withTimezone: true }).defaultNow().notNull(),
 	},
 	(table) => [
