@@ -301,6 +301,10 @@ export async function updateUserTimezone(userId: string, timezone: string): Prom
 	await db.update(users).set({ timezone, updatedAt: new Date() }).where(eq(users.id, userId));
 }
 
+export async function updateUserName(userId: string, name: string): Promise<void> {
+	await db.update(users).set({ name, updatedAt: new Date() }).where(eq(users.id, userId));
+}
+
 // --- Email Verification ---
 
 export async function generateVerificationToken(userId: string): Promise<string> {
