@@ -22,6 +22,7 @@ vi.mock("~/services/groups.server", () => ({
 		group: { id: "g1", name: "Test Group" },
 		members: [{ id: "user-1", name: "Test User", email: "test@example.com" }],
 	}),
+	getGroupMembersWithPreferences: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("~/services/events.server", () => ({

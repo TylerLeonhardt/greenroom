@@ -46,6 +46,7 @@ export default function GroupLayout() {
 	const isOverview = location.pathname === basePath || location.pathname === `${basePath}/`;
 	const isAvailability = location.pathname.startsWith(`${basePath}/availability`);
 	const isEvents = location.pathname.startsWith(`${basePath}/events`);
+	const isNotifications = location.pathname.startsWith(`${basePath}/notifications`);
 	const isSettings = location.pathname.startsWith(`${basePath}/settings`);
 
 	return (
@@ -67,6 +68,9 @@ export default function GroupLayout() {
 				</TabLink>
 				<TabLink to={`${basePath}/events`} active={isEvents}>
 					Events
+				</TabLink>
+				<TabLink to={`${basePath}/notifications`} active={isNotifications}>
+					Notifications
 				</TabLink>
 				{role === "admin" && (
 					<TabLink to={`${basePath}/settings`} active={isSettings}>
