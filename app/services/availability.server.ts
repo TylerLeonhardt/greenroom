@@ -3,6 +3,7 @@ import { db } from "../../src/db/index.js";
 import {
 	availabilityRequests,
 	availabilityResponses,
+	events,
 	groupMemberships,
 	users,
 } from "../../src/db/schema.js";
@@ -281,4 +282,19 @@ export async function reopenAvailabilityRequest(requestId: string): Promise<void
 		.update(availabilityRequests)
 		.set({ status: "open" })
 		.where(eq(availabilityRequests.id, requestId));
+}
+
+// --- Delete ---
+
+export async function deleteAvailabilityRequest(requestId: string): Promise<void> {
+	await db.transaction(async (tx) => {
+		// Unlink any events that were created from this request
+		await tx
+			.update(events)
+			.set({ createdFromRequestId: null })
+			.where(eq(events.createdFromRequestId, requestId));
+
+		// Delete the request (responses cascade automatically)
+		await tx.delete(availabilityRequests).where(eq(availabilityRequests.id, requestId));
+	});
 }

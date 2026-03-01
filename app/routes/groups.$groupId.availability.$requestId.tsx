@@ -2,12 +2,13 @@ import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remi
 import {
 	Form,
 	Link,
+	redirect,
 	useActionData,
 	useLoaderData,
 	useNavigation,
 	useRouteLoaderData,
 } from "@remix-run/react";
-import { ArrowLeft, Clock, Lock, LockOpen, Users } from "lucide-react";
+import { ArrowLeft, Clock, Lock, LockOpen, Trash2, Users } from "lucide-react";
 import { useState } from "react";
 import { AvailabilityGrid } from "~/components/availability-grid";
 import { CsrfInput } from "~/components/csrf-input";
@@ -15,6 +16,7 @@ import { ResultsHeatmap } from "~/components/results-heatmap";
 import { formatDateMedium, formatTimeRange } from "~/lib/date-utils";
 import {
 	closeAvailabilityRequest,
+	deleteAvailabilityRequest,
 	getAggregatedResults,
 	getAvailabilityRequest,
 	getUserResponse,
@@ -106,11 +108,26 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		return { success: true };
 	}
 
+	if (intent === "delete") {
+		const availRequest = await getAvailabilityRequest(requestId);
+		if (!availRequest || availRequest.groupId !== groupId) {
+			throw new Response("Not Found", { status: 404 });
+		}
+
+		const admin = await isGroupAdmin(user.id, groupId);
+		if (!admin && availRequest.createdById !== user.id) {
+			throw new Response("Forbidden", { status: 403 });
+		}
+
+		await deleteAvailabilityRequest(requestId);
+		return redirect(`/groups/${groupId}/availability`);
+	}
+
 	return { error: "Invalid action." };
 }
 
 export default function AvailabilityRequestDetail() {
-	const { availRequest, userResponse, results, isAdmin } = useLoaderData<typeof loader>();
+	const { availRequest, userResponse, results, isAdmin, user } = useLoaderData<typeof loader>();
 	const parentData = useRouteLoaderData<typeof groupLayoutLoader>("routes/groups.$groupId");
 	const timezone = parentData?.user?.timezone ?? undefined;
 	const actionData = useActionData<typeof action>();
@@ -125,6 +142,7 @@ export default function AvailabilityRequestDetail() {
 	const isClosed = availRequest.status === "closed";
 	const timeRange = formatTimeRange(availRequest.requestedStartTime, availRequest.requestedEndTime);
 	const hasTimeRange = timeRange !== "All day";
+	const canDelete = isAdmin || availRequest.createdById === user.id;
 
 	return (
 		<div className="max-w-4xl">
@@ -305,6 +323,31 @@ export default function AvailabilityRequestDetail() {
 							</button>
 						</div>
 					)}
+				</div>
+			)}
+
+			{/* Danger Zone — visible to admin or creator */}
+			{canDelete && (
+				<div className="mt-8 rounded-xl border border-red-200 bg-red-50 p-6">
+					<h3 className="text-sm font-semibold text-red-900">Danger Zone</h3>
+					<p className="mt-1 text-xs text-red-700">
+						Deleting this request will remove all responses and cannot be undone.
+					</p>
+					<Form method="post" className="mt-4">
+						<CsrfInput />
+						<input type="hidden" name="intent" value="delete" />
+						<button
+							type="submit"
+							onClick={(e) => {
+								if (!confirm("Are you sure you want to delete this availability request?")) {
+									e.preventDefault();
+								}
+							}}
+							className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100"
+						>
+							<Trash2 className="h-4 w-4" /> Delete Request
+						</button>
+					</Form>
 				</div>
 			)}
 		</div>
