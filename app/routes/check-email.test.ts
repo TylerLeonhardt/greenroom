@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // Mock auth service
 vi.mock("~/services/auth.server", () => ({
 	generateVerificationToken: vi.fn().mockResolvedValue("test-token-123"),
-	getUserEmailById: vi.fn().mockResolvedValue("user@example.com"),
+	getUserByEmail: vi.fn(),
 }));
 
 // Mock email service
@@ -16,67 +16,48 @@ vi.mock("~/services/rate-limit.server", () => ({
 	checkResendVerificationRateLimit: vi.fn().mockReturnValue({ limited: false }),
 }));
 
-// Mock session service
-vi.mock("~/services/session.server", () => ({
-	getUserId: vi.fn().mockResolvedValue("user-1"),
-	destroyUserSession: vi
-		.fn()
-		.mockReturnValue(new Response(null, { status: 302, headers: { Location: "/signup" } })),
-}));
-
 // Mock CSRF validation — allow all by default
 vi.mock("~/services/csrf.server", () => ({
 	validateCsrfToken: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { action, loader } from "~/routes/check-email";
-import { generateVerificationToken, getUserEmailById } from "~/services/auth.server";
+import { generateVerificationToken, getUserByEmail } from "~/services/auth.server";
 import { sendVerificationEmail } from "~/services/email.server";
 import { checkResendVerificationRateLimit } from "~/services/rate-limit.server";
-import { destroyUserSession, getUserId } from "~/services/session.server";
 
 describe("check-email route", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		(getUserId as ReturnType<typeof vi.fn>).mockResolvedValue("user-1");
-		(getUserEmailById as ReturnType<typeof vi.fn>).mockResolvedValue("user@example.com");
+		(getUserByEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: "user-1",
+			email: "user@example.com",
+			name: "Test User",
+			emailVerified: false,
+		});
 		(checkResendVerificationRateLimit as ReturnType<typeof vi.fn>).mockReturnValue({
 			limited: false,
 		});
-		(destroyUserSession as ReturnType<typeof vi.fn>).mockReturnValue(
-			new Response(null, { status: 302, headers: { Location: "/signup" } }),
-		);
 	});
 
 	describe("loader", () => {
-		it("returns email for authenticated user", async () => {
-			const request = new Request("http://localhost/check-email");
+		it("returns email from query param", async () => {
+			const request = new Request("http://localhost/check-email?email=user@example.com");
 			const result = await loader({ request, params: {}, context: {} });
 			expect(result).toEqual({ email: "user@example.com" });
 		});
 
-		it("redirects to /login if not authenticated", async () => {
-			(getUserId as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+		it("returns null email when no query param", async () => {
 			const request = new Request("http://localhost/check-email");
 			const result = await loader({ request, params: {}, context: {} });
-			expect(result).toBeInstanceOf(Response);
-			expect((result as Response).status).toBe(302);
-			expect((result as Response).headers.get("Location")).toBe("/login");
-		});
-
-		it("redirects to /login if user email not found", async () => {
-			(getUserEmailById as ReturnType<typeof vi.fn>).mockResolvedValue(null);
-			const request = new Request("http://localhost/check-email");
-			const result = await loader({ request, params: {}, context: {} });
-			expect(result).toBeInstanceOf(Response);
-			expect((result as Response).status).toBe(302);
-			expect((result as Response).headers.get("Location")).toBe("/login");
+			expect(result).toEqual({ email: null });
 		});
 	});
 
 	describe("action", () => {
-		it("resends verification email on default POST", async () => {
+		it("resends verification email for unverified user", async () => {
 			const formData = new FormData();
+			formData.set("email", "user@example.com");
 			const request = new Request("http://localhost/check-email", {
 				method: "POST",
 				body: formData,
@@ -84,15 +65,53 @@ describe("check-email route", () => {
 
 			const result = await action({ request, params: {}, context: {} });
 			expect(result).toEqual({ success: true });
+			expect(getUserByEmail).toHaveBeenCalledWith("user@example.com");
 			expect(generateVerificationToken).toHaveBeenCalledWith("user-1");
 			expect(sendVerificationEmail).toHaveBeenCalledWith({
 				email: "user@example.com",
-				name: "there",
+				name: "Test User",
 				verificationUrl: "http://localhost:5173/verify-email?token=test-token-123",
 			});
 		});
 
-		it("destroys session and redirects to /signup on change-email intent", async () => {
+		it("returns success without sending email for already verified user (prevents enumeration)", async () => {
+			(getUserByEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
+				id: "user-1",
+				email: "user@example.com",
+				name: "Test User",
+				emailVerified: true,
+			});
+
+			const formData = new FormData();
+			formData.set("email", "user@example.com");
+			const request = new Request("http://localhost/check-email", {
+				method: "POST",
+				body: formData,
+			});
+
+			const result = await action({ request, params: {}, context: {} });
+			expect(result).toEqual({ success: true });
+			expect(sendVerificationEmail).not.toHaveBeenCalled();
+			expect(generateVerificationToken).not.toHaveBeenCalled();
+		});
+
+		it("returns success without sending email for unknown email (prevents enumeration)", async () => {
+			(getUserByEmail as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+
+			const formData = new FormData();
+			formData.set("email", "unknown@example.com");
+			const request = new Request("http://localhost/check-email", {
+				method: "POST",
+				body: formData,
+			});
+
+			const result = await action({ request, params: {}, context: {} });
+			expect(result).toEqual({ success: true });
+			expect(sendVerificationEmail).not.toHaveBeenCalled();
+			expect(generateVerificationToken).not.toHaveBeenCalled();
+		});
+
+		it("redirects to /signup on change-email intent", async () => {
 			const request = new Request("http://localhost/check-email", {
 				method: "POST",
 				body: new URLSearchParams({ intent: "change-email" }),
@@ -100,7 +119,6 @@ describe("check-email route", () => {
 			});
 
 			const result = await action({ request, params: {}, context: {} });
-			expect(destroyUserSession).toHaveBeenCalled();
 			expect(result).toBeInstanceOf(Response);
 			expect((result as Response).status).toBe(302);
 			expect((result as Response).headers.get("Location")).toBe("/signup");
@@ -115,6 +133,7 @@ describe("check-email route", () => {
 			});
 
 			const formData = new FormData();
+			formData.set("email", "user@example.com");
 			const request = new Request("http://localhost/check-email", {
 				method: "POST",
 				body: formData,
@@ -125,8 +144,7 @@ describe("check-email route", () => {
 			expect((result as { error: string }).error).toContain("Please wait 30 seconds");
 		});
 
-		it("redirects to /login if not authenticated on resend", async () => {
-			(getUserId as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+		it("redirects to /signup when no email provided", async () => {
 			const formData = new FormData();
 			const request = new Request("http://localhost/check-email", {
 				method: "POST",
@@ -136,7 +154,7 @@ describe("check-email route", () => {
 			const result = await action({ request, params: {}, context: {} });
 			expect(result).toBeInstanceOf(Response);
 			expect((result as Response).status).toBe(302);
-			expect((result as Response).headers.get("Location")).toBe("/login");
+			expect((result as Response).headers.get("Location")).toBe("/signup");
 		});
 	});
 });

@@ -107,6 +107,7 @@ const user = await requireGroupAdminOrPermission(request, groupId, "membersCanCr
 - Auth uses `remix-auth` with `FormStrategy` for email/password
 - Google OAuth is manual implementation (not using remix-auth-google adapter) — see `getGoogleAuthURL()`, `exchangeGoogleCode()`, `findOrCreateGoogleUser()`
 - Session is a signed cookie (`__greenroom_session`, 30 day expiry)
+- **Session = verified user.** Signup does NOT create a session. Users must verify their email first, then log in. Login blocks unverified users. There is no "logged in but unverified" state.
 
 ### Data Flow
 
@@ -254,8 +255,10 @@ export async function action({ request }: ActionFunctionArgs) {
 |-------|------|-------------|
 | `/` | Public | Landing page (redirects to `/dashboard` if logged in) |
 | `/login` | Public | Login form (email/password + Google OAuth) |
-| `/signup` | Public | Registration form with password strength meter |
+| `/signup` | Public | Registration form with password strength meter. Redirects to `/check-email` after signup (no session created). |
 | `/logout` | POST only | Destroys session, redirects to `/` |
+| `/check-email` | Public | Email verification prompt. Accepts `?email=` query param. Supports resend verification email. |
+| `/verify-email` | Public | Validates email verification token from `?token=`. Redirects to `/login?verified=true` on success. |
 | `/auth/google` | Public | Redirects to Google OAuth consent screen |
 | `/auth/google/callback` | Public | Handles OAuth code exchange, creates session |
 | `/api/health` | Public | Returns `{ status: "ok", timestamp }` |

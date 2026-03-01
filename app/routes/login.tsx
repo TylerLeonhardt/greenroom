@@ -51,10 +51,13 @@ export async function action({ request }: ActionFunctionArgs) {
 	try {
 		const user = await authenticator.authenticate("form", request);
 
-		// Check email verification before creating session
+		// Block unverified users from logging in
 		const verified = await isEmailVerified(user.id);
 		if (!verified) {
-			return createUserSession(user.id, "/check-email");
+			return {
+				error:
+					"Please verify your email first. Check your inbox or request a new verification link.",
+			};
 		}
 
 		return createUserSession(user.id, "/dashboard");
