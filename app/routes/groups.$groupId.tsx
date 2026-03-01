@@ -27,7 +27,7 @@ function TabLink({
 	return (
 		<Link
 			to={to}
-			className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+			className={`whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
 				active
 					? "border-emerald-600 text-emerald-600"
 					: "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700"
@@ -59,7 +59,7 @@ export default function GroupLayout() {
 				{group.description && <p className="mt-1 text-slate-600">{group.description}</p>}
 			</div>
 
-			<div className="mb-6 flex gap-0 border-b border-slate-200">
+			<div className="mb-6 flex gap-0 overflow-x-auto border-b border-slate-200">
 				<TabLink to={basePath} active={isOverview}>
 					Overview
 				</TabLink>

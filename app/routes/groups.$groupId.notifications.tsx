@@ -7,6 +7,8 @@ import {
 	requireGroupMember,
 	updateNotificationPreferences,
 } from "~/services/groups.server";
+import { logger } from "~/services/logger.server";
+import { DEFAULT_NOTIFICATION_PREFERENCES } from "../../src/db/schema.js";
 
 export const meta: MetaFunction = () => {
 	return [{ title: "Notification Preferences — My Call Time" }];
@@ -15,8 +17,13 @@ export const meta: MetaFunction = () => {
 export async function loader({ request, params }: LoaderFunctionArgs) {
 	const groupId = params.groupId ?? "";
 	const user = await requireGroupMember(request, groupId);
-	const preferences = await getNotificationPreferences(user.id, groupId);
-	return { preferences };
+	try {
+		const preferences = await getNotificationPreferences(user.id, groupId);
+		return { preferences };
+	} catch (err) {
+		logger.error({ err, userId: user.id, groupId }, "Failed to load notification preferences");
+		return { preferences: { ...DEFAULT_NOTIFICATION_PREFERENCES } };
+	}
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -84,23 +91,26 @@ export default function GroupNotifications() {
 			)}
 
 			<div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-				<div className="border-b border-slate-100 px-6 py-4">
+				<div className="border-b border-slate-100 px-4 py-4 sm:px-6">
 					<h2 className="text-lg font-semibold text-slate-900">Email Notifications</h2>
 					<p className="mt-1 text-sm text-slate-500">
 						Choose which email notifications you receive from this group
 					</p>
 				</div>
-				<Form method="post" className="p-6">
+				<Form method="post" className="p-4 sm:p-6">
 					<CsrfInput />
 					<input type="hidden" name="intent" value="update-preferences" />
 					<div className="space-y-4">
 						{NOTIFICATION_CATEGORIES.map((category) => (
-							<label key={category.key} className="flex items-center justify-between gap-4">
-								<div>
+							<label
+								key={category.key}
+								className="flex items-start justify-between gap-3 sm:items-center sm:gap-4"
+							>
+								<div className="min-w-0">
 									<span className="text-sm font-medium text-slate-700">
 										{category.label}
 										{category.comingSoon && (
-											<span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-normal text-slate-500">
+											<span className="ml-2 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs font-normal text-slate-500">
 												Coming soon
 											</span>
 										)}
@@ -110,8 +120,8 @@ export default function GroupNotifications() {
 								<input
 									type="checkbox"
 									name={category.key}
-									defaultChecked={preferences[category.key].email}
-									className="h-5 w-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/20"
+									defaultChecked={preferences[category.key]?.email ?? true}
+									className="mt-0.5 h-5 w-5 shrink-0 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/20 sm:mt-0"
 								/>
 							</label>
 						))}

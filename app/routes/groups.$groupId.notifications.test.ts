@@ -28,8 +28,16 @@ vi.mock("~/services/csrf.server", () => ({
 	validateCsrfToken: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { action } from "~/routes/groups.$groupId.notifications";
-import { requireGroupMember, updateNotificationPreferences } from "~/services/groups.server";
+vi.mock("~/services/logger.server", () => ({
+	logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+}));
+
+import { action, loader } from "~/routes/groups.$groupId.notifications";
+import {
+	getNotificationPreferences,
+	requireGroupMember,
+	updateNotificationPreferences,
+} from "~/services/groups.server";
 
 function makeRequest(fields: Record<string, string>) {
 	const formData = new FormData();
@@ -112,5 +120,44 @@ describe("notifications action", () => {
 		});
 		const result = await action({ request, params: { groupId: "g1" }, context: {} });
 		expect(result).toEqual({ error: "Failed to update preferences.", success: false });
+	});
+});
+
+describe("notifications loader", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		(requireGroupMember as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: "user-1",
+			email: "test@example.com",
+			name: "Test User",
+			profileImage: null,
+		});
+	});
+
+	it("returns preferences from service", async () => {
+		const request = new Request("http://localhost/groups/g1/notifications");
+		const result = await loader({ request, params: { groupId: "g1" }, context: {} });
+		expect(result).toEqual({
+			preferences: {
+				availabilityRequests: { email: true },
+				eventNotifications: { email: true },
+				showReminders: { email: true },
+			},
+		});
+	});
+
+	it("returns defaults when getNotificationPreferences throws", async () => {
+		(getNotificationPreferences as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+			new Error("column does not exist"),
+		);
+		const request = new Request("http://localhost/groups/g1/notifications");
+		const result = await loader({ request, params: { groupId: "g1" }, context: {} });
+		expect(result).toEqual({
+			preferences: {
+				availabilityRequests: { email: true },
+				eventNotifications: { email: true },
+				showReminders: { email: true },
+			},
+		});
 	});
 });
