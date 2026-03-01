@@ -1,5 +1,7 @@
 # My Call Time — Agent Notes
 
+Read [`docs/vision.md`](docs/vision.md) first to understand the product vision and principles before starting any work.
+
 Institutional knowledge for agents working on the My Call Time codebase. Read this before touching anything.
 
 ## What Is My Call Time?
