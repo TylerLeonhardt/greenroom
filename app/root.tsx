@@ -31,7 +31,8 @@ export const links: LinksFunction = () => [
 export async function loader({ request }: LoaderFunctionArgs) {
 	const user = await getOptionalUser(request);
 	const { token: csrfToken, cookie } = await generateCsrfToken(request);
-	return Response.json({ user, csrfToken }, { headers: { "Set-Cookie": cookie } });
+	const supportUrl = process.env.SUPPORT_URL || null;
+	return Response.json({ user, csrfToken, supportUrl }, { headers: { "Set-Cookie": cookie } });
 }
 
 function NavLink({ to, children }: { to: string; children: React.ReactNode }) {
@@ -199,6 +200,23 @@ function LoadingBar() {
 	);
 }
 
+function AppFooter() {
+	const { supportUrl } = useLoaderData<typeof loader>();
+	if (!supportUrl) return null;
+	return (
+		<footer className="mt-12 border-t border-slate-200 py-6 text-center">
+			<a
+				href={supportUrl}
+				target="_blank"
+				rel="noopener noreferrer"
+				className="text-sm text-slate-400 transition-colors hover:text-slate-600"
+			>
+				☕ Buy me a coffee
+			</a>
+		</footer>
+	);
+}
+
 export default function App() {
 	const location = useLocation();
 	const isLanding = location.pathname === "/";
@@ -217,9 +235,12 @@ export default function App() {
 				{isLanding ? (
 					<Outlet />
 				) : (
-					<main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-						<Outlet />
-					</main>
+					<>
+						<main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+							<Outlet />
+						</main>
+						<AppFooter />
+					</>
 				)}
 				<ScrollRestoration />
 				<Scripts />
