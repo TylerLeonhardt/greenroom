@@ -47,7 +47,7 @@ vi.mock("~/services/session.server", () => ({
 	}),
 }));
 
-import { action, loader } from "~/routes/settings.delete-account";
+import { action, loader } from "~/routes/settings_.delete-account";
 import { executeAccountDeletion, getAccountDeletionPreview } from "~/services/account.server";
 import { requireUser } from "~/services/auth.server";
 import { destroyUserSession } from "~/services/session.server";
