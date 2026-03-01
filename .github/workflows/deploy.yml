@@ -35,3 +35,4 @@ jobs:
           containerAppName: greenroom
           resourceGroup: ${{ secrets.AZURE_RESOURCE_GROUP }}
           imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/greenroom:${{ github.sha }}
+          disableTelemetry: true
