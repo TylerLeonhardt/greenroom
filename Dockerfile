@@ -20,7 +20,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/build ./build
 COPY --from=build /app/certs ./certs
+COPY --from=build /app/drizzle ./drizzle
+COPY --from=build /app/scripts/migrate.mjs ./scripts/migrate.mjs
 COPY --from=build /app/package.json ./
 EXPOSE 3000
 ENV NODE_ENV=production
-CMD ["pnpm", "start"]
+CMD ["sh", "-c", "node scripts/migrate.mjs && pnpm start"]

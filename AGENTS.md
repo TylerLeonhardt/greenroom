@@ -440,6 +440,7 @@ CI runs on every push/PR to `master`: typecheck → lint → build → test
 
 - **Platform:** Azure Container Apps
 - **Container:** Node.js 20 slim, multi-stage Docker build (deps → build → runtime)
+- **Migrations:** Auto-run on container startup via `scripts/migrate.mjs` (uses `drizzle-orm/node-postgres/migrator`, not drizzle-kit). Idempotent — safe with multiple replicas. Fails fast if migration fails (prevents app from starting with broken schema).
 - **CI/CD:** GitHub Actions
   - `ci.yml` — typecheck + lint + build + test on push/PR to `master`
   - `deploy.yml` — Docker build → Azure Container Registry → Azure Container Apps on push to `master`
