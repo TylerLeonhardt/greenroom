@@ -237,7 +237,6 @@ describe("availability response action", () => {
 	});
 });
 
-
 describe("availability request delete action", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
