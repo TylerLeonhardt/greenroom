@@ -10,7 +10,7 @@ export async function loader(_args: LoaderFunctionArgs) {
 		);
 		await Promise.race([db.execute(sql`SELECT 1`), timeout]);
 	} catch (error) {
-		logger.error({ err: error }, "Health check: database unreachable");
+		logger.error({ err: error, route: "api.health" }, "Health check: database unreachable");
 		const errorMessage = error instanceof Error ? error.message : "Unknown error";
 
 		return Response.json(
