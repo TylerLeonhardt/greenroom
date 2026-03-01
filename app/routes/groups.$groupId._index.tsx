@@ -12,6 +12,7 @@ import {
 	requireGroupAdmin,
 	requireGroupMember,
 } from "~/services/groups.server";
+import { logger } from "~/services/logger.server";
 import type { loader as groupLayoutLoader } from "./groups.$groupId";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -42,6 +43,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		try {
 			await removeMember(groupId, userId);
 		} catch (error) {
+			logger.error({ err: error, route: "groups.$groupId._index" }, "Failed to remove member");
 			return { error: error instanceof Error ? error.message : "Failed to remove member." };
 		}
 	}

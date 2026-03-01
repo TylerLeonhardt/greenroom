@@ -46,7 +46,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	try {
 		await updateNotificationPreferences(user.id, groupId, preferences);
 		return { success: true, message: "Notification preferences updated." };
-	} catch {
+	} catch (error) {
+		logger.error(
+			{ err: error, route: "groups.$groupId.notifications", intent: "update-preferences" },
+			"Failed to update notification preferences",
+		);
 		return { error: "Failed to update preferences.", success: false };
 	}
 }

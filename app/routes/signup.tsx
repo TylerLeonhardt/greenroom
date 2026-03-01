@@ -6,6 +6,7 @@ import { CsrfInput } from "~/components/csrf-input";
 import { generateVerificationToken, getOptionalUser, registerUser } from "~/services/auth.server";
 import { validateCsrfToken } from "~/services/csrf.server";
 import { sendVerificationEmail } from "~/services/email.server";
+import { logger } from "~/services/logger.server";
 import { checkSignupRateLimit } from "~/services/rate-limit.server";
 
 export const meta: MetaFunction = () => {
@@ -87,6 +88,7 @@ export async function action({ request }: ActionFunctionArgs) {
 		return redirect(`/check-email?email=${encodeURIComponent(user.email)}`);
 	} catch (error) {
 		if (error instanceof Response) throw error;
+		logger.error({ err: error, route: "signup" }, "Registration failed");
 		return { errors: { form: "Registration failed. Please try again." } };
 	}
 }

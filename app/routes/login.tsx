@@ -9,6 +9,7 @@ import {
 	isEmailVerified,
 } from "~/services/auth.server";
 import { validateCsrfToken } from "~/services/csrf.server";
+import { logger } from "~/services/logger.server";
 import { checkLoginRateLimit } from "~/services/rate-limit.server";
 
 export const meta: MetaFunction = () => {
@@ -63,6 +64,7 @@ export async function action({ request }: ActionFunctionArgs) {
 		return createUserSession(user.id, "/dashboard");
 	} catch (error) {
 		if (error instanceof Response) throw error;
+		logger.error({ err: error, route: "login" }, "Login failed");
 		const message = error instanceof Error ? error.message : "Login failed.";
 		return { error: message };
 	}
