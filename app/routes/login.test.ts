@@ -8,6 +8,8 @@ vi.mock("~/services/auth.server", () => ({
 	createUserSession: vi.fn(),
 	getOptionalUser: vi.fn().mockResolvedValue(null),
 	isEmailVerified: vi.fn().mockResolvedValue(true),
+	getUserDeletedAt: vi.fn().mockResolvedValue(null),
+	reactivateAccount: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock rate limiting — allow all by default

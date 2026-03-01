@@ -5,6 +5,9 @@ vi.mock("~/services/session.server", () => ({
 	getUserId: vi.fn(),
 	getSession: vi.fn(),
 	sessionStorage: { commitSession: vi.fn() },
+	destroyUserSession: vi.fn().mockImplementation(async (_request: unknown, redirectTo: string) => {
+		return new Response(null, { status: 302, headers: { Location: redirectTo } });
+	}),
 }));
 
 // Mock DB — control query results
@@ -86,7 +89,10 @@ describe("requireUser", () => {
 
 	it("redirects to /login when user not found in DB", async () => {
 		(getUserId as ReturnType<typeof vi.fn>).mockResolvedValue("nonexistent-id");
-		setupDbResponses([]); // getUserById returns no results
+		setupDbResponses(
+			[{ deletedAt: null }], // getUserDeletedAt
+			[], // getUserById returns no results
+		);
 
 		try {
 			await requireUser(new Request("http://localhost/dashboard"));
@@ -101,7 +107,10 @@ describe("requireUser", () => {
 	it("returns user when session is valid (no email verification check)", async () => {
 		const record = makeUserRecord({ emailVerified: true });
 		(getUserId as ReturnType<typeof vi.fn>).mockResolvedValue("user-1");
-		setupDbResponses([record]);
+		setupDbResponses(
+			[{ deletedAt: null }], // getUserDeletedAt
+			[record], // getUserById
+		);
 
 		const result = await requireUser(new Request("http://localhost/dashboard"));
 		expect(result).toEqual(expectedAuthUser(record));
@@ -110,7 +119,10 @@ describe("requireUser", () => {
 	it("returns user on any path when session is valid", async () => {
 		const record = makeUserRecord({ emailVerified: true });
 		(getUserId as ReturnType<typeof vi.fn>).mockResolvedValue("user-1");
-		setupDbResponses([record]);
+		setupDbResponses(
+			[{ deletedAt: null }], // getUserDeletedAt
+			[record], // getUserById
+		);
 
 		const result = await requireUser(new Request("http://localhost/groups/some-id/events"));
 		expect(result).toEqual(expectedAuthUser(record));
@@ -127,9 +139,28 @@ describe("requireUser", () => {
 			timezone: "America/Los_Angeles",
 		});
 		(getUserId as ReturnType<typeof vi.fn>).mockResolvedValue("user-2");
-		setupDbResponses([record]);
+		setupDbResponses(
+			[{ deletedAt: null }], // getUserDeletedAt
+			[record], // getUserById
+		);
 
 		const result = await requireUser(new Request("http://localhost/groups/some-id/events"));
 		expect(result).toEqual(expectedAuthUser(record));
+	});
+
+	it("destroys session for soft-deleted user", async () => {
+		(getUserId as ReturnType<typeof vi.fn>).mockResolvedValue("user-1");
+		setupDbResponses(
+			[{ deletedAt: new Date() }], // getUserDeletedAt — user is soft-deleted
+		);
+
+		try {
+			await requireUser(new Request("http://localhost/dashboard"));
+			expect.fail("Should have thrown a redirect");
+		} catch (response) {
+			expect(response).toBeInstanceOf(Response);
+			expect((response as Response).status).toBe(302);
+			expect((response as Response).headers.get("Location")).toBe("/login");
+		}
 	});
 });

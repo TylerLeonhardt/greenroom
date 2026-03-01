@@ -40,6 +40,7 @@ export const users = pgTable(
 		emailVerificationToken: varchar("email_verification_token", { length: 255 }),
 		emailVerificationExpiry: timestamp("email_verification_expiry", { withTimezone: true }),
 		timezone: varchar("timezone", { length: 100 }),
+		deletedAt: timestamp("deleted_at", { withTimezone: true }),
 		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 		updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 	},
@@ -58,9 +59,7 @@ export const groups = pgTable(
 		name: varchar("name", { length: 255 }).notNull(),
 		description: text("description"),
 		inviteCode: varchar("invite_code", { length: 8 }).notNull().unique(),
-		createdById: uuid("created_by_id")
-			.notNull()
-			.references(() => users.id),
+		createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
 		membersCanCreateRequests: boolean("members_can_create_requests").default(false).notNull(),
 		membersCanCreateEvents: boolean("members_can_create_events").default(false).notNull(),
 		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -130,9 +129,7 @@ export const availabilityRequests = pgTable(
 		requestedStartTime: varchar("requested_start_time", { length: 5 }),
 		requestedEndTime: varchar("requested_end_time", { length: 5 }),
 		status: availabilityStatusEnum("status").default("open").notNull(),
-		createdById: uuid("created_by_id")
-			.notNull()
-			.references(() => users.id),
+		createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
 		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 		expiresAt: timestamp("expires_at", { withTimezone: true }),
 	},
@@ -175,9 +172,7 @@ export const events = pgTable(
 		startTime: timestamp("start_time", { withTimezone: true }).notNull(),
 		endTime: timestamp("end_time", { withTimezone: true }).notNull(),
 		location: varchar("location", { length: 500 }),
-		createdById: uuid("created_by_id")
-			.notNull()
-			.references(() => users.id),
+		createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
 		createdFromRequestId: uuid("created_from_request_id").references(() => availabilityRequests.id),
 		callTime: timestamp("call_time", { withTimezone: true }),
 		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

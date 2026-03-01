@@ -6,7 +6,9 @@ import {
 	authenticator,
 	createUserSession,
 	getOptionalUser,
+	getUserDeletedAt,
 	isEmailVerified,
+	reactivateAccount,
 } from "~/services/auth.server";
 import { validateCsrfToken } from "~/services/csrf.server";
 import { logger } from "~/services/logger.server";
@@ -59,6 +61,16 @@ export async function action({ request }: ActionFunctionArgs) {
 				error:
 					"Please verify your email first. Check your inbox or request a new verification link.",
 			};
+		}
+
+		// Reactivate soft-deleted accounts on login (30-day grace period)
+		const deletedAt = await getUserDeletedAt(user.id);
+		if (deletedAt) {
+			const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+			if (deletedAt < thirtyDaysAgo) {
+				return { error: "This account has been permanently deleted." };
+			}
+			await reactivateAccount(user.id);
 		}
 
 		return createUserSession(user.id, "/dashboard");
