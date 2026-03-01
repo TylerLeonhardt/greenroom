@@ -32,6 +32,7 @@ vi.mock("~/services/events.server", () => ({
 	updateAssignmentStatus: vi.fn(),
 	removeAssignment: vi.fn(),
 	bulkAssignToEvent: vi.fn(),
+	deleteEvent: vi.fn(),
 	getAvailabilityRequestGroupId: vi.fn(),
 	getAvailabilityForEventDate: vi.fn(),
 }));
@@ -43,6 +44,7 @@ vi.mock("~/services/csrf.server", () => ({
 
 import {
 	assignToEvent,
+	deleteEvent,
 	getEventWithAssignments,
 	updateAssignmentStatus,
 } from "~/services/events.server";
@@ -165,5 +167,113 @@ describe("event detail action — IDOR prevention", () => {
 			expect(response).toBeInstanceOf(Response);
 			expect((response as Response).status).toBe(404);
 		}
+	});
+});
+
+describe("event detail action — delete authorization", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		(requireGroupMember as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: "user-1",
+			email: "test@example.com",
+			name: "Test User",
+			profileImage: null,
+		});
+		(isGroupAdmin as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+	});
+
+	function makeDeleteRequest() {
+		const formData = new FormData();
+		formData.set("intent", "delete");
+		return new Request("http://localhost/groups/g1/events/event-1", {
+			method: "POST",
+			body: formData,
+		});
+	}
+
+	it("allows admin to delete any event", async () => {
+		(isGroupAdmin as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: { id: "event-1", groupId: "g1", title: "My Event", createdById: "other-user" },
+			assignments: [],
+		});
+
+		const result = await action({
+			request: makeDeleteRequest(),
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		expect(result).toBeInstanceOf(Response);
+		expect((result as Response).status).toBe(302);
+		expect((result as Response).headers.get("Location")).toBe("/groups/g1/events");
+		expect(deleteEvent).toHaveBeenCalledWith("event-1");
+	});
+
+	it("allows event creator to delete their own event", async () => {
+		(isGroupAdmin as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: { id: "event-1", groupId: "g1", title: "My Event", createdById: "user-1" },
+			assignments: [],
+		});
+
+		const result = await action({
+			request: makeDeleteRequest(),
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		expect(result).toBeInstanceOf(Response);
+		expect((result as Response).status).toBe(302);
+		expect(deleteEvent).toHaveBeenCalledWith("event-1");
+	});
+
+	it("rejects delete from non-admin non-creator member", async () => {
+		(isGroupAdmin as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: { id: "event-1", groupId: "g1", title: "My Event", createdById: "other-user" },
+			assignments: [],
+		});
+
+		try {
+			await action({
+				request: makeDeleteRequest(),
+				params: { groupId: "g1", eventId: "event-1" },
+				context: {},
+			});
+			expect.fail("Should have thrown 403");
+		} catch (response) {
+			expect(response).toBeInstanceOf(Response);
+			expect((response as Response).status).toBe(403);
+		}
+
+		expect(deleteEvent).not.toHaveBeenCalled();
+	});
+
+	it("prevents deleting event from another group", async () => {
+		(isGroupAdmin as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: {
+				id: "event-1",
+				groupId: "other-group",
+				title: "Other Event",
+				createdById: "user-1",
+			},
+			assignments: [],
+		});
+
+		try {
+			await action({
+				request: makeDeleteRequest(),
+				params: { groupId: "g1", eventId: "event-1" },
+				context: {},
+			});
+			expect.fail("Should have thrown 404");
+		} catch (response) {
+			expect(response).toBeInstanceOf(Response);
+			expect((response as Response).status).toBe(404);
+		}
+
+		expect(deleteEvent).not.toHaveBeenCalled();
 	});
 });

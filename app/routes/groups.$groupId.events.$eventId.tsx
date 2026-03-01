@@ -2,6 +2,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remi
 import {
 	Form,
 	Link,
+	redirect,
 	useActionData,
 	useLoaderData,
 	useNavigation,
@@ -18,6 +19,7 @@ import {
 	Eye,
 	MapPin,
 	Pencil,
+	Trash2,
 	UserPlus,
 	Users,
 	X,
@@ -29,6 +31,7 @@ import { validateCsrfToken } from "~/services/csrf.server";
 import {
 	assignToEvent,
 	bulkAssignToEvent,
+	deleteEvent,
 	getAvailabilityForEventDate,
 	getAvailabilityRequestGroupId,
 	getEventWithAssignments,
@@ -115,6 +118,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		return { success: true };
 	}
 
+	if (intent === "delete") {
+		const admin = await isGroupAdmin(user.id, groupId);
+		const isCreator = eventData.event.createdById === user.id;
+		if (!admin && !isCreator) {
+			throw new Response("Forbidden", { status: 403 });
+		}
+		await deleteEvent(eventId);
+		return redirect(`/groups/${groupId}/events`);
+	}
+
 	// Admin-only actions
 	const admin = await isGroupAdmin(user.id, groupId);
 	if (!admin) throw new Response("Forbidden", { status: 403 });
@@ -189,6 +202,8 @@ export default function EventDetail() {
 		? assignments.filter((a) => a.role !== "Performer" && a.role !== "Viewer")
 		: assignments;
 	const canSelfRegister = !myAssignment && !isAdmin;
+	const canDelete = isAdmin || event.createdById === userId;
+	const confirmedCount = assignments.filter((a) => a.status === "confirmed").length;
 
 	const dateStr = formatDateLong(event.startTime, timezone);
 	const startTimeStr = formatTime(event.startTime, timezone);
@@ -1014,6 +1029,35 @@ export default function EventDetail() {
 					</div>
 				</div>
 			</div>
+
+			{/* Danger Zone — visible to admin or event creator */}
+			{canDelete && (
+				<div className="mt-8 rounded-xl border border-red-200 bg-red-50 p-6">
+					<h3 className="text-sm font-semibold text-red-900">Danger Zone</h3>
+					<p className="mt-1 text-xs text-red-700">
+						Deleting this event will remove all assignments and cannot be undone.
+					</p>
+					<Form method="post" className="mt-4">
+						<CsrfInput />
+						<input type="hidden" name="intent" value="delete" />
+						<button
+							type="submit"
+							onClick={(e) => {
+								const message =
+									confirmedCount > 0
+										? `This event has ${confirmedCount} confirmed attendee${confirmedCount === 1 ? "" : "s"} who will lose their confirmation. Are you sure you want to delete this event?`
+										: "Are you sure you want to delete this event?";
+								if (!confirm(message)) {
+									e.preventDefault();
+								}
+							}}
+							className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100"
+						>
+							<Trash2 className="h-4 w-4" /> Delete Event
+						</button>
+					</Form>
+				</div>
+			)}
 		</div>
 	);
 }
