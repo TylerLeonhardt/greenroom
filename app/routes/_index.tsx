@@ -1,8 +1,6 @@
-import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
-import { redirect } from "@remix-run/node";
+import type { MetaFunction } from "@remix-run/node";
 import { Link, useRouteLoaderData } from "@remix-run/react";
 import type { loader as rootLoader } from "~/root";
-import { getOptionalUser } from "~/services/auth.server";
 
 export const meta: MetaFunction = () => {
 	return [
@@ -22,9 +20,7 @@ export const meta: MetaFunction = () => {
 	];
 };
 
-export async function loader({ request }: LoaderFunctionArgs) {
-	const user = await getOptionalUser(request);
-	if (user) throw redirect("/dashboard");
+export function loader() {
 	const supportUrl = process.env.SUPPORT_URL || null;
 	return Response.json({ supportUrl });
 }
@@ -58,6 +54,7 @@ const features = [
 export default function Index() {
 	const rootData = useRouteLoaderData<typeof rootLoader>("root");
 	const supportUrl = rootData?.supportUrl;
+	const user = rootData?.user;
 	return (
 		<div>
 			{/* Hero */}
@@ -77,18 +74,29 @@ export default function Index() {
 						finding availability, and managing shows effortless.
 					</p>
 					<div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
-						<Link
-							to="/signup"
-							className="rounded-xl bg-emerald-600 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-emerald-600/25 transition-all hover:bg-emerald-700 hover:shadow-xl hover:shadow-emerald-600/30"
-						>
-							Get Started Free
-						</Link>
-						<Link
-							to="/login"
-							className="rounded-xl border-2 border-slate-300 px-8 py-3.5 text-base font-semibold text-slate-700 transition-all hover:border-slate-400 hover:bg-slate-50"
-						>
-							Sign In
-						</Link>
+						{user ? (
+							<Link
+								to="/dashboard"
+								className="rounded-xl bg-emerald-600 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-emerald-600/25 transition-all hover:bg-emerald-700 hover:shadow-xl hover:shadow-emerald-600/30"
+							>
+								Go to Dashboard
+							</Link>
+						) : (
+							<>
+								<Link
+									to="/signup"
+									className="rounded-xl bg-emerald-600 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-emerald-600/25 transition-all hover:bg-emerald-700 hover:shadow-xl hover:shadow-emerald-600/30"
+								>
+									Get Started Free
+								</Link>
+								<Link
+									to="/login"
+									className="rounded-xl border-2 border-slate-300 px-8 py-3.5 text-base font-semibold text-slate-700 transition-all hover:border-slate-400 hover:bg-slate-50"
+								>
+									Sign In
+								</Link>
+							</>
+						)}
 					</div>
 				</div>
 			</section>
