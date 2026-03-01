@@ -16,7 +16,11 @@ import { formatDateShort, formatTimeRange } from "~/lib/date-utils";
 import { createAvailabilityRequest } from "~/services/availability.server";
 import { validateCsrfToken } from "~/services/csrf.server";
 import { sendAvailabilityRequestNotification } from "~/services/email.server";
-import { getGroupWithMembers, requireGroupAdminOrPermission } from "~/services/groups.server";
+import {
+	getGroupById,
+	getGroupMembersWithPreferences,
+	requireGroupAdminOrPermission,
+} from "~/services/groups.server";
 
 export const meta: MetaFunction = () => {
 	return [{ title: "New Availability Request — My Call Time" }];
@@ -115,28 +119,36 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
 	// Fire-and-forget email notification to group members
 	const appUrl = process.env.APP_URL ?? "http://localhost:5173";
-	void getGroupWithMembers(groupId).then((groupData) => {
-		if (!groupData) return;
-		const recipients = groupData.members
-			.filter((m) => m.id !== user.id)
-			.map((m) => ({ email: m.email, name: m.name }));
-		if (recipients.length === 0) return;
+	const preferencesUrl = `${appUrl}/groups/${groupId}/notifications`;
+	void Promise.all([getGroupById(groupId), getGroupMembersWithPreferences(groupId)]).then(
+		([group, members]) => {
+			if (!group) return;
+			const recipients = members
+				.filter((m) => m.id !== user.id)
+				.map((m) => ({
+					email: m.email,
+					name: m.name,
+					notificationPreferences: m.notificationPreferences,
+				}));
+			if (recipients.length === 0) return;
 
-		const dateRange = `${formatDateShort(`${dateRangeStart}T00:00:00`)} – ${formatDateShort(`${dateRangeEnd}T00:00:00`)}`;
-		const timeRangeStr = formatTimeRange(startTimeVal, endTimeVal);
-		const dateRangeDisplay =
-			timeRangeStr !== "All day" ? `${dateRange} · ${timeRangeStr}` : dateRange;
+			const dateRange = `${formatDateShort(`${dateRangeStart}T00:00:00`)} – ${formatDateShort(`${dateRangeEnd}T00:00:00`)}`;
+			const timeRangeStr = formatTimeRange(startTimeVal, endTimeVal);
+			const dateRangeDisplay =
+				timeRangeStr !== "All day" ? `${dateRange} · ${timeRangeStr}` : dateRange;
 
-		void sendAvailabilityRequestNotification({
-			requestId: req.id,
-			requestTitle: req.title,
-			groupName: groupData.group.name,
-			dateRange: dateRangeDisplay,
-			createdByName: user.name,
-			recipients,
-			requestUrl: `${appUrl}/groups/${groupId}/availability/${req.id}`,
-		});
-	});
+			void sendAvailabilityRequestNotification({
+				requestId: req.id,
+				requestTitle: req.title,
+				groupName: group.name,
+				dateRange: dateRangeDisplay,
+				createdByName: user.name,
+				recipients,
+				requestUrl: `${appUrl}/groups/${groupId}/availability/${req.id}`,
+				preferencesUrl,
+			});
+		},
+	);
 
 	return redirect(`/groups/${groupId}/availability/${req.id}`);
 }

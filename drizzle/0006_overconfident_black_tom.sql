@@ -1,0 +1,1 @@
+ALTER TABLE "group_memberships" ADD COLUMN "notification_preferences" jsonb DEFAULT '{"availabilityRequests":{"email":true},"eventNotifications":{"email":true},"showReminders":{"email":true}}' NOT NULL;

@@ -24,7 +24,12 @@ import {
 	createEvent,
 	getAvailabilityForEventDate,
 } from "~/services/events.server";
-import { getGroupWithMembers, requireGroupAdminOrPermission } from "~/services/groups.server";
+import {
+	getGroupMembersWithPreferences,
+	getGroupWithMembers,
+	requireGroupAdminOrPermission,
+} from "~/services/groups.server";
+import type { NotificationPreferences } from "../../src/db/schema.js";
 
 export const meta: MetaFunction = () => {
 	return [{ title: "Create Event — My Call Time" }];
@@ -141,24 +146,40 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	// Fire-and-forget email notifications
 	const appUrl = process.env.APP_URL ?? "http://localhost:5173";
 	const eventUrl = `${appUrl}/groups/${groupId}/events/${event.id}`;
+	const preferencesUrl = `${appUrl}/groups/${groupId}/notifications`;
 	const validFromRequestId =
 		typeof fromRequestId === "string" && fromRequestId ? fromRequestId : null;
 
 	void (async () => {
-		const groupData = await getGroupWithMembers(groupId);
+		const [groupData, membersWithPrefs] = await Promise.all([
+			getGroupWithMembers(groupId),
+			getGroupMembersWithPreferences(groupId),
+		]);
 		if (!groupData) return;
 
+		const prefsMap = new Map(membersWithPrefs.map((m) => [m.id, m.notificationPreferences]));
 		const dateTime = formatEventTime(`${date}T${startTime}:00`, `${date}T${endTime}:00`);
 
 		if (validFromRequestId && typeof date === "string") {
 			// Availability-aware notifications
 			const availData = await getAvailabilityForEventDate(validFromRequestId, date);
 			const memberMap = new Map(
-				groupData.members.map((m) => [m.id, { email: m.email, name: m.name }]),
+				groupData.members.map((m) => [
+					m.id,
+					{ email: m.email, name: m.name, notificationPreferences: prefsMap.get(m.id) },
+				]),
 			);
 
-			const availableRecipients: Array<{ email: string; name: string }> = [];
-			const maybeRecipients: Array<{ email: string; name: string }> = [];
+			const availableRecipients: Array<{
+				email: string;
+				name: string;
+				notificationPreferences?: NotificationPreferences;
+			}> = [];
+			const maybeRecipients: Array<{
+				email: string;
+				name: string;
+				notificationPreferences?: NotificationPreferences;
+			}> = [];
 			const respondedUserIds = new Set<string>();
 
 			for (const entry of availData) {
@@ -180,7 +201,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
 			// Members who didn't respond at all
 			const noResponseRecipients = groupData.members
 				.filter((m) => m.id !== user.id && !respondedUserIds.has(m.id))
-				.map((m) => ({ email: m.email, name: m.name }));
+				.map((m) => ({
+					email: m.email,
+					name: m.name,
+					notificationPreferences: prefsMap.get(m.id),
+				}));
 
 			void sendEventFromAvailabilityNotification({
 				eventTitle: event.title,
@@ -192,12 +217,17 @@ export async function action({ request, params }: ActionFunctionArgs) {
 				availableRecipients,
 				maybeRecipients,
 				noResponseRecipients,
+				preferencesUrl,
 			});
 		} else {
 			// Standard notification
 			const recipients = groupData.members
 				.filter((m) => m.id !== user.id)
-				.map((m) => ({ email: m.email, name: m.name }));
+				.map((m) => ({
+					email: m.email,
+					name: m.name,
+					notificationPreferences: prefsMap.get(m.id),
+				}));
 			if (recipients.length === 0) return;
 
 			void sendEventCreatedNotification({
@@ -208,6 +238,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 				groupName: groupData.group.name,
 				recipients,
 				eventUrl,
+				preferencesUrl,
 			});
 		}
 	})();
