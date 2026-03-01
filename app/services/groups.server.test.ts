@@ -74,7 +74,7 @@ vi.mock("../../src/db/index.js", () => ({
 	},
 }));
 
-const { requireGroupAdminOrPermission } = await import("~/services/groups.server");
+const { requireGroupAdminOrPermission, deleteGroup } = await import("~/services/groups.server");
 const { requireUser } = await import("~/services/auth.server");
 const { db } = await import("../../src/db/index.js");
 
@@ -279,5 +279,31 @@ describe("requireGroupAdminOrPermission", () => {
 			"membersCanCreateEvents",
 		);
 		expect(user.id).toBe("user-1");
+	});
+});
+
+describe("deleteGroup", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("calls db.delete with the correct groupId", async () => {
+		const mockWhere = vi.fn().mockResolvedValue(undefined);
+		(db.delete as ReturnType<typeof vi.fn>).mockReturnValue({
+			where: mockWhere,
+		});
+
+		await deleteGroup("group-123");
+
+		expect(db.delete).toHaveBeenCalled();
+		expect(mockWhere).toHaveBeenCalled();
+	});
+
+	it("propagates database errors", async () => {
+		(db.delete as ReturnType<typeof vi.fn>).mockReturnValue({
+			where: vi.fn().mockRejectedValue(new Error("DB connection lost")),
+		});
+
+		await expect(deleteGroup("group-123")).rejects.toThrow("DB connection lost");
 	});
 });
