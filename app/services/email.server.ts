@@ -425,3 +425,51 @@ ${ctaButton(options.eventUrl, "View Event Details")}
 		});
 	}
 }
+
+export async function sendEventReminderNotification(options: {
+	eventTitle: string;
+	eventType: string;
+	dateTime: string;
+	location?: string | null;
+	callTime?: string | null;
+	groupName: string;
+	recipient: { email: string; name: string; notificationPreferences?: NotificationPreferences };
+	eventUrl: string;
+	preferencesUrl?: string;
+}): Promise<void> {
+	const prefs = mergeWithDefaults(options.recipient.notificationPreferences);
+	if (!prefs.showReminders.email) return;
+
+	const typeEmoji =
+		options.eventType === "show" ? "🎭" : options.eventType === "rehearsal" ? "🎯" : "📅";
+	const locationLine = options.location
+		? `<p style="margin:0;font-size:13px;color:#475569;">📍 ${escapeHtml(options.location)}</p>`
+		: "";
+	const callTimeLine = options.callTime
+		? `<p style="margin:4px 0 0;font-size:13px;font-weight:600;color:#b45309;">🕐 Call time: ${escapeHtml(options.callTime)}</p>`
+		: "";
+
+	const html = emailLayout(
+		`
+<h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0f172a;">Event Reminder</h2>
+<p style="color:#475569;margin:0 0 20px;">Hi ${escapeHtml(options.recipient.name)}, just a reminder — you have an event coming up tomorrow!</p>
+${infoCard([
+	`<p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0f172a;">${typeEmoji} ${escapeHtml(options.eventTitle)}</p>`,
+	`<p style="margin:0 0 4px;font-size:13px;color:#475569;">${escapeHtml(options.groupName)} · ${escapeHtml(options.dateTime)}</p>`,
+	locationLine,
+	callTimeLine,
+])}
+${ctaButton(options.eventUrl, "View Event Details")}
+<p style="color:#64748b;font-size:13px;margin:0;">See you there!</p>`,
+		{ preferencesUrl: options.preferencesUrl },
+	);
+
+	const text = `Hi ${options.recipient.name},\n\nReminder: you have an event coming up tomorrow!\n\nEvent: ${options.eventTitle}\nGroup: ${options.groupName}\nWhen: ${options.dateTime}${options.location ? `\nWhere: ${options.location}` : ""}${options.callTime ? `\nCall time: ${options.callTime}` : ""}\n\nView details: ${options.eventUrl}`;
+
+	void sendEmail({
+		to: options.recipient.email,
+		subject: `⏰ Reminder: "${options.eventTitle}" is tomorrow`,
+		html,
+		text,
+	});
+}

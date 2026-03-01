@@ -78,6 +78,7 @@ const mockEvent = {
 	createdById: "user-1",
 	createdFromRequestId: null,
 	callTime: null,
+	reminderSentAt: null,
 	createdAt: now,
 	updatedAt: now,
 };
@@ -479,6 +480,34 @@ describe("events.server", () => {
 			expect(setArg).not.toHaveProperty("description");
 			expect(setArg).not.toHaveProperty("location");
 			expect(setArg).toHaveProperty("updatedAt"); // always set
+		});
+
+		it("resets reminderSentAt when startTime is updated", async () => {
+			const newStart = new Date("2026-03-10T19:00:00Z");
+			const updated = { ...mockEvent, startTime: newStart };
+			const chain = chainMock(null);
+			chain.returning = vi.fn().mockResolvedValue([updated]);
+			chain.where = vi.fn().mockReturnValue(chain);
+			mockSet.mockReturnValueOnce(chain);
+
+			await updateEvent("event-1", { startTime: newStart });
+
+			const setArg = mockSet.mock.calls[0][0];
+			expect(setArg).toHaveProperty("startTime", newStart);
+			expect(setArg).toHaveProperty("reminderSentAt", null);
+		});
+
+		it("does not reset reminderSentAt when startTime is not changed", async () => {
+			const updated = { ...mockEvent, title: "New Title" };
+			const chain = chainMock(null);
+			chain.returning = vi.fn().mockResolvedValue([updated]);
+			chain.where = vi.fn().mockReturnValue(chain);
+			mockSet.mockReturnValueOnce(chain);
+
+			await updateEvent("event-1", { title: "New Title" });
+
+			const setArg = mockSet.mock.calls[0][0];
+			expect(setArg).not.toHaveProperty("reminderSentAt");
 		});
 	});
 
