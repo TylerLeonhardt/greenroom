@@ -1,8 +1,11 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import { redirect } from "@remix-run/node";
 import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { useState } from "react";
 import { CsrfInput } from "~/components/csrf-input";
 import { validateCsrfToken } from "~/services/csrf.server";
 import {
+	deleteGroup,
 	getGroupById,
 	regenerateInviteCode,
 	requireGroupAdmin,
@@ -73,6 +76,22 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		}
 	}
 
+	if (intent === "delete-group") {
+		const group = await getGroupById(groupId);
+		if (!group) throw new Response("Not Found", { status: 404 });
+
+		const confirmName = formData.get("confirmName");
+		if (typeof confirmName !== "string" || confirmName !== group.name) {
+			return {
+				error: "Group name does not match. Please type the exact group name.",
+				success: false,
+			};
+		}
+
+		await deleteGroup(groupId);
+		return redirect("/dashboard");
+	}
+
 	return { error: "Invalid action.", success: false };
 }
 
@@ -81,6 +100,8 @@ export default function GroupSettings() {
 	const actionData = useActionData<typeof action>();
 	const navigation = useNavigation();
 	const isSubmitting = navigation.state === "submitting";
+	const [confirmName, setConfirmName] = useState("");
+	const nameMatches = confirmName === group.name;
 
 	return (
 		<div className="max-w-2xl space-y-8">
@@ -240,6 +261,46 @@ export default function GroupSettings() {
 						{isSubmitting ? "Saving…" : "Save Permissions"}
 					</button>
 				</Form>
+			</div>
+
+			{/* Danger Zone */}
+			<div className="rounded-xl border border-red-300 bg-white shadow-sm">
+				<div className="border-b border-red-200 px-6 py-4">
+					<h2 className="text-lg font-semibold text-red-600">Danger Zone</h2>
+				</div>
+				<div className="p-6">
+					<h3 className="text-sm font-semibold text-slate-900">Delete this group</h3>
+					<p className="mt-2 text-sm text-slate-600">
+						Deleting this group will permanently remove all members, availability requests, events,
+						and assignments. This cannot be undone.
+					</p>
+					<Form method="post" className="mt-4 space-y-3">
+						<CsrfInput />
+						<input type="hidden" name="intent" value="delete-group" />
+						<div>
+							<label htmlFor="confirmName" className="block text-sm font-medium text-slate-700">
+								Type <span className="font-semibold">&quot;{group.name}&quot;</span> to confirm:
+							</label>
+							<input
+								id="confirmName"
+								name="confirmName"
+								type="text"
+								autoComplete="off"
+								value={confirmName}
+								onChange={(e) => setConfirmName(e.target.value)}
+								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+								placeholder={group.name}
+							/>
+						</div>
+						<button
+							type="submit"
+							disabled={!nameMatches || isSubmitting}
+							className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+						>
+							{isSubmitting ? "Deleting…" : "Delete this group"}
+						</button>
+					</Form>
+				</div>
 			</div>
 		</div>
 	);

@@ -212,6 +212,11 @@ export async function removeMember(groupId: string, userId: string): Promise<voi
 		.where(and(eq(groupMemberships.groupId, groupId), eq(groupMemberships.userId, userId)));
 }
 
+export async function deleteGroup(groupId: string): Promise<void> {
+	await db.delete(groups).where(eq(groups.id, groupId));
+	// FK cascades handle: memberships, availability requests (→ responses), events (→ assignments)
+}
+
 export async function updateGroup(
 	groupId: string,
 	data: { name?: string; description?: string },
