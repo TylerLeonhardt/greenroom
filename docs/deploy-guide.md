@@ -245,9 +245,9 @@ az containerapp update \
 
 ---
 
-### Step 10: Run Database Migrations
+### Step 10: Run Initial Database Migrations
 
-This creates all the tables your app needs in the database.
+The app automatically runs database migrations on container startup (via `scripts/migrate.mjs`). For the **first deployment**, you need to run migrations manually since the container won't start without tables.
 
 - [ ] First, allow your Mac to connect to the database. Find your public IP:
 
@@ -286,6 +286,8 @@ az postgres flexible-server firewall-rule delete \
   --name AllowMyMac \
   --yes
 ```
+
+> 💡 **After the first deployment**, migrations run automatically on every container startup. You only need to run them manually if the container can't start (e.g., first-time setup or major schema changes that prevent boot).
 
 ---
 
