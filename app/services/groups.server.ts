@@ -49,6 +49,7 @@ export async function createGroup(
 					groupId: group.id,
 					userId,
 					role: "admin",
+					notificationPreferences: DEFAULT_NOTIFICATION_PREFERENCES,
 				});
 
 				return group;
@@ -153,6 +154,7 @@ export async function joinGroup(
 		groupId: group.id,
 		userId,
 		role: "member",
+		notificationPreferences: DEFAULT_NOTIFICATION_PREFERENCES,
 	});
 
 	return { success: true, groupId: group.id };
