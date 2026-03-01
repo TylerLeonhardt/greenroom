@@ -80,14 +80,17 @@ export async function getGroupAvailabilityRequests(groupId: string): Promise<
 			) as int)`,
 		})
 		.from(availabilityRequests)
-		.innerJoin(users, eq(availabilityRequests.createdById, users.id))
+		.leftJoin(users, eq(availabilityRequests.createdById, users.id))
 		.where(eq(availabilityRequests.groupId, groupId))
 		.orderBy(
 			sql`case when ${availabilityRequests.status} = 'open' then 0 else 1 end`,
 			desc(availabilityRequests.createdAt),
 		);
 
-	return rows;
+	return rows.map((r) => ({
+		...r,
+		createdByName: r.createdByName ?? "Deleted user",
+	}));
 }
 
 // --- Get Single ---
@@ -113,10 +116,11 @@ export async function getAvailabilityRequest(
 			createdByName: users.name,
 		})
 		.from(availabilityRequests)
-		.innerJoin(users, eq(availabilityRequests.createdById, users.id))
+		.leftJoin(users, eq(availabilityRequests.createdById, users.id))
 		.where(eq(availabilityRequests.id, requestId))
 		.limit(1);
-	return row ?? null;
+	if (!row) return null;
+	return { ...row, createdByName: row.createdByName ?? "Deleted user" };
 }
 
 // --- Submit / Update Response (upsert) ---

@@ -6,7 +6,7 @@ import { Authenticator } from "remix-auth";
 import { FormStrategy } from "remix-auth-form";
 import { db } from "../../src/db/index.js";
 import { users } from "../../src/db/schema.js";
-import { getSession, getUserId, sessionStorage } from "./session.server.js";
+import { destroyUserSession, getSession, getUserId, sessionStorage } from "./session.server.js";
 
 type UserRecord = typeof users.$inferSelect;
 
@@ -73,7 +73,35 @@ export async function getUserByEmail(email: string): Promise<UserRecord | undefi
 export async function getUserById(id: string): Promise<AuthUser | null> {
 	const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
 	if (!result[0]) return null;
+	// Treat users deleted more than 30 days ago as non-existent
+	if (result[0].deletedAt) {
+		const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+		if (result[0].deletedAt < thirtyDaysAgo) return null;
+	}
 	return toAuthUser(result[0]);
+}
+
+/**
+ * Check if a user is soft-deleted (within 30-day grace period).
+ * Returns the deletedAt date if soft-deleted, null otherwise.
+ */
+export async function getUserDeletedAt(id: string): Promise<Date | null> {
+	const result = await db
+		.select({ deletedAt: users.deletedAt })
+		.from(users)
+		.where(eq(users.id, id))
+		.limit(1);
+	return result[0]?.deletedAt ?? null;
+}
+
+/**
+ * Reactivate a soft-deleted account by clearing the deletedAt timestamp.
+ */
+export async function reactivateAccount(userId: string): Promise<void> {
+	await db
+		.update(users)
+		.set({ deletedAt: null, updatedAt: new Date() })
+		.where(eq(users.id, userId));
 }
 
 export async function getUserByGoogleId(googleId: string): Promise<UserRecord | undefined> {
@@ -283,6 +311,13 @@ export async function requireUser(request: Request): Promise<AuthUser> {
 		throw redirect("/login");
 	}
 
+	// Check if the user is soft-deleted
+	const deletedAt = await getUserDeletedAt(userId);
+	if (deletedAt) {
+		// Destroy session for soft-deleted users
+		throw await destroyUserSession(request, "/login");
+	}
+
 	const user = await getUserById(userId);
 	if (!user) {
 		throw redirect("/login");
@@ -294,6 +329,9 @@ export async function requireUser(request: Request): Promise<AuthUser> {
 export async function getOptionalUser(request: Request): Promise<AuthUser | null> {
 	const userId = await getUserId(request);
 	if (!userId) return null;
+	// Check soft-delete — treat as not logged in
+	const deletedAt = await getUserDeletedAt(userId);
+	if (deletedAt) return null;
 	return getUserById(userId);
 }
 

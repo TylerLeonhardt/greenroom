@@ -90,6 +90,7 @@ function chainMock(resolved: unknown) {
 	chain.limit = vi.fn().mockResolvedValue(resolved);
 	chain.orderBy = vi.fn().mockReturnValue(chain);
 	chain.innerJoin = vi.fn().mockReturnValue(chain);
+	chain.leftJoin = vi.fn().mockReturnValue(chain);
 	chain.where = vi.fn().mockReturnValue(chain);
 	chain.from = vi.fn().mockReturnValue(chain);
 	return chain;
@@ -319,7 +320,7 @@ describe("events.server", () => {
 			const eventChain = chainMock(null);
 			eventChain.limit = vi.fn().mockResolvedValue([eventRow]);
 			eventChain.where = vi.fn().mockReturnValue(eventChain);
-			eventChain.innerJoin = vi.fn().mockReturnValue(eventChain);
+			eventChain.leftJoin = vi.fn().mockReturnValue(eventChain);
 			eventChain.from = vi.fn().mockReturnValue(eventChain);
 
 			// Second select chain: assignments query
@@ -348,7 +349,7 @@ describe("events.server", () => {
 			const eventChain = chainMock(null);
 			eventChain.limit = vi.fn().mockResolvedValue([]);
 			eventChain.where = vi.fn().mockReturnValue(eventChain);
-			eventChain.innerJoin = vi.fn().mockReturnValue(eventChain);
+			eventChain.leftJoin = vi.fn().mockReturnValue(eventChain);
 			eventChain.from = vi.fn().mockReturnValue(eventChain);
 			mockSelect.mockReturnValueOnce(eventChain);
 
@@ -363,7 +364,7 @@ describe("events.server", () => {
 			const eventChain = chainMock(null);
 			eventChain.limit = vi.fn().mockResolvedValue([eventRow]);
 			eventChain.where = vi.fn().mockReturnValue(eventChain);
-			eventChain.innerJoin = vi.fn().mockReturnValue(eventChain);
+			eventChain.leftJoin = vi.fn().mockReturnValue(eventChain);
 			eventChain.from = vi.fn().mockReturnValue(eventChain);
 
 			const assignChain = chainMock(null);

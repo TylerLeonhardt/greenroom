@@ -177,11 +177,12 @@ export async function getEventWithAssignments(eventId: string): Promise<{
 			createdByName: users.name,
 		})
 		.from(events)
-		.innerJoin(users, eq(events.createdById, users.id))
+		.leftJoin(users, eq(events.createdById, users.id))
 		.where(eq(events.id, eventId))
 		.limit(1);
 
 	if (!eventRow) return null;
+	const createdByName = eventRow.createdByName ?? "Deleted user";
 
 	const assignments = await db
 		.select({
@@ -197,7 +198,7 @@ export async function getEventWithAssignments(eventId: string): Promise<{
 		.orderBy(users.name);
 
 	return {
-		event: eventRow,
+		event: { ...eventRow, createdByName },
 		assignments: assignments as Array<{
 			userId: string;
 			userName: string;
