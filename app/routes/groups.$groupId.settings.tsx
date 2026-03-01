@@ -12,6 +12,7 @@ import {
 	updateGroup,
 	updateGroupPermissions,
 } from "~/services/groups.server";
+import { logger } from "~/services/logger.server";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
 	const groupId = params.groupId ?? "";
@@ -50,7 +51,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
 				description: typeof description === "string" ? description : undefined,
 			});
 			return { success: true, message: "Group updated successfully." };
-		} catch {
+		} catch (error) {
+			logger.error(
+				{ err: error, route: "groups.$groupId.settings", intent: "update" },
+				"Failed to update group",
+			);
 			return { error: "Failed to update group.", success: false };
 		}
 	}
@@ -59,7 +64,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		try {
 			const newCode = await regenerateInviteCode(groupId);
 			return { success: true, message: `Invite code regenerated: ${newCode}` };
-		} catch {
+		} catch (error) {
+			logger.error(
+				{ err: error, route: "groups.$groupId.settings", intent: "regenerate-code" },
+				"Failed to regenerate invite code",
+			);
 			return { error: "Failed to regenerate invite code.", success: false };
 		}
 	}
@@ -71,7 +80,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
 				membersCanCreateEvents: formData.get("membersCanCreateEvents") === "on",
 			});
 			return { success: true, message: "Member permissions updated." };
-		} catch {
+		} catch (error) {
+			logger.error(
+				{ err: error, route: "groups.$groupId.settings", intent: "update-permissions" },
+				"Failed to update permissions",
+			);
 			return { error: "Failed to update permissions.", success: false };
 		}
 	}

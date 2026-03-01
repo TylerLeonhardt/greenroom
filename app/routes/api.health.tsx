@@ -4,23 +4,20 @@ import { logger } from "~/services/logger.server";
 import { db } from "../../src/db/index.js";
 
 export async function loader(_args: LoaderFunctionArgs) {
-	let dbStatus: "connected" | "disconnected" = "disconnected";
-
 	try {
 		const timeout = new Promise<never>((_, reject) =>
 			setTimeout(() => reject(new Error("Health check timeout")), 2000),
 		);
 		await Promise.race([db.execute(sql`SELECT 1`), timeout]);
-		dbStatus = "connected";
 	} catch (error) {
-		logger.error({ err: error }, "Health check: database unreachable");
-	}
+		logger.error({ err: error, route: "api.health" }, "Health check: database unreachable");
+		const errorMessage = error instanceof Error ? error.message : "Unknown error";
 
-	if (dbStatus === "disconnected") {
 		return Response.json(
 			{
 				status: "degraded",
-				db: "disconnected",
+				db: "unreachable",
+				error: errorMessage,
 				timestamp: new Date().toISOString(),
 			},
 			{ status: 503 },

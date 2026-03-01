@@ -6,6 +6,7 @@ import {
 	findOrCreateGoogleUser,
 	verifyOAuthState,
 } from "~/services/auth.server";
+import { logger } from "~/services/logger.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
 	const url = new URL(request.url);
@@ -30,7 +31,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		const profile = await exchangeGoogleCode(code);
 		const user = await findOrCreateGoogleUser(profile);
 		return createUserSession(user.id, "/dashboard");
-	} catch {
+	} catch (error) {
+		logger.error({ err: error, route: "auth.google.callback" }, "Google OAuth login failed");
 		return redirect("/login");
 	}
 }

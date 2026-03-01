@@ -5,6 +5,7 @@ import { CsrfInput } from "~/components/csrf-input";
 import { requireUser } from "~/services/auth.server";
 import { validateCsrfToken } from "~/services/csrf.server";
 import { createGroup } from "~/services/groups.server";
+import { logger } from "~/services/logger.server";
 
 export const meta: MetaFunction = () => {
 	return [{ title: "Create Group — My Call Time" }];
@@ -43,6 +44,7 @@ export async function action({ request }: ActionFunctionArgs) {
 		return redirect(`/groups/${group.id}`);
 	} catch (error) {
 		if (error instanceof Response) throw error;
+		logger.error({ err: error, route: "groups.new" }, "Failed to create group");
 		return { errors: { form: "Failed to create group. Please try again." } };
 	}
 }

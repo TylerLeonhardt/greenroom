@@ -43,7 +43,8 @@ describe("GET /api/health", () => {
 
 		expect(response.status).toBe(503);
 		expect(data.status).toBe("degraded");
-		expect(data.db).toBe("disconnected");
+		expect(data.db).toBe("unreachable");
+		expect(data.error).toBe("Connection refused");
 		expect(data.timestamp).toBeDefined();
 	});
 });
