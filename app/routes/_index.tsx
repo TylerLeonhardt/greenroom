@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
-import { Link } from "@remix-run/react";
+import { Link, useLoaderData } from "@remix-run/react";
 import { getOptionalUser } from "~/services/auth.server";
 
 export const meta: MetaFunction = () => {
@@ -24,7 +24,8 @@ export const meta: MetaFunction = () => {
 export async function loader({ request }: LoaderFunctionArgs) {
 	const user = await getOptionalUser(request);
 	if (user) throw redirect("/dashboard");
-	return null;
+	const supportUrl = process.env.SUPPORT_URL || null;
+	return Response.json({ supportUrl });
 }
 
 const features = [
@@ -54,6 +55,8 @@ const features = [
 ];
 
 export default function Index() {
+	const { supportUrl } = useLoaderData<typeof loader>();
+
 	return (
 		<div>
 			{/* Hero */}
@@ -129,6 +132,16 @@ export default function Index() {
 					<div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
 						<p className="text-sm text-slate-400">© 2026 My Call Time</p>
 						<div className="flex gap-6">
+							{supportUrl && (
+								<a
+									href={supportUrl}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="text-sm text-slate-400 transition-colors hover:text-slate-600"
+								>
+									☕ Buy me a coffee
+								</a>
+							)}
 							<a
 								href="https://github.com/TylerLeonhardt/greenroom"
 								target="_blank"
