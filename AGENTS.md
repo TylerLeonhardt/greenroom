@@ -363,6 +363,7 @@ pnpm run dev
 | `AZURE_COMMUNICATION_CONNECTION_STRING` | Optional | For sending emails (logs to console if missing) |
 | `LOG_LEVEL` | Optional | Pino log level: `trace`, `debug`, `info` (default), `warn`, `error`, `fatal` |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | Optional | Azure Application Insights connection string for production telemetry (graceful no-op if missing) |
+| `SUPPORT_URL` | Optional | URL for "Buy me a coffee" link in landing page footer (hidden if not set) |
 
 ## Build, Test & Deploy Commands
 
