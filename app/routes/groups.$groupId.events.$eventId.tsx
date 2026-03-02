@@ -26,8 +26,9 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { CsrfInput } from "~/components/csrf-input";
-import { formatDateLong, formatTime, utcToLocalParts } from "~/lib/date-utils";
+import { formatDateLong, formatEventTime, formatTime, utcToLocalParts } from "~/lib/date-utils";
 import { validateCsrfToken } from "~/services/csrf.server";
+import { sendEventAssignmentNotification } from "~/services/email.server";
 import {
 	assignToEvent,
 	bulkAssignToEvent,
@@ -38,7 +39,12 @@ import {
 	removeAssignment,
 	updateAssignmentStatus,
 } from "~/services/events.server";
-import { getGroupWithMembers, isGroupAdmin, requireGroupMember } from "~/services/groups.server";
+import {
+	getGroupMembersWithPreferences,
+	getGroupWithMembers,
+	isGroupAdmin,
+	requireGroupMember,
+} from "~/services/groups.server";
 import type { loader as groupLayoutLoader } from "./groups.$groupId";
 
 export const meta: MetaFunction = () => {
@@ -144,11 +150,51 @@ export async function action({ request, params }: ActionFunctionArgs) {
 			if (verifiedIds.length === 0) {
 				return { error: "None of the specified users are members of this group." };
 			}
+
+			// Get existing assignments before adding new ones
+			const existingAssignmentIds = new Set(eventData.assignments.map((a) => a.userId));
+
 			await bulkAssignToEvent(
 				eventId,
 				verifiedIds,
 				typeof role === "string" && role ? role : undefined,
 			);
+
+			// Fire-and-forget: email newly assigned users
+			const newlyAssignedIds = verifiedIds.filter((id) => !existingAssignmentIds.has(id));
+			if (newlyAssignedIds.length > 0) {
+				void (async () => {
+					const membersWithPrefs = await getGroupMembersWithPreferences(groupId);
+					const prefsMap = new Map(membersWithPrefs.map((m) => [m.id, m]));
+					const appUrl = process.env.APP_URL ?? "http://localhost:5173";
+					const eventUrl = `${appUrl}/groups/${groupId}/events/${eventId}`;
+					const preferencesUrl = `${appUrl}/groups/${groupId}/notifications`;
+					const event = eventData.event;
+					const dateTime = formatEventTime(
+						event.startTime as unknown as string,
+						event.endTime as unknown as string,
+					);
+					const groupName = groupData?.group.name ?? "";
+
+					for (const userId of newlyAssignedIds) {
+						const member = prefsMap.get(userId);
+						if (!member) continue;
+						void sendEventAssignmentNotification({
+							eventTitle: event.title,
+							eventType: event.eventType,
+							dateTime,
+							groupName,
+							recipient: {
+								email: member.email,
+								name: member.name,
+								notificationPreferences: member.notificationPreferences,
+							},
+							eventUrl,
+							preferencesUrl,
+						});
+					}
+				})();
+			}
 		}
 		return { success: true };
 	}
