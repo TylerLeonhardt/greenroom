@@ -984,7 +984,10 @@ export default function EventDetail() {
 									<Form method="post" className="mt-3">
 										<CsrfInput />
 										<input type="hidden" name="intent" value="decline" />
-										<button type="submit" className="text-xs text-slate-500 hover:text-red-600">
+										<button
+											type="submit"
+											className="border border-slate-300 rounded-lg px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+										>
 											Change to Declined
 										</button>
 									</Form>
@@ -997,7 +1000,10 @@ export default function EventDetail() {
 									<Form method="post" className="mt-3">
 										<CsrfInput />
 										<input type="hidden" name="intent" value="confirm" />
-										<button type="submit" className="text-xs text-slate-500 hover:text-emerald-600">
+										<button
+											type="submit"
+											className="border border-emerald-300 rounded-lg px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50"
+										>
 											Change to Confirmed
 										</button>
 									</Form>
