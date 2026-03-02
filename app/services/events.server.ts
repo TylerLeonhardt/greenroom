@@ -134,11 +134,11 @@ export async function getGroupEvents(
 			updatedAt: events.updatedAt,
 			assignmentCount: sql<number>`cast((
 				select count(*) from event_assignments
-				where event_assignments.event_id = ${events.id}
+				where event_assignments.event_id = events.id
 			) as int)`,
 			confirmedCount: sql<number>`cast((
 				select count(*) from event_assignments
-				where event_assignments.event_id = ${events.id} and event_assignments.status = 'confirmed'
+				where event_assignments.event_id = events.id and event_assignments.status = 'confirmed'
 			) as int)`,
 		})
 		.from(events)
@@ -328,7 +328,7 @@ export async function getUserUpcomingEvents(
 			groupName: groups.name,
 			userStatus: sql<string | null>`(
 				select ea.status from event_assignments ea
-				where ea.event_id = ${events.id} and ea.user_id = ${userId}
+				where ea.event_id = events.id and ea.user_id = ${userId}
 				limit 1
 			)`,
 		})

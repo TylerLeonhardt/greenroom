@@ -253,6 +253,33 @@ describe("events.server", () => {
 			expect(result[0].confirmedCount).toBe(2);
 		});
 
+		it("uses table-qualified column refs in count subqueries to avoid ambiguity", async () => {
+			const chain = chainMock([]);
+			chain.orderBy = vi.fn().mockResolvedValue([]);
+			chain.where = vi.fn().mockReturnValue(chain);
+			chain.from = vi.fn().mockReturnValue(chain);
+			mockSelect.mockReturnValueOnce(chain);
+
+			await getGroupEvents("group-1");
+
+			// Verify the select field map contains assignmentCount and confirmedCount
+			const selectArg = mockSelect.mock.calls.at(-1)?.[0];
+			expect(selectArg).toHaveProperty("assignmentCount");
+			expect(selectArg).toHaveProperty("confirmedCount");
+
+			// Verify the SQL subqueries use "events.id" (table-qualified) not just "id"
+			// to prevent PostgreSQL from resolving "id" to event_assignments.id
+			const assignmentSql = selectArg.assignmentCount;
+			const confirmedSql = selectArg.confirmedCount;
+			// SQL objects from drizzle's sql tag have queryChunks with StringChunk objects
+			const getChunkText = (sqlObj: { queryChunks: Array<{ value?: string[] }> }) =>
+				sqlObj.queryChunks
+					.flatMap((c) => c.value ?? [])
+					.join("");
+			expect(getChunkText(assignmentSql)).toContain("events.id");
+			expect(getChunkText(confirmedSql)).toContain("events.id");
+		});
+
 		it("applies upcoming filter when specified", async () => {
 			const chain = chainMock([]);
 			chain.orderBy = vi.fn().mockResolvedValue([]);
