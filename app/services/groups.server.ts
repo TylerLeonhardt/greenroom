@@ -9,6 +9,7 @@ import {
 	users,
 } from "../../src/db/schema.js";
 import { requireUser } from "./auth.server.js";
+import { mergeWithDefaults } from "./notification-utils.server.js";
 
 type Group = typeof groups.$inferSelect;
 
@@ -279,21 +280,8 @@ export async function updateGroupPermissions(
 
 // --- Notification Preferences ---
 
-/**
- * Merge stored preferences with defaults for forward-compatibility.
- * New categories or channels added later will default to true.
- */
-export function mergeWithDefaults(
-	stored: Partial<NotificationPreferences> | null | undefined,
-): NotificationPreferences {
-	const defaults = DEFAULT_NOTIFICATION_PREFERENCES;
-	if (!stored) return { ...defaults };
-	return {
-		availabilityRequests: { ...defaults.availabilityRequests, ...stored.availabilityRequests },
-		eventNotifications: { ...defaults.eventNotifications, ...stored.eventNotifications },
-		showReminders: { ...defaults.showReminders, ...stored.showReminders },
-	};
-}
+// Re-export mergeWithDefaults from shared utility for backward compatibility
+export { mergeWithDefaults } from "./notification-utils.server.js";
 
 export async function getNotificationPreferences(
 	userId: string,

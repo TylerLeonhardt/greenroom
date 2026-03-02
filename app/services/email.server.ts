@@ -1,22 +1,10 @@
 import { EmailClient } from "@azure/communication-email";
 import type { NotificationPreferences } from "../../src/db/schema.js";
-import { DEFAULT_NOTIFICATION_PREFERENCES } from "../../src/db/schema.js";
 import { logger } from "./logger.server.js";
+import { mergeWithDefaults } from "./notification-utils.server.js";
 import { getTelemetryClient } from "./telemetry.server.js";
 
 // --- Core Email Sender ---
-
-function mergeWithDefaults(
-	stored: Partial<NotificationPreferences> | null | undefined,
-): NotificationPreferences {
-	const defaults = DEFAULT_NOTIFICATION_PREFERENCES;
-	if (!stored) return { ...defaults };
-	return {
-		availabilityRequests: { ...defaults.availabilityRequests, ...stored.availabilityRequests },
-		eventNotifications: { ...defaults.eventNotifications, ...stored.eventNotifications },
-		showReminders: { ...defaults.showReminders, ...stored.showReminders },
-	};
-}
 
 let emailClient: EmailClient | null = null;
 const senderAddress = "DoNotReply@mycalltime.app";

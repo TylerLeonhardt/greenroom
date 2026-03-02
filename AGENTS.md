@@ -32,12 +32,16 @@ app/
 │   ├── login.tsx               # Email/password + Google OAuth login
 │   ├── signup.tsx              # Registration with password strength meter
 │   ├── logout.tsx              # POST-only logout action
+│   ├── check-email.tsx         # Email verification prompt, resend verification
+│   ├── verify-email.tsx        # Validates email verification token from ?token=
 │   ├── auth.google.tsx         # Redirects to Google OAuth consent
 │   ├── auth.google.callback.tsx # Handles Google OAuth code exchange
 │   ├── api.health.tsx          # Health check endpoint (GET)
 │   ├── api.events.$eventId.ics.tsx # iCal export (GET, role-aware start times)
 │   ├── $.tsx                   # Catch-all 404 page
 │   ├── dashboard.tsx           # Authenticated dashboard (requires login)
+│   ├── settings.tsx            # User settings: timezone preference, display name
+│   ├── settings_.delete-account.tsx # Account deletion (soft-delete with 30-day reactivation)
 │   ├── groups.tsx              # Groups layout (Outlet wrapper)
 │   ├── groups._index.tsx       # Groups list with inline join/create forms
 │   ├── groups.new.tsx          # Create group form
@@ -53,21 +57,27 @@ app/
 │   ├── groups.$groupId.events.new.tsx    # Create event (admin or permitted member, supports ?fromRequest=)
 │   ├── groups.$groupId.events.$eventId.tsx      # Event detail: cast list, confirm/decline
 │   ├── groups.$groupId.events.$eventId.edit.tsx # Edit/delete event (admin)
-│   ├── groups.$groupId.settings.tsx      # Group settings: edit name, permissions, regenerate invite code
+│   ├── groups.$groupId.notifications.tsx # Per-group notification preferences
+│   ├── groups.$groupId.settings.tsx      # Group settings: edit name, permissions, regenerate invite code, delete group
 │   └── settings.tsx              # User settings: timezone preference
 ├── services/                   # Server-side business logic (*.server.ts)
+│   ├── account.server.ts       # Account deletion (soft-delete, reactivation, sole-admin handling)
 │   ├── auth.server.ts          # Authentication: form strategy, Google OAuth, requireUser()
-│   ├── session.server.ts       # Cookie session storage, getUserId(), createUserSession()
-│   ├── groups.server.ts        # Group CRUD, membership, invite codes, permissions, requireGroupMember/Admin/AdminOrPermission
 │   ├── availability.server.ts  # Availability requests, responses, aggregation
-│   ├── events.server.ts        # Events CRUD, assignments, bulk assign, cross-group queries
+│   ├── csrf.server.ts          # CSRF token generation, validation (cookie-backed)
 │   ├── dashboard.server.ts     # Dashboard data aggregation (parallel queries)
 │   ├── email.server.ts         # Azure Communication Services email with graceful fallback
+│   ├── events.server.ts        # Events CRUD, assignments, bulk assign, cross-group queries
+│   ├── groups.server.ts        # Group CRUD, membership, invite codes, permissions, requireGroupMember/Admin/AdminOrPermission
 │   ├── logger.server.ts        # Pino structured logger, configurable via LOG_LEVEL env var
+│   ├── notification-utils.server.ts # Shared notification preferences utilities (mergeWithDefaults)
 │   ├── rate-limit.server.ts    # In-memory sliding window rate limiter for auth routes
+│   ├── reminder.server.ts      # Event reminder cron job (advisory lock, 24h before)
+│   ├── session.server.ts       # Cookie session storage, getUserId(), createUserSession()
 │   └── telemetry.server.ts     # Application Insights SDK init + getTelemetryClient() helper
 └── components/                 # Reusable React components
     ├── availability-grid.tsx   # Date × status grid for submitting availability
+    ├── csrf-input.tsx          # Hidden CSRF token input (reads from root loader data)
     ├── date-selector.tsx       # Calendar-based date picker for creating requests
     ├── event-calendar.tsx      # Monthly calendar view with event dots
     ├── event-card.tsx          # Reusable event card (used in dashboard, lists, sidebar)
@@ -266,7 +276,8 @@ export async function action({ request }: ActionFunctionArgs) {
 | `/api/health` | Public | Returns `{ status: "ok", timestamp }` |
 | `/api/events/:eventId/ics` | `requireUser` + `requireGroupMember` | Downloads .ics file (role-aware start times for performers) |
 | `/dashboard` | `requireUser` | Action items, upcoming events, group list |
-| `/settings` | `requireUser` | Timezone preference, auto-detects on first visit |
+| `/settings` | `requireUser` | Timezone preference, display name, auto-detects timezone on first visit |
+| `/settings/delete-account` | `requireUser` | Account deletion (soft-delete with 30-day reactivation window) |
 | `/groups` | `requireUser` | Layout (Outlet wrapper) |
 | `/groups` (index) | `requireUser` | List user's groups + inline join form |
 | `/groups/new` | `requireUser` | Create group form |
@@ -282,22 +293,23 @@ export async function action({ request }: ActionFunctionArgs) {
 | `/groups/:groupId/events/new` | `requireGroupAdminOrPermission` | Create event (supports `?fromRequest=&date=`) |
 | `/groups/:groupId/events/:eventId` | `requireGroupMember` | Event detail, cast list, confirm/decline |
 | `/groups/:groupId/events/:eventId/edit` | `requireGroupAdmin` | Edit/delete event |
-| `/groups/:groupId/settings` | `requireGroupAdmin` | Edit group name/description, regenerate invite code |
+| `/groups/:groupId/notifications` | `requireGroupMember` | Per-group notification preferences (email channels) |
+| `/groups/:groupId/settings` | `requireGroupAdmin` | Edit group name/description, permissions, regenerate invite code, delete group |
 
 ## Database Schema
 
-6 tables + 5 enums. All PKs are UUIDs (`defaultRandom()`). All timestamps are `with time zone`.
+7 tables + 5 enums. All PKs are UUIDs (`defaultRandom()`). All timestamps are `with time zone`.
 
 ### Tables
 
 | Table | Key Columns | Notes |
 |-------|-------------|-------|
-| `users` | id, email (unique), passwordHash, name, googleId (unique), emailVerified, timezone | Supports email/password + Google OAuth. `passwordHash` is null for Google-only users. `timezone` is IANA timezone string, auto-detected on first visit |
+| `users` | id, email (unique), passwordHash, name, googleId (unique), emailVerified, timezone, profileImage, deletedAt | Supports email/password + Google OAuth. `passwordHash` is null for Google-only users. `timezone` is IANA timezone string, auto-detected on first visit. `deletedAt` enables soft-delete (30-day reactivation). `profileImage` from Google OAuth. |
 | `groups` | id, name, description, inviteCode (unique, 8 chars), createdById → users, membersCanCreateRequests, membersCanCreateEvents | Invite code uses chars `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (no ambiguous I/O/0/1). Permission booleans default to `false` (admin-only). |
-| `group_memberships` | id, groupId → groups, userId → users, role (admin/member) | Unique on (groupId, userId). Creator gets admin role |
-| `availability_requests` | id, groupId → groups, title, requestedDates (JSONB `string[]`), status (open/closed), expiresAt, requestedStartTime, requestedEndTime | `requestedDates` is a JSON array of ISO date strings. `requestedStartTime`/`requestedEndTime` are nullable "HH:MM" strings for time range (null = all day) |
+| `group_memberships` | id, groupId → groups, userId → users, role (admin/member), notificationPreferences (JSONB) | Unique on (groupId, userId). Creator gets admin role. Per-group notification preferences. |
+| `availability_requests` | id, groupId → groups, title, requestedDates (JSONB `string[]`), status (open/closed), expiresAt, requestedStartTime, requestedEndTime, dateRangeStart, dateRangeEnd | `requestedDates` is a JSON array of ISO date strings. `requestedStartTime`/`requestedEndTime` are nullable "HH:MM" strings for time range (null = all day). `dateRangeStart`/`dateRangeEnd` are timestamps. |
 | `availability_responses` | id, requestId → availability_requests, userId → users, responses (JSONB) | `responses` is `Record<string, "available" | "maybe" | "not_available">`. Upsert on (requestId, userId) |
-| `events` | id, groupId → groups, title, eventType, startTime, endTime, callTime, location, createdFromRequestId | Links back to availability request if created from one. `callTime` is nullable (only for shows — performer arrival time) |
+| `events` | id, groupId → groups, title, eventType, startTime, endTime, callTime, location, createdFromRequestId, reminderSentAt | Links back to availability request if created from one. `callTime` is nullable (only for shows — performer arrival time). `reminderSentAt` tracks when reminder email was sent. |
 | `event_assignments` | id, eventId → events, userId → users, role, status (pending/confirmed/declined) | Unique on (eventId, userId). `onConflictDoNothing` for bulk assigns. Role values: "Performer" (shows), "Viewer" (self-registered attendees) |
 
 ### Enums

@@ -37,7 +37,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
 	if (intent === "remove-member") {
 		const userId = formData.get("userId");
-		if (typeof userId !== "string") {
+		if (typeof userId !== "string" || !userId.trim()) {
 			return { error: "Invalid user." };
 		}
 		try {
