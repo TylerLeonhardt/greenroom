@@ -7,6 +7,7 @@ import {
 	groupMemberships,
 	users,
 } from "../../src/db/schema.js";
+import { trackEvent } from "./telemetry.server.js";
 
 type AvailabilityRequest = typeof availabilityRequests.$inferSelect;
 
@@ -40,6 +41,7 @@ export async function createAvailabilityRequest(data: {
 		})
 		.returning();
 	if (!request) throw new Error("Failed to create availability request.");
+	trackEvent("AvailabilityRequestCreated", { groupId: data.groupId });
 	return request;
 }
 
