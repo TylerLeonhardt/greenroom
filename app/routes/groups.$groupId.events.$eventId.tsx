@@ -124,6 +124,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		return { success: true };
 	}
 
+	if (intent === "decline-attendance") {
+		// Self-register as viewer with declined status
+		await assignToEvent(eventId, user.id, "Viewer");
+		await updateAssignmentStatus(eventId, user.id, "declined");
+		return { success: true };
+	}
+
 	if (intent === "delete") {
 		const admin = await isGroupAdmin(user.id, groupId);
 		const isCreator = eventData.event.createdById === user.id;
@@ -643,17 +650,30 @@ export default function EventDetail() {
 									)}
 									{canSelfRegister && (
 										<div className="border-t border-slate-100 p-4">
-											<Form method="post">
-												<CsrfInput />
-												<input type="hidden" name="intent" value="attend" />
-												<button
-													type="submit"
-													disabled={isSubmitting}
-													className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-200 disabled:opacity-50"
-												>
-													<Calendar className="h-4 w-4" /> I'll be there
-												</button>
-											</Form>
+											<div className="flex flex-col gap-2 sm:flex-row">
+												<Form method="post">
+													<CsrfInput />
+													<input type="hidden" name="intent" value="attend" />
+													<button
+														type="submit"
+														disabled={isSubmitting}
+														className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-200 disabled:opacity-50"
+													>
+														<Calendar className="h-4 w-4" /> I'll be there
+													</button>
+												</Form>
+												<Form method="post">
+													<CsrfInput />
+													<input type="hidden" name="intent" value="decline-attendance" />
+													<button
+														type="submit"
+														disabled={isSubmitting}
+														className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+													>
+														<X className="h-4 w-4" /> I won't be there
+													</button>
+												</Form>
+											</div>
 										</div>
 									)}
 								</>
@@ -1015,18 +1035,31 @@ export default function EventDetail() {
 					{!isShow && canSelfRegister && (
 						<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
 							<h3 className="text-sm font-semibold text-slate-900">Attending?</h3>
-							<p className="mt-1 text-xs text-slate-500">Let your group know you'll be there.</p>
-							<Form method="post" className="mt-3">
-								<CsrfInput />
-								<input type="hidden" name="intent" value="attend" />
-								<button
-									type="submit"
-									disabled={isSubmitting}
-									className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
-								>
-									<Calendar className="h-4 w-4" /> I'll be there
-								</button>
-							</Form>
+							<p className="mt-1 text-xs text-slate-500">Let your group know if you can make it.</p>
+							<div className="mt-3 flex flex-col gap-2 sm:flex-row">
+								<Form method="post">
+									<CsrfInput />
+									<input type="hidden" name="intent" value="attend" />
+									<button
+										type="submit"
+										disabled={isSubmitting}
+										className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+									>
+										<Calendar className="h-4 w-4" /> I'll be there
+									</button>
+								</Form>
+								<Form method="post">
+									<CsrfInput />
+									<input type="hidden" name="intent" value="decline-attendance" />
+									<button
+										type="submit"
+										disabled={isSubmitting}
+										className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+									>
+										<X className="h-4 w-4" /> I won't be there
+									</button>
+								</Form>
+							</div>
 						</div>
 					)}
 

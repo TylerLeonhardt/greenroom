@@ -183,6 +183,73 @@ describe("event detail action — IDOR prevention", () => {
 	});
 });
 
+describe("event detail action — decline attendance", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		(requireGroupMember as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: "user-1",
+			email: "test@example.com",
+			name: "Test User",
+			profileImage: null,
+		});
+		(isGroupAdmin as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+	});
+
+	it("allows self-declining attendance on event in the same group", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: { id: "event-1", groupId: "g1", title: "My Event" },
+			assignments: [],
+		});
+
+		const formData = new FormData();
+		formData.set("intent", "decline-attendance");
+
+		const request = new Request("http://localhost/groups/g1/events/event-1", {
+			method: "POST",
+			body: formData,
+		});
+
+		const result = await action({
+			request,
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ success: true });
+		expect(assignToEvent).toHaveBeenCalledWith("event-1", "user-1", "Viewer");
+		expect(updateAssignmentStatus).toHaveBeenCalledWith("event-1", "user-1", "declined");
+	});
+
+	it("prevents self-declining on event from another group", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: { id: "event-1", groupId: "other-group", title: "Other Group Event" },
+			assignments: [],
+		});
+
+		const formData = new FormData();
+		formData.set("intent", "decline-attendance");
+
+		const request = new Request("http://localhost/groups/g1/events/event-1", {
+			method: "POST",
+			body: formData,
+		});
+
+		try {
+			await action({
+				request,
+				params: { groupId: "g1", eventId: "event-1" },
+				context: {},
+			});
+			expect.fail("Should have thrown 404");
+		} catch (response) {
+			expect(response).toBeInstanceOf(Response);
+			expect((response as Response).status).toBe(404);
+		}
+
+		expect(assignToEvent).not.toHaveBeenCalled();
+	});
+});
+
 describe("event detail action — delete authorization", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
