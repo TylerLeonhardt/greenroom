@@ -273,9 +273,7 @@ describe("events.server", () => {
 			const confirmedSql = selectArg.confirmedCount;
 			// SQL objects from drizzle's sql tag have queryChunks with StringChunk objects
 			const getChunkText = (sqlObj: { queryChunks: Array<{ value?: string[] }> }) =>
-				sqlObj.queryChunks
-					.flatMap((c) => c.value ?? [])
-					.join("");
+				sqlObj.queryChunks.flatMap((c) => c.value ?? []).join("");
 			expect(getChunkText(assignmentSql)).toContain("events.id");
 			expect(getChunkText(confirmedSql)).toContain("events.id");
 		});
