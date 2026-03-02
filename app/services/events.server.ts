@@ -10,6 +10,7 @@ import {
 	users,
 } from "../../src/db/schema.js";
 import { localTimeToUTC } from "../lib/date-utils.js";
+import { trackEvent } from "./telemetry.server.js";
 
 type Event = typeof events.$inferSelect;
 
@@ -43,6 +44,7 @@ export async function createEvent(data: {
 		})
 		.returning();
 	if (!event) throw new Error("Failed to create event.");
+	trackEvent("EventCreated", { groupId: data.groupId, eventType: data.eventType });
 	return event;
 }
 

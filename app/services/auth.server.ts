@@ -7,6 +7,7 @@ import { FormStrategy } from "remix-auth-form";
 import { db } from "../../src/db/index.js";
 import { users } from "../../src/db/schema.js";
 import { destroyUserSession, getSession, getUserId, sessionStorage } from "./session.server.js";
+import { trackEvent } from "./telemetry.server.js";
 
 type UserRecord = typeof users.$inferSelect;
 
@@ -140,6 +141,7 @@ export async function registerUser(
 			throw new Error("Failed to create user.");
 		}
 
+		trackEvent("UserCreated", { method: "email" });
 		return { user: toAuthUser(user), isNew: true };
 	} catch (error) {
 		// Handle race condition: concurrent signup with same email hits unique constraint
@@ -196,6 +198,7 @@ export async function findOrCreateGoogleUser(profile: {
 
 	const user = result[0];
 	if (!user) throw new Error("Failed to create user.");
+	trackEvent("UserCreated", { method: "google" });
 	return toAuthUser(user);
 }
 

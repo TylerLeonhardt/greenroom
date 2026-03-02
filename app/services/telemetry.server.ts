@@ -26,3 +26,11 @@ if (connectionString) {
 export function getTelemetryClient(): appInsights.TelemetryClient | null {
 	return connectionString ? appInsights.defaultClient : null;
 }
+
+/**
+ * Track a custom event in Application Insights.
+ * Safe no-op when App Insights isn't configured (e.g., local dev).
+ */
+export function trackEvent(name: string, properties?: Record<string, string>): void {
+	getTelemetryClient()?.trackEvent({ name, properties });
+}
