@@ -23,6 +23,7 @@ vi.mock("~/services/groups.server", () => ({
 		group: { id: "g1", name: "Test Group" },
 		members: [{ id: "user-1", name: "Test User", email: "test@example.com" }],
 	}),
+	getGroupMembersWithPreferences: vi.fn().mockResolvedValue([]),
 }));
 
 // Mock events service
@@ -42,13 +43,25 @@ vi.mock("~/services/csrf.server", () => ({
 	validateCsrfToken: vi.fn().mockResolvedValue(undefined),
 }));
 
+// Mock email service
+vi.mock("~/services/email.server", () => ({
+	sendEventAssignmentNotification: vi.fn().mockResolvedValue(undefined),
+}));
+
+import { sendEventAssignmentNotification } from "~/services/email.server";
 import {
 	assignToEvent,
+	bulkAssignToEvent,
 	deleteEvent,
 	getEventWithAssignments,
 	updateAssignmentStatus,
 } from "~/services/events.server";
-import { isGroupAdmin, requireGroupMember } from "~/services/groups.server";
+import {
+	getGroupMembersWithPreferences,
+	getGroupWithMembers,
+	isGroupAdmin,
+	requireGroupMember,
+} from "~/services/groups.server";
 import { action } from "./groups.$groupId.events.$eventId";
 
 describe("event detail action — IDOR prevention", () => {
@@ -275,5 +288,125 @@ describe("event detail action — delete authorization", () => {
 		}
 
 		expect(deleteEvent).not.toHaveBeenCalled();
+	});
+});
+
+describe("event detail action — assignment notifications", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		(requireGroupMember as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: "user-1",
+			email: "test@example.com",
+			name: "Test User",
+			profileImage: null,
+		});
+		(isGroupAdmin as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+	});
+
+	it("sends notification to newly assigned users", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: {
+				id: "event-1",
+				groupId: "g1",
+				title: "Friday Show",
+				eventType: "show",
+				startTime: "2026-03-15T19:00:00.000Z",
+				endTime: "2026-03-15T21:00:00.000Z",
+			},
+			assignments: [],
+		});
+		(getGroupWithMembers as ReturnType<typeof vi.fn>).mockResolvedValue({
+			group: { id: "g1", name: "Test Group" },
+			members: [
+				{ id: "user-1", name: "Test User", email: "test@example.com" },
+				{ id: "user-2", name: "New Performer", email: "new@example.com" },
+			],
+		});
+		(getGroupMembersWithPreferences as ReturnType<typeof vi.fn>).mockResolvedValue([
+			{
+				id: "user-2",
+				name: "New Performer",
+				email: "new@example.com",
+				notificationPreferences: {},
+			},
+		]);
+
+		const formData = new FormData();
+		formData.set("intent", "assign");
+		formData.append("userIds", "user-2");
+		formData.set("role", "Performer");
+
+		const request = new Request("http://localhost/groups/g1/events/event-1", {
+			method: "POST",
+			body: formData,
+		});
+
+		const result = await action({
+			request,
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ success: true });
+		expect(bulkAssignToEvent).toHaveBeenCalledWith("event-1", ["user-2"], "Performer");
+
+		// Allow the fire-and-forget async to complete
+		await vi.waitFor(() => {
+			expect(sendEventAssignmentNotification).toHaveBeenCalledWith(
+				expect.objectContaining({
+					eventTitle: "Friday Show",
+					eventType: "show",
+					groupName: "Test Group",
+					recipient: expect.objectContaining({
+						email: "new@example.com",
+						name: "New Performer",
+					}),
+				}),
+			);
+		});
+	});
+
+	it("does not send notification to already-assigned users", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: {
+				id: "event-1",
+				groupId: "g1",
+				title: "Friday Show",
+				eventType: "show",
+				startTime: "2026-03-15T19:00:00.000Z",
+				endTime: "2026-03-15T21:00:00.000Z",
+			},
+			assignments: [
+				{ userId: "user-2", userName: "Existing User", role: "Performer", status: "confirmed" },
+			],
+		});
+		(getGroupWithMembers as ReturnType<typeof vi.fn>).mockResolvedValue({
+			group: { id: "g1", name: "Test Group" },
+			members: [
+				{ id: "user-1", name: "Test User", email: "test@example.com" },
+				{ id: "user-2", name: "Existing User", email: "existing@example.com" },
+			],
+		});
+
+		const formData = new FormData();
+		formData.set("intent", "assign");
+		formData.append("userIds", "user-2");
+		formData.set("role", "Performer");
+
+		const request = new Request("http://localhost/groups/g1/events/event-1", {
+			method: "POST",
+			body: formData,
+		});
+
+		const result = await action({
+			request,
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ success: true });
+		expect(bulkAssignToEvent).toHaveBeenCalled();
+		// Should NOT send email because user-2 was already assigned
+		expect(sendEventAssignmentNotification).not.toHaveBeenCalled();
 	});
 });
