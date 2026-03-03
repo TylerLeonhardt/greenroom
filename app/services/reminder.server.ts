@@ -120,7 +120,7 @@ export async function processReminders(): Promise<void> {
 				);
 
 			const eventUrl = `${appUrl}/groups/${event.groupId}/events/${event.id}`;
-			const preferencesUrl = `${appUrl}/groups/${event.groupId}/settings`;
+			const preferencesUrl = `${appUrl}/groups/${event.groupId}/notifications`;
 
 			for (const attendee of attendees) {
 				// Format times in each attendee's timezone for accurate display
