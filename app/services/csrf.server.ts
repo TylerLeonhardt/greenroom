@@ -1,5 +1,5 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
-import { getSession, sessionStorage } from "./session.server";
+import { getSession, sessionStorage } from "./session.server.js";
 
 const CSRF_SESSION_KEY = "csrfToken";
 
