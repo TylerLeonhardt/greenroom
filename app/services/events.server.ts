@@ -132,6 +132,7 @@ export async function getGroupEvents(
 			createdFromRequestId: events.createdFromRequestId,
 			callTime: events.callTime,
 			reminderSentAt: events.reminderSentAt,
+			confirmationReminderSentAt: events.confirmationReminderSentAt,
 			createdAt: events.createdAt,
 			updatedAt: events.updatedAt,
 			assignmentCount: sql<number>`cast((
@@ -176,6 +177,7 @@ export async function getEventWithAssignments(eventId: string): Promise<{
 			createdFromRequestId: events.createdFromRequestId,
 			callTime: events.callTime,
 			reminderSentAt: events.reminderSentAt,
+			confirmationReminderSentAt: events.confirmationReminderSentAt,
 			createdAt: events.createdAt,
 			updatedAt: events.updatedAt,
 			createdByName: users.name,
@@ -239,8 +241,10 @@ export async function updateEvent(
 			...(data.endTime !== undefined ? { endTime: data.endTime } : {}),
 			...(data.location !== undefined ? { location: data.location.trim() || null } : {}),
 			...(data.callTime !== undefined ? { callTime: data.callTime } : {}),
-			// Reset reminder when event is rescheduled so a new reminder is sent
-			...(data.startTime !== undefined ? { reminderSentAt: null } : {}),
+			// Reset reminders when event is rescheduled so new reminders are sent
+			...(data.startTime !== undefined
+				? { reminderSentAt: null, confirmationReminderSentAt: null }
+				: {}),
 			updatedAt: new Date(),
 		})
 		.where(eq(events.id, eventId))
@@ -325,6 +329,7 @@ export async function getUserUpcomingEvents(
 			createdFromRequestId: events.createdFromRequestId,
 			callTime: events.callTime,
 			reminderSentAt: events.reminderSentAt,
+			confirmationReminderSentAt: events.confirmationReminderSentAt,
 			createdAt: events.createdAt,
 			updatedAt: events.updatedAt,
 			groupName: groups.name,

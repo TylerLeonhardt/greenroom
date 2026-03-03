@@ -22,8 +22,10 @@ vi.mock("../../src/db/index.js", () => ({
 }));
 
 const mockSendEventReminderNotification = vi.fn();
+const mockSendConfirmationReminderNotification = vi.fn();
 vi.mock("./email.server.js", () => ({
 	sendEventReminderNotification: mockSendEventReminderNotification,
+	sendConfirmationReminderNotification: mockSendConfirmationReminderNotification,
 }));
 
 vi.mock("./logger.server.js", () => ({
@@ -35,12 +37,19 @@ vi.mock("./logger.server.js", () => ({
 	},
 }));
 
+const mockTrackEvent = vi.fn();
+vi.mock("./telemetry.server.js", () => ({
+	trackEvent: mockTrackEvent,
+}));
+
 vi.mock("../lib/date-utils.js", () => ({
 	formatEventTime: vi.fn(() => "Sun, Mar 1 · 7:00 PM – 9:00 PM"),
 	formatTime: vi.fn(() => "6:00 PM"),
 }));
 
-const { processReminders, startReminderJob } = await import("~/services/reminder.server");
+const { processReminders, processConfirmationReminders, startReminderJob } = await import(
+	"~/services/reminder.server"
+);
 
 // --- Test data ---
 
@@ -74,6 +83,31 @@ const mockAttendees = [
 		userId: "user-2",
 		email: "bob@example.com",
 		name: "Bob",
+		notificationPreferences: {
+			availabilityRequests: { email: true },
+			eventNotifications: { email: true },
+			showReminders: { email: false },
+		},
+	},
+];
+
+const mockPendingAttendees = [
+	{
+		userId: "user-3",
+		email: "charlie@example.com",
+		name: "Charlie",
+		timezone: "America/New_York",
+		notificationPreferences: {
+			availabilityRequests: { email: true },
+			eventNotifications: { email: true },
+			showReminders: { email: true },
+		},
+	},
+	{
+		userId: "user-4",
+		email: "diana@example.com",
+		name: "Diana",
+		timezone: "Europe/London",
 		notificationPreferences: {
 			availabilityRequests: { email: true },
 			eventNotifications: { email: true },
@@ -255,6 +289,318 @@ describe("reminder.server", () => {
 
 			// Should still mark as sent even with no attendees (to avoid retrying)
 			expect(mockSendEventReminderNotification).not.toHaveBeenCalled();
+		});
+	});
+
+	describe("processConfirmationReminders", () => {
+		it("skips processing when advisory lock is held by another instance", async () => {
+			mockTransaction.mockImplementation(async (fn) => {
+				const tx = {
+					execute: vi.fn().mockResolvedValue({
+						rows: [{ pg_try_advisory_xact_lock: false }],
+					}),
+					select: vi.fn(),
+				};
+				return fn(tx);
+			});
+
+			await processConfirmationReminders();
+
+			expect(mockSendConfirmationReminderNotification).not.toHaveBeenCalled();
+		});
+
+		it("sends confirmation reminders only to pending attendees", async () => {
+			const confirmationEvent = {
+				id: "event-2",
+				groupId: "group-1",
+				title: "Friday Rehearsal",
+				eventType: "rehearsal",
+				startTime: new Date("2026-03-04T02:00:00Z"),
+				endTime: new Date("2026-03-04T04:00:00Z"),
+				location: "Studio B",
+				groupName: "Comedy Team",
+			};
+
+			mockTransaction.mockImplementation(async (fn) => {
+				const eventChain = txChainMock(null);
+				eventChain.where = vi.fn().mockResolvedValue([confirmationEvent]);
+				eventChain.innerJoin = vi.fn().mockReturnValue(eventChain);
+				eventChain.from = vi.fn().mockReturnValue(eventChain);
+
+				const attendeeChain = txChainMock(null);
+				attendeeChain.where = vi.fn().mockResolvedValue(mockPendingAttendees);
+				attendeeChain.innerJoin = vi.fn().mockReturnValue(attendeeChain);
+				attendeeChain.from = vi.fn().mockReturnValue(attendeeChain);
+
+				let selectCallCount = 0;
+				const tx = {
+					execute: vi.fn().mockResolvedValue({
+						rows: [{ pg_try_advisory_xact_lock: true }],
+					}),
+					select: vi.fn().mockImplementation(() => {
+						selectCallCount++;
+						return selectCallCount === 1 ? eventChain : attendeeChain;
+					}),
+					update: vi.fn().mockReturnValue({
+						set: vi.fn().mockReturnValue({
+							where: vi.fn().mockResolvedValue(undefined),
+						}),
+					}),
+				};
+				return fn(tx);
+			});
+
+			await processConfirmationReminders();
+
+			expect(mockSendConfirmationReminderNotification).toHaveBeenCalledTimes(2);
+			expect(mockSendConfirmationReminderNotification).toHaveBeenCalledWith(
+				expect.objectContaining({
+					eventTitle: "Friday Rehearsal",
+					eventType: "rehearsal",
+					groupName: "Comedy Team",
+					location: "Studio B",
+					recipient: expect.objectContaining({
+						email: "charlie@example.com",
+						name: "Charlie",
+					}),
+					eventUrl: "https://mycalltime.app/groups/group-1/events/event-2",
+					preferencesUrl: "https://mycalltime.app/groups/group-1/notifications",
+				}),
+			);
+		});
+
+		it("does not send when no events need confirmation reminders", async () => {
+			mockTransaction.mockImplementation(async (fn) => {
+				const eventChain = txChainMock(null);
+				eventChain.where = vi.fn().mockResolvedValue([]);
+				eventChain.innerJoin = vi.fn().mockReturnValue(eventChain);
+				eventChain.from = vi.fn().mockReturnValue(eventChain);
+
+				const tx = {
+					execute: vi.fn().mockResolvedValue({
+						rows: [{ pg_try_advisory_xact_lock: true }],
+					}),
+					select: vi.fn().mockReturnValue(eventChain),
+				};
+				return fn(tx);
+			});
+
+			await processConfirmationReminders();
+
+			expect(mockSendConfirmationReminderNotification).not.toHaveBeenCalled();
+		});
+
+		it("marks event as confirmation reminder sent after processing", async () => {
+			const mockUpdateSetWhere = vi.fn().mockResolvedValue(undefined);
+			const mockUpdateSet = vi.fn().mockReturnValue({ where: mockUpdateSetWhere });
+			const mockTxUpdateFn = vi.fn().mockReturnValue({ set: mockUpdateSet });
+
+			const confirmationEvent = {
+				id: "event-3",
+				groupId: "group-2",
+				title: "Show",
+				eventType: "show",
+				startTime: new Date("2026-03-04T02:00:00Z"),
+				endTime: new Date("2026-03-04T04:00:00Z"),
+				location: null,
+				groupName: "Improv Group",
+			};
+
+			mockTransaction.mockImplementation(async (fn) => {
+				const eventChain = txChainMock(null);
+				eventChain.where = vi.fn().mockResolvedValue([confirmationEvent]);
+				eventChain.innerJoin = vi.fn().mockReturnValue(eventChain);
+				eventChain.from = vi.fn().mockReturnValue(eventChain);
+
+				const attendeeChain = txChainMock(null);
+				attendeeChain.where = vi.fn().mockResolvedValue([mockPendingAttendees[0]]);
+				attendeeChain.innerJoin = vi.fn().mockReturnValue(attendeeChain);
+				attendeeChain.from = vi.fn().mockReturnValue(attendeeChain);
+
+				let selectCallCount = 0;
+				const tx = {
+					execute: vi.fn().mockResolvedValue({
+						rows: [{ pg_try_advisory_xact_lock: true }],
+					}),
+					select: vi.fn().mockImplementation(() => {
+						selectCallCount++;
+						return selectCallCount === 1 ? eventChain : attendeeChain;
+					}),
+					update: mockTxUpdateFn,
+				};
+				return fn(tx);
+			});
+
+			await processConfirmationReminders();
+
+			expect(mockTxUpdateFn).toHaveBeenCalled();
+			expect(mockUpdateSet).toHaveBeenCalledWith(
+				expect.objectContaining({ confirmationReminderSentAt: expect.any(Date) }),
+			);
+		});
+
+		it("tracks telemetry event after sending confirmation reminders", async () => {
+			const confirmationEvent = {
+				id: "event-4",
+				groupId: "group-1",
+				title: "Weekly Practice",
+				eventType: "rehearsal",
+				startTime: new Date("2026-03-04T02:00:00Z"),
+				endTime: new Date("2026-03-04T04:00:00Z"),
+				location: null,
+				groupName: "Comedy Team",
+			};
+
+			mockTransaction.mockImplementation(async (fn) => {
+				const eventChain = txChainMock(null);
+				eventChain.where = vi.fn().mockResolvedValue([confirmationEvent]);
+				eventChain.innerJoin = vi.fn().mockReturnValue(eventChain);
+				eventChain.from = vi.fn().mockReturnValue(eventChain);
+
+				const attendeeChain = txChainMock(null);
+				attendeeChain.where = vi.fn().mockResolvedValue([mockPendingAttendees[0]]);
+				attendeeChain.innerJoin = vi.fn().mockReturnValue(attendeeChain);
+				attendeeChain.from = vi.fn().mockReturnValue(attendeeChain);
+
+				let selectCallCount = 0;
+				const tx = {
+					execute: vi.fn().mockResolvedValue({
+						rows: [{ pg_try_advisory_xact_lock: true }],
+					}),
+					select: vi.fn().mockImplementation(() => {
+						selectCallCount++;
+						return selectCallCount === 1 ? eventChain : attendeeChain;
+					}),
+					update: vi.fn().mockReturnValue({
+						set: vi.fn().mockReturnValue({
+							where: vi.fn().mockResolvedValue(undefined),
+						}),
+					}),
+				};
+				return fn(tx);
+			});
+
+			await processConfirmationReminders();
+
+			expect(mockTrackEvent).toHaveBeenCalledWith("ConfirmationReminderSent", {
+				groupId: "group-1",
+				eventId: "event-4",
+				pendingAttendeeCount: "1",
+			});
+		});
+
+		it("handles events with no pending attendees gracefully", async () => {
+			const confirmationEvent = {
+				id: "event-5",
+				groupId: "group-1",
+				title: "All Confirmed",
+				eventType: "rehearsal",
+				startTime: new Date("2026-03-04T02:00:00Z"),
+				endTime: new Date("2026-03-04T04:00:00Z"),
+				location: null,
+				groupName: "Comedy Team",
+			};
+
+			mockTransaction.mockImplementation(async (fn) => {
+				const eventChain = txChainMock(null);
+				eventChain.where = vi.fn().mockResolvedValue([confirmationEvent]);
+				eventChain.innerJoin = vi.fn().mockReturnValue(eventChain);
+				eventChain.from = vi.fn().mockReturnValue(eventChain);
+
+				const attendeeChain = txChainMock(null);
+				attendeeChain.where = vi.fn().mockResolvedValue([]); // No pending attendees
+				attendeeChain.innerJoin = vi.fn().mockReturnValue(attendeeChain);
+				attendeeChain.from = vi.fn().mockReturnValue(attendeeChain);
+
+				let selectCallCount = 0;
+				const tx = {
+					execute: vi.fn().mockResolvedValue({
+						rows: [{ pg_try_advisory_xact_lock: true }],
+					}),
+					select: vi.fn().mockImplementation(() => {
+						selectCallCount++;
+						return selectCallCount === 1 ? eventChain : attendeeChain;
+					}),
+					update: vi.fn().mockReturnValue({
+						set: vi.fn().mockReturnValue({
+							where: vi.fn().mockResolvedValue(undefined),
+						}),
+					}),
+				};
+				return fn(tx);
+			});
+
+			await processConfirmationReminders();
+
+			// Should still mark as sent even with no pending attendees (to avoid retrying)
+			expect(mockSendConfirmationReminderNotification).not.toHaveBeenCalled();
+		});
+
+		it("passes attendee timezone for time formatting", async () => {
+			const { formatEventTime } = await import("../lib/date-utils.js");
+
+			const confirmationEvent = {
+				id: "event-6",
+				groupId: "group-1",
+				title: "Timezone Test",
+				eventType: "other",
+				startTime: new Date("2026-03-04T02:00:00Z"),
+				endTime: new Date("2026-03-04T04:00:00Z"),
+				location: null,
+				groupName: "Comedy Team",
+			};
+
+			const singleAttendee = [
+				{
+					userId: "user-5",
+					email: "eve@example.com",
+					name: "Eve",
+					timezone: "America/Los_Angeles",
+					notificationPreferences: {
+						availabilityRequests: { email: true },
+						eventNotifications: { email: true },
+						showReminders: { email: true },
+					},
+				},
+			];
+
+			mockTransaction.mockImplementation(async (fn) => {
+				const eventChain = txChainMock(null);
+				eventChain.where = vi.fn().mockResolvedValue([confirmationEvent]);
+				eventChain.innerJoin = vi.fn().mockReturnValue(eventChain);
+				eventChain.from = vi.fn().mockReturnValue(eventChain);
+
+				const attendeeChain = txChainMock(null);
+				attendeeChain.where = vi.fn().mockResolvedValue(singleAttendee);
+				attendeeChain.innerJoin = vi.fn().mockReturnValue(attendeeChain);
+				attendeeChain.from = vi.fn().mockReturnValue(attendeeChain);
+
+				let selectCallCount = 0;
+				const tx = {
+					execute: vi.fn().mockResolvedValue({
+						rows: [{ pg_try_advisory_xact_lock: true }],
+					}),
+					select: vi.fn().mockImplementation(() => {
+						selectCallCount++;
+						return selectCallCount === 1 ? eventChain : attendeeChain;
+					}),
+					update: vi.fn().mockReturnValue({
+						set: vi.fn().mockReturnValue({
+							where: vi.fn().mockResolvedValue(undefined),
+						}),
+					}),
+				};
+				return fn(tx);
+			});
+
+			await processConfirmationReminders();
+
+			// Verify formatEventTime was called with the attendee's timezone
+			expect(formatEventTime).toHaveBeenCalledWith(
+				confirmationEvent.startTime,
+				confirmationEvent.endTime,
+				"America/Los_Angeles",
+			);
 		});
 	});
 });

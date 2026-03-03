@@ -79,6 +79,7 @@ const mockEvent = {
 	createdFromRequestId: null,
 	callTime: null,
 	reminderSentAt: null,
+	confirmationReminderSentAt: null,
 	createdAt: now,
 	updatedAt: now,
 };
@@ -520,6 +521,7 @@ describe("events.server", () => {
 			const setArg = mockSet.mock.calls[0][0];
 			expect(setArg).toHaveProperty("startTime", newStart);
 			expect(setArg).toHaveProperty("reminderSentAt", null);
+			expect(setArg).toHaveProperty("confirmationReminderSentAt", null);
 		});
 
 		it("does not reset reminderSentAt when startTime is not changed", async () => {
@@ -533,6 +535,7 @@ describe("events.server", () => {
 
 			const setArg = mockSet.mock.calls[0][0];
 			expect(setArg).not.toHaveProperty("reminderSentAt");
+			expect(setArg).not.toHaveProperty("confirmationReminderSentAt");
 		});
 	});
 

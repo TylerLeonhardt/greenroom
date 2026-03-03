@@ -498,3 +498,46 @@ ${ctaButton(options.eventUrl, "View Event Details")}
 		text,
 	});
 }
+
+export async function sendConfirmationReminderNotification(options: {
+	eventTitle: string;
+	eventType: string;
+	dateTime: string;
+	location?: string | null;
+	groupName: string;
+	recipient: { email: string; name: string; notificationPreferences?: NotificationPreferences };
+	eventUrl: string;
+	preferencesUrl?: string;
+}): Promise<void> {
+	const prefs = mergeWithDefaults(options.recipient.notificationPreferences);
+	if (!prefs.showReminders.email) return;
+
+	const typeEmoji =
+		options.eventType === "show" ? "🎭" : options.eventType === "rehearsal" ? "🎯" : "📅";
+	const locationLine = options.location
+		? `<p style="margin:0;font-size:13px;color:#475569;">📍 ${escapeHtml(options.location)}</p>`
+		: "";
+
+	const html = emailLayout(
+		`
+<h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0f172a;">Please Confirm Your Attendance</h2>
+<p style="color:#475569;margin:0 0 20px;">Hi ${escapeHtml(options.recipient.name)}, you haven't confirmed yet — this event is in 2 days!</p>
+${infoCard([
+	`<p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0f172a;">${typeEmoji} ${escapeHtml(options.eventTitle)}</p>`,
+	`<p style="margin:0 0 4px;font-size:13px;color:#475569;">${escapeHtml(options.groupName)} · ${escapeHtml(options.dateTime)}</p>`,
+	locationLine,
+])}
+${ctaButton(options.eventUrl, "Confirm Attendance")}
+<p style="color:#64748b;font-size:13px;margin:0;">Please confirm or decline so your group knows who's coming.</p>`,
+		{ preferencesUrl: options.preferencesUrl },
+	);
+
+	const text = `Hi ${options.recipient.name},\n\nYou haven't confirmed yet — this event is in 2 days!\n\nEvent: ${options.eventTitle}\nGroup: ${options.groupName}\nWhen: ${options.dateTime}${options.location ? `\nWhere: ${options.location}` : ""}\n\nConfirm your attendance: ${options.eventUrl}`;
+
+	void sendEmail({
+		to: options.recipient.email,
+		subject: `⏰ Please confirm: "${options.eventTitle}" in 2 days`,
+		html,
+		text,
+	});
+}
