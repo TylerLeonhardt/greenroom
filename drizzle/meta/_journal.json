@@ -71,6 +71,13 @@
       "when": 1772513384008,
       "tag": "0009_fantastic_forgotten_one",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1772514464300,
+      "tag": "0010_cultured_zombie",
+      "breakpoints": true
     }
   ]
 }

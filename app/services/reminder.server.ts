@@ -9,6 +9,7 @@ import {
 } from "./email.server.js";
 import { logger } from "./logger.server.js";
 import { trackEvent } from "./telemetry.server.js";
+import { sendEventReminderWebhook } from "./webhook.server.js";
 
 /**
  * Start a cron job that sends reminder emails for upcoming events.
@@ -83,6 +84,7 @@ export async function processReminders(): Promise<void> {
 				location: events.location,
 				callTime: events.callTime,
 				groupName: groups.name,
+				webhookUrl: groups.webhookUrl,
 			})
 			.from(events)
 			.innerJoin(groups, eq(events.groupId, groups.id))
@@ -156,6 +158,18 @@ export async function processReminders(): Promise<void> {
 
 			// Mark reminder as sent
 			await tx.update(events).set({ reminderSentAt: new Date() }).where(eq(events.id, event.id));
+
+			// Fire-and-forget Discord webhook (one message per event, not per attendee)
+			if (event.webhookUrl) {
+				const webhookDateTime = formatEventTime(event.startTime, event.endTime);
+				sendEventReminderWebhook(event.webhookUrl, {
+					groupName: event.groupName,
+					eventTitle: event.title,
+					dateTime: webhookDateTime,
+					location: event.location,
+					eventUrl,
+				});
+			}
 
 			logger.info(
 				{ eventId: event.id, attendeeCount: attendees.length },

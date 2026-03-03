@@ -21,6 +21,7 @@ import {
 	getGroupMembersWithPreferences,
 	requireGroupAdminOrPermission,
 } from "~/services/groups.server";
+import { sendAvailabilityRequestWebhook } from "~/services/webhook.server";
 
 export const meta: MetaFunction = () => {
 	return [{ title: "New Availability Request — My Call Time" }];
@@ -147,6 +148,17 @@ export async function action({ request, params }: ActionFunctionArgs) {
 				requestUrl: `${appUrl}/groups/${groupId}/availability/${req.id}`,
 				preferencesUrl,
 			});
+
+			// Fire-and-forget Discord webhook
+			if (group.webhookUrl) {
+				sendAvailabilityRequestWebhook(group.webhookUrl, {
+					groupName: group.name,
+					title: req.title,
+					createdByName: user.name,
+					dateRange: dateRangeDisplay,
+					requestUrl: `${appUrl}/groups/${groupId}/availability/${req.id}`,
+				});
+			}
 		},
 	);
 
