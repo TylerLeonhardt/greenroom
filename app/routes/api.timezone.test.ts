@@ -127,4 +127,29 @@ describe("api.timezone action", () => {
 			action({ request: makeRequest(formData), params: {}, context: {} }),
 		).rejects.toBeInstanceOf(Response);
 	});
+
+	it("skips setting timezone if user already has one set", async () => {
+		vi.mocked(requireUser).mockResolvedValueOnce({
+			id: "user-1",
+			email: "test@example.com",
+			name: "Test User",
+			profileImage: null,
+			timezone: "Europe/London",
+		});
+
+		const formData = makeFormData({
+			timezone: "America/New_York",
+			_csrf: "token",
+		});
+		const response = await action({
+			request: makeRequest(formData),
+			params: {},
+			context: {},
+		});
+		const data = await response.json();
+
+		expect(response.status).toBe(200);
+		expect(data).toEqual({ ok: true, message: "Timezone already set" });
+		expect(updateUserTimezone).not.toHaveBeenCalled();
+	});
 });

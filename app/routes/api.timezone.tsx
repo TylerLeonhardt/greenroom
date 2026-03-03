@@ -9,6 +9,12 @@ export async function action({ request }: ActionFunctionArgs) {
 	}
 
 	const user = await requireUser(request);
+
+	// Guard: if user already has timezone set, return early to prevent overwriting
+	if (user.timezone) {
+		return Response.json({ ok: true, message: "Timezone already set" }, { status: 200 });
+	}
+
 	const formData = await request.formData();
 	await validateCsrfToken(request, formData);
 
