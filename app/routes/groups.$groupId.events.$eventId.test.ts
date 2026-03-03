@@ -423,6 +423,7 @@ describe("event detail action — assignment notifications", () => {
 				expect.objectContaining({
 					eventTitle: "Friday Show",
 					eventType: "show",
+					dateTime: "Sun, Mar 15 · 12:00 PM – 2:00 PM",
 					groupName: "Test Group",
 					recipient: expect.objectContaining({
 						email: "new@example.com",

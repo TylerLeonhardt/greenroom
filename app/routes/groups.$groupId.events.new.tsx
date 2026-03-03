@@ -12,7 +12,7 @@ import { ArrowLeft, Clock, Users } from "lucide-react";
 import { useState } from "react";
 import { CsrfInput } from "~/components/csrf-input";
 import { InlineTimezoneSelector } from "~/components/timezone-selector";
-import { formatEventTime, localTimeToUTC } from "~/lib/date-utils";
+import { localTimeToUTC } from "~/lib/date-utils";
 import { getAvailabilityRequest } from "~/services/availability.server";
 import { validateCsrfToken } from "~/services/csrf.server";
 import {
@@ -158,7 +158,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		if (!groupData) return;
 
 		const prefsMap = new Map(membersWithPrefs.map((m) => [m.id, m.notificationPreferences]));
-		const dateTime = formatEventTime(`${date}T${startTime}:00`, `${date}T${endTime}:00`);
 
 		if (validFromRequestId && typeof date === "string") {
 			// Availability-aware notifications
@@ -166,18 +165,25 @@ export async function action({ request, params }: ActionFunctionArgs) {
 			const memberMap = new Map(
 				groupData.members.map((m) => [
 					m.id,
-					{ email: m.email, name: m.name, notificationPreferences: prefsMap.get(m.id) },
+					{
+						email: m.email,
+						name: m.name,
+						timezone: m.timezone,
+						notificationPreferences: prefsMap.get(m.id),
+					},
 				]),
 			);
 
 			const availableRecipients: Array<{
 				email: string;
 				name: string;
+				timezone?: string | null;
 				notificationPreferences?: NotificationPreferences;
 			}> = [];
 			const maybeRecipients: Array<{
 				email: string;
 				name: string;
+				timezone?: string | null;
 				notificationPreferences?: NotificationPreferences;
 			}> = [];
 			const respondedUserIds = new Set<string>();
@@ -204,13 +210,15 @@ export async function action({ request, params }: ActionFunctionArgs) {
 				.map((m) => ({
 					email: m.email,
 					name: m.name,
+					timezone: m.timezone,
 					notificationPreferences: prefsMap.get(m.id),
 				}));
 
 			void sendEventFromAvailabilityNotification({
 				eventTitle: event.title,
 				eventType: event.eventType,
-				dateTime,
+				startTime: event.startTime,
+				endTime: event.endTime,
 				location: event.location ?? undefined,
 				groupName: groupData.group.name,
 				eventUrl,
@@ -226,6 +234,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 				.map((m) => ({
 					email: m.email,
 					name: m.name,
+					timezone: m.timezone,
 					notificationPreferences: prefsMap.get(m.id),
 				}));
 			if (recipients.length === 0) return;
@@ -233,7 +242,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 			void sendEventCreatedNotification({
 				eventTitle: event.title,
 				eventType: event.eventType,
-				dateTime,
+				startTime: event.startTime,
+				endTime: event.endTime,
 				location: event.location ?? undefined,
 				groupName: groupData.group.name,
 				recipients,

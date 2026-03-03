@@ -67,7 +67,8 @@ describe("email notification filtering", () => {
 		await sendEventCreatedNotification({
 			eventTitle: "Friday Show",
 			eventType: "show",
-			dateTime: "Fri, Mar 15 · 7:00 PM",
+			startTime: "2026-03-15T19:00:00.000Z",
+			endTime: "2026-03-15T21:00:00.000Z",
 			groupName: "Test Group",
 			recipients: [
 				{
