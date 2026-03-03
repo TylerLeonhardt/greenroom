@@ -169,6 +169,50 @@ describe("settings route", () => {
 			});
 			expect(result).toEqual({ error: "Timezone is required." });
 		});
+
+		it("rejects timezone abbreviations like PST", async () => {
+			const formData = makeFormData({ intent: "update-timezone", timezone: "PST" });
+			const result = await action({
+				request: makeRequest(formData),
+				params: {},
+				context: {},
+			});
+			expect(result).toEqual({ error: "Invalid timezone. Please select a valid IANA timezone." });
+			expect(updateUserTimezone).not.toHaveBeenCalled();
+		});
+
+		it("rejects timezone abbreviations like EST", async () => {
+			const formData = makeFormData({ intent: "update-timezone", timezone: "EST" });
+			const result = await action({
+				request: makeRequest(formData),
+				params: {},
+				context: {},
+			});
+			expect(result).toEqual({ error: "Invalid timezone. Please select a valid IANA timezone." });
+			expect(updateUserTimezone).not.toHaveBeenCalled();
+		});
+
+		it("rejects timezone abbreviations like CST", async () => {
+			const formData = makeFormData({ intent: "update-timezone", timezone: "CST" });
+			const result = await action({
+				request: makeRequest(formData),
+				params: {},
+				context: {},
+			});
+			expect(result).toEqual({ error: "Invalid timezone. Please select a valid IANA timezone." });
+			expect(updateUserTimezone).not.toHaveBeenCalled();
+		});
+
+		it("accepts UTC", async () => {
+			const formData = makeFormData({ intent: "update-timezone", timezone: "UTC" });
+			const result = await action({
+				request: makeRequest(formData),
+				params: {},
+				context: {},
+			});
+			expect(result).toEqual({ success: true, message: "Timezone updated!" });
+			expect(updateUserTimezone).toHaveBeenCalledWith("user-1", "UTC");
+		});
 	});
 
 	describe("action — invalid intent", () => {

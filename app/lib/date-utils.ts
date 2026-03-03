@@ -8,16 +8,51 @@
  */
 
 /**
+ * Validate that a timezone string is a valid IANA timezone identifier.
+ * Rejects abbreviations like "PST", "EST" that Intl.DateTimeFormat may
+ * silently accept and fall back to UTC.
+ */
+export function isValidTimezone(tz: string): boolean {
+	if (!tz || typeof tz !== "string") return false;
+	if (tz === "UTC") return true;
+	try {
+		const supported = Intl.supportedValuesOf("timeZone");
+		return supported.includes(tz);
+	} catch {
+		// Fallback for environments without supportedValuesOf
+		if (!tz.includes("/")) return false;
+		try {
+			Intl.DateTimeFormat(undefined, { timeZone: tz });
+			return true;
+		} catch {
+			return false;
+		}
+	}
+}
+
+/**
+ * Sanitize a timezone value for use in formatting functions.
+ * Returns undefined (server default) if the timezone is not a valid IANA identifier,
+ * preventing silent fallback to UTC on invalid abbreviations like "PST".
+ */
+export function sanitizeTimezone(timezone?: string | null): string | undefined {
+	if (!timezone) return undefined;
+	if (isValidTimezone(timezone)) return timezone;
+	return undefined;
+}
+
+/**
  * Format a date as "Wed, Mar 4, 2026"
  */
 export function formatDate(date: string | Date, timezone?: string): string {
+	const tz = sanitizeTimezone(timezone);
 	const d = typeof date === "string" ? new Date(date) : date;
 	return d.toLocaleDateString("en-US", {
 		weekday: "short",
 		month: "short",
 		day: "numeric",
 		year: "numeric",
-		timeZone: timezone,
+		timeZone: tz,
 	});
 }
 
@@ -25,11 +60,12 @@ export function formatDate(date: string | Date, timezone?: string): string {
  * Format a time as "7:00 PM"
  */
 export function formatTime(date: string | Date, timezone?: string): string {
+	const tz = sanitizeTimezone(timezone);
 	const d = typeof date === "string" ? new Date(date) : date;
 	return d.toLocaleTimeString("en-US", {
 		hour: "numeric",
 		minute: "2-digit",
-		timeZone: timezone,
+		timeZone: tz,
 	});
 }
 
@@ -37,14 +73,15 @@ export function formatTime(date: string | Date, timezone?: string): string {
  * Format a date and time as "Wed, Mar 4 · 7:00 PM"
  */
 export function formatDateTime(date: string | Date, timezone?: string): string {
+	const tz = sanitizeTimezone(timezone);
 	const d = typeof date === "string" ? new Date(date) : date;
 	const dateStr = d.toLocaleDateString("en-US", {
 		weekday: "short",
 		month: "short",
 		day: "numeric",
-		timeZone: timezone,
+		timeZone: tz,
 	});
-	const timeStr = formatTime(d, timezone);
+	const timeStr = formatTime(d, tz);
 	return `${dateStr} · ${timeStr}`;
 }
 
@@ -57,20 +94,21 @@ export function formatDateRange(
 	end: string | Date,
 	timezone?: string,
 ): string {
+	const tz = sanitizeTimezone(timezone);
 	const s = typeof start === "string" ? new Date(start) : start;
 	const e = typeof end === "string" ? new Date(end) : end;
 	const opts: Intl.DateTimeFormatOptions = {
 		month: "short",
 		day: "numeric",
-		timeZone: timezone,
+		timeZone: tz,
 	};
 	const yearOpts: Intl.DateTimeFormatOptions = {
 		...opts,
 		year: "numeric",
 	};
 
-	const sYear = s.toLocaleDateString("en-US", { year: "numeric", timeZone: timezone });
-	const eYear = e.toLocaleDateString("en-US", { year: "numeric", timeZone: timezone });
+	const sYear = s.toLocaleDateString("en-US", { year: "numeric", timeZone: tz });
+	const eYear = e.toLocaleDateString("en-US", { year: "numeric", timeZone: tz });
 
 	if (sYear === eYear) {
 		return `${s.toLocaleDateString("en-US", opts)} – ${e.toLocaleDateString("en-US", yearOpts)}`;
@@ -86,16 +124,18 @@ export function formatEventTime(
 	endTime: string | Date,
 	timezone?: string,
 ): string {
+	// Sanitize timezone to prevent silent fallback on invalid abbreviations
+	const tz = sanitizeTimezone(timezone);
 	const start = typeof startTime === "string" ? new Date(startTime) : startTime;
 	const end = typeof endTime === "string" ? new Date(endTime) : endTime;
 	const dateStr = start.toLocaleDateString("en-US", {
 		weekday: "short",
 		month: "short",
 		day: "numeric",
-		timeZone: timezone,
+		timeZone: tz,
 	});
-	const startStr = formatTime(start, timezone);
-	const endStr = formatTime(end, timezone);
+	const startStr = formatTime(start, tz);
+	const endStr = formatTime(end, tz);
 	return `${dateStr} · ${startStr} – ${endStr}`;
 }
 
@@ -107,13 +147,14 @@ export function formatDateDisplay(
 	dateStr: string,
 	timezone?: string,
 ): { dayOfWeek: string; display: string } {
+	const tz = sanitizeTimezone(timezone);
 	const date = new Date(`${dateStr}T12:00:00Z`);
 	return {
-		dayOfWeek: date.toLocaleDateString("en-US", { weekday: "short", timeZone: timezone }),
+		dayOfWeek: date.toLocaleDateString("en-US", { weekday: "short", timeZone: tz }),
 		display: date.toLocaleDateString("en-US", {
 			month: "short",
 			day: "numeric",
-			timeZone: timezone,
+			timeZone: tz,
 		}),
 	};
 }
@@ -123,13 +164,14 @@ export function formatDateDisplay(
  * "Wednesday, March 4, 2026"
  */
 export function formatDateLong(date: string | Date, timezone?: string): string {
+	const tz = sanitizeTimezone(timezone);
 	const d = typeof date === "string" ? new Date(date) : date;
 	return d.toLocaleDateString("en-US", {
 		weekday: "long",
 		month: "long",
 		day: "numeric",
 		year: "numeric",
-		timeZone: timezone,
+		timeZone: tz,
 	});
 }
 
@@ -138,12 +180,13 @@ export function formatDateLong(date: string | Date, timezone?: string): string {
  * "March 4, 2026"
  */
 export function formatDateMedium(date: string | Date, timezone?: string): string {
+	const tz = sanitizeTimezone(timezone);
 	const d = typeof date === "string" ? new Date(date) : date;
 	return d.toLocaleDateString("en-US", {
 		month: "long",
 		day: "numeric",
 		year: "numeric",
-		timeZone: timezone,
+		timeZone: tz,
 	});
 }
 
@@ -152,12 +195,13 @@ export function formatDateMedium(date: string | Date, timezone?: string): string
  * "Mon, Mar 4"
  */
 export function formatDateShort(date: string | Date, timezone?: string): string {
+	const tz = sanitizeTimezone(timezone);
 	const d = typeof date === "string" ? new Date(date) : date;
 	return d.toLocaleDateString("en-US", {
 		weekday: "short",
 		month: "short",
 		day: "numeric",
-		timeZone: timezone,
+		timeZone: tz,
 	});
 }
 
@@ -188,7 +232,8 @@ export function formatTimeRange(startTime?: string | null, endTime?: string | nu
  * Uses iterative refinement to handle DST transitions correctly.
  */
 export function localTimeToUTC(dateStr: string, timeStr: string, timezone?: string | null): Date {
-	if (!timezone) {
+	const tz = sanitizeTimezone(timezone ?? undefined);
+	if (!tz) {
 		// No timezone — interpret as server-local time (existing behavior)
 		return new Date(`${dateStr}T${timeStr}:00`);
 	}
@@ -199,7 +244,7 @@ export function localTimeToUTC(dateStr: string, timeStr: string, timezone?: stri
 	let guess = Date.UTC(year, month - 1, day, hour, minute, 0);
 
 	const formatter = new Intl.DateTimeFormat("en-US", {
-		timeZone: timezone,
+		timeZone: tz,
 		year: "numeric",
 		month: "2-digit",
 		day: "2-digit",
@@ -256,8 +301,9 @@ export function utcToLocalParts(
 	date: Date,
 	timezone?: string | null,
 ): { date: string; time: string } {
+	const tz = sanitizeTimezone(timezone ?? undefined);
 	const formatter = new Intl.DateTimeFormat("en-US", {
-		timeZone: timezone ?? undefined,
+		timeZone: tz,
 		year: "numeric",
 		month: "2-digit",
 		day: "2-digit",
