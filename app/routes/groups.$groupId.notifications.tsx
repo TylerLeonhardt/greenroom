@@ -71,7 +71,6 @@ const NOTIFICATION_CATEGORIES = [
 		key: "showReminders" as const,
 		label: "Show reminders",
 		description: "Get reminder emails before events you're confirmed for",
-		comingSoon: true,
 	},
 ];
 
@@ -111,14 +110,7 @@ export default function GroupNotifications() {
 								className="flex items-start justify-between gap-3 sm:items-center sm:gap-4"
 							>
 								<div className="min-w-0">
-									<span className="text-sm font-medium text-slate-700">
-										{category.label}
-										{category.comingSoon && (
-											<span className="ml-2 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs font-normal text-slate-500">
-												Coming soon
-											</span>
-										)}
-									</span>
+									<span className="text-sm font-medium text-slate-700">{category.label}</span>
 									<p className="text-xs text-slate-500">{category.description}</p>
 								</div>
 								<input
