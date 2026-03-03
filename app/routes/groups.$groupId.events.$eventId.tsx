@@ -177,15 +177,17 @@ export async function action({ request, params }: ActionFunctionArgs) {
 					const eventUrl = `${appUrl}/groups/${groupId}/events/${eventId}`;
 					const preferencesUrl = `${appUrl}/groups/${groupId}/notifications`;
 					const event = eventData.event;
-					const dateTime = formatEventTime(
-						event.startTime as unknown as string,
-						event.endTime as unknown as string,
-					);
 					const groupName = groupData?.group.name ?? "";
 
 					for (const userId of newlyAssignedIds) {
 						const member = prefsMap.get(userId);
 						if (!member) continue;
+						const tz = member.timezone ?? undefined;
+						const dateTime = formatEventTime(
+							event.startTime as unknown as string,
+							event.endTime as unknown as string,
+							tz,
+						);
 						void sendEventAssignmentNotification({
 							eventTitle: event.title,
 							eventType: event.eventType,

@@ -105,6 +105,7 @@ export async function getGroupWithMembers(groupId: string): Promise<{
 		profileImage: string | null;
 		role: string;
 		joinedAt: Date;
+		timezone: string | null;
 	}>;
 } | null> {
 	const [group] = await db.select().from(groups).where(eq(groups.id, groupId)).limit(1);
@@ -118,6 +119,7 @@ export async function getGroupWithMembers(groupId: string): Promise<{
 			profileImage: users.profileImage,
 			role: groupMemberships.role,
 			joinedAt: groupMemberships.joinedAt,
+			timezone: users.timezone,
 		})
 		.from(groupMemberships)
 		.innerJoin(users, eq(groupMemberships.userId, users.id))
@@ -311,6 +313,7 @@ export async function getGroupMembersWithPreferences(groupId: string): Promise<
 		id: string;
 		name: string;
 		email: string;
+		timezone: string | null;
 		notificationPreferences: NotificationPreferences;
 	}>
 > {
@@ -319,6 +322,7 @@ export async function getGroupMembersWithPreferences(groupId: string): Promise<
 			id: users.id,
 			name: users.name,
 			email: users.email,
+			timezone: users.timezone,
 			notificationPreferences: groupMemberships.notificationPreferences,
 		})
 		.from(groupMemberships)

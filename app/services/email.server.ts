@@ -1,5 +1,6 @@
 import { EmailClient } from "@azure/communication-email";
 import type { NotificationPreferences } from "../../src/db/schema.js";
+import { formatEventTime } from "../lib/date-utils.js";
 import { logger } from "./logger.server.js";
 import { mergeWithDefaults } from "./notification-utils.server.js";
 import { getTelemetryClient } from "./telemetry.server.js";
@@ -216,12 +217,14 @@ ${ctaButton(options.requestUrl, "Submit Your Availability")}
 export async function sendEventCreatedNotification(options: {
 	eventTitle: string;
 	eventType: string;
-	dateTime: string;
+	startTime: string | Date;
+	endTime: string | Date;
 	location?: string;
 	groupName: string;
 	recipients: Array<{
 		email: string;
 		name: string;
+		timezone?: string | null;
 		notificationPreferences?: NotificationPreferences;
 	}>;
 	eventUrl: string;
@@ -237,13 +240,19 @@ export async function sendEventCreatedNotification(options: {
 		const prefs = mergeWithDefaults(recipient.notificationPreferences);
 		if (!prefs.eventNotifications.email) continue;
 
+		const dateTime = formatEventTime(
+			options.startTime,
+			options.endTime,
+			recipient.timezone ?? undefined,
+		);
+
 		const html = emailLayout(
 			`
 <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0f172a;">New Event Created</h2>
 <p style="color:#475569;margin:0 0 20px;">Hi ${escapeHtml(recipient.name)}, you've been assigned to an upcoming event.</p>
 ${infoCard([
 	`<p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0f172a;">${typeEmoji} ${escapeHtml(options.eventTitle)}</p>`,
-	`<p style="margin:0 0 4px;font-size:13px;color:#475569;">${escapeHtml(options.groupName)} · ${escapeHtml(options.dateTime)}</p>`,
+	`<p style="margin:0 0 4px;font-size:13px;color:#475569;">${escapeHtml(options.groupName)} · ${escapeHtml(dateTime)}</p>`,
 	locationLine,
 ])}
 ${ctaButton(options.eventUrl, "View Event Details")}
@@ -251,7 +260,7 @@ ${ctaButton(options.eventUrl, "View Event Details")}
 			{ preferencesUrl: options.preferencesUrl },
 		);
 
-		const text = `Hi ${recipient.name},\n\nYou've been assigned to an upcoming event.\n\nEvent: ${options.eventTitle}\nGroup: ${options.groupName}\nWhen: ${options.dateTime}${options.location ? `\nWhere: ${options.location}` : ""}\n\nView details and confirm: ${options.eventUrl}`;
+		const text = `Hi ${recipient.name},\n\nYou've been assigned to an upcoming event.\n\nEvent: ${options.eventTitle}\nGroup: ${options.groupName}\nWhen: ${dateTime}${options.location ? `\nWhere: ${options.location}` : ""}\n\nView details and confirm: ${options.eventUrl}`;
 
 		void sendEmail({
 			to: recipient.email,
@@ -303,23 +312,27 @@ ${ctaButton(options.eventUrl, "Confirm Attendance")}
 export async function sendEventFromAvailabilityNotification(options: {
 	eventTitle: string;
 	eventType: string;
-	dateTime: string;
+	startTime: string | Date;
+	endTime: string | Date;
 	location?: string;
 	groupName: string;
 	eventUrl: string;
 	availableRecipients: Array<{
 		email: string;
 		name: string;
+		timezone?: string | null;
 		notificationPreferences?: NotificationPreferences;
 	}>;
 	maybeRecipients: Array<{
 		email: string;
 		name: string;
+		timezone?: string | null;
 		notificationPreferences?: NotificationPreferences;
 	}>;
 	noResponseRecipients: Array<{
 		email: string;
 		name: string;
+		timezone?: string | null;
 		notificationPreferences?: NotificationPreferences;
 	}>;
 	preferencesUrl?: string;
@@ -330,18 +343,22 @@ export async function sendEventFromAvailabilityNotification(options: {
 		? `<p style="margin:0;font-size:13px;color:#475569;">📍 ${escapeHtml(options.location)}</p>`
 		: "";
 
-	const eventBlock = infoCard([
-		`<p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0f172a;">${typeEmoji} ${escapeHtml(options.eventTitle)}</p>`,
-		`<p style="margin:0 0 4px;font-size:13px;color:#475569;">${escapeHtml(options.groupName)} · ${escapeHtml(options.dateTime)}</p>`,
-		locationLine,
-	]);
-
 	const layoutOpts = { preferencesUrl: options.preferencesUrl };
 
 	// Email people who said "available" — they're confirmed
 	for (const recipient of options.availableRecipients) {
 		const prefs = mergeWithDefaults(recipient.notificationPreferences);
 		if (!prefs.eventNotifications.email) continue;
+		const dateTime = formatEventTime(
+			options.startTime,
+			options.endTime,
+			recipient.timezone ?? undefined,
+		);
+		const eventBlock = infoCard([
+			`<p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0f172a;">${typeEmoji} ${escapeHtml(options.eventTitle)}</p>`,
+			`<p style="margin:0 0 4px;font-size:13px;color:#475569;">${escapeHtml(options.groupName)} · ${escapeHtml(dateTime)}</p>`,
+			locationLine,
+		]);
 
 		const html = emailLayout(
 			`
@@ -353,7 +370,7 @@ ${ctaButton(options.eventUrl, "View Event Details")}
 			layoutOpts,
 		);
 
-		const text = `Hi ${recipient.name},\n\nGreat news - you're confirmed! The event you said you were available for is happening.\n\nEvent: ${options.eventTitle}\nGroup: ${options.groupName}\nWhen: ${options.dateTime}${options.location ? `\nWhere: ${options.location}` : ""}\n\nView details: ${options.eventUrl}`;
+		const text = `Hi ${recipient.name},\n\nGreat news - you're confirmed! The event you said you were available for is happening.\n\nEvent: ${options.eventTitle}\nGroup: ${options.groupName}\nWhen: ${dateTime}${options.location ? `\nWhere: ${options.location}` : ""}\n\nView details: ${options.eventUrl}`;
 
 		void sendEmail({
 			to: recipient.email,
@@ -367,6 +384,16 @@ ${ctaButton(options.eventUrl, "View Event Details")}
 	for (const recipient of options.maybeRecipients) {
 		const prefs = mergeWithDefaults(recipient.notificationPreferences);
 		if (!prefs.eventNotifications.email) continue;
+		const dateTime = formatEventTime(
+			options.startTime,
+			options.endTime,
+			recipient.timezone ?? undefined,
+		);
+		const eventBlock = infoCard([
+			`<p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0f172a;">${typeEmoji} ${escapeHtml(options.eventTitle)}</p>`,
+			`<p style="margin:0 0 4px;font-size:13px;color:#475569;">${escapeHtml(options.groupName)} · ${escapeHtml(dateTime)}</p>`,
+			locationLine,
+		]);
 
 		const html = emailLayout(
 			`
@@ -378,11 +405,11 @@ ${ctaButton(options.eventUrl, "Confirm Attendance")}
 			layoutOpts,
 		);
 
-		const text = `Hi ${recipient.name},\n\nYou said you might be free - the event is now scheduled!\n\nEvent: ${options.eventTitle}\nGroup: ${options.groupName}\nWhen: ${options.dateTime}${options.location ? `\nWhere: ${options.location}` : ""}\n\nConfirm your attendance: ${options.eventUrl}`;
+		const text = `Hi ${recipient.name},\n\nYou said you might be free - the event is now scheduled!\n\nEvent: ${options.eventTitle}\nGroup: ${options.groupName}\nWhen: ${dateTime}${options.location ? `\nWhere: ${options.location}` : ""}\n\nConfirm your attendance: ${options.eventUrl}`;
 
 		void sendEmail({
 			to: recipient.email,
-			subject: `${typeEmoji} Can you make it? "${options.eventTitle}" is on ${options.dateTime}`,
+			subject: `${typeEmoji} Can you make it? "${options.eventTitle}" is on ${dateTime}`,
 			html,
 			text,
 		});
@@ -392,6 +419,16 @@ ${ctaButton(options.eventUrl, "Confirm Attendance")}
 	for (const recipient of options.noResponseRecipients) {
 		const prefs = mergeWithDefaults(recipient.notificationPreferences);
 		if (!prefs.eventNotifications.email) continue;
+		const dateTime = formatEventTime(
+			options.startTime,
+			options.endTime,
+			recipient.timezone ?? undefined,
+		);
+		const eventBlock = infoCard([
+			`<p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0f172a;">${typeEmoji} ${escapeHtml(options.eventTitle)}</p>`,
+			`<p style="margin:0 0 4px;font-size:13px;color:#475569;">${escapeHtml(options.groupName)} · ${escapeHtml(dateTime)}</p>`,
+			locationLine,
+		]);
 
 		const html = emailLayout(
 			`
@@ -403,11 +440,11 @@ ${ctaButton(options.eventUrl, "View Event Details")}
 			layoutOpts,
 		);
 
-		const text = `Hi ${recipient.name},\n\nA new event has been scheduled for your group.\n\nEvent: ${options.eventTitle}\nGroup: ${options.groupName}\nWhen: ${options.dateTime}${options.location ? `\nWhere: ${options.location}` : ""}\n\nView details: ${options.eventUrl}`;
+		const text = `Hi ${recipient.name},\n\nA new event has been scheduled for your group.\n\nEvent: ${options.eventTitle}\nGroup: ${options.groupName}\nWhen: ${dateTime}${options.location ? `\nWhere: ${options.location}` : ""}\n\nView details: ${options.eventUrl}`;
 
 		void sendEmail({
 			to: recipient.email,
-			subject: `${typeEmoji} New event — "${options.eventTitle}" on ${options.dateTime}`,
+			subject: `${typeEmoji} New event — "${options.eventTitle}" on ${dateTime}`,
 			html,
 			text,
 		});
