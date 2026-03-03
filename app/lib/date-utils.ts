@@ -232,7 +232,8 @@ export function formatTimeRange(startTime?: string | null, endTime?: string | nu
  * Uses iterative refinement to handle DST transitions correctly.
  */
 export function localTimeToUTC(dateStr: string, timeStr: string, timezone?: string | null): Date {
-	if (!timezone) {
+	const tz = sanitizeTimezone(timezone ?? undefined);
+	if (!tz) {
 		// No timezone — interpret as server-local time (existing behavior)
 		return new Date(`${dateStr}T${timeStr}:00`);
 	}
@@ -243,7 +244,7 @@ export function localTimeToUTC(dateStr: string, timeStr: string, timezone?: stri
 	let guess = Date.UTC(year, month - 1, day, hour, minute, 0);
 
 	const formatter = new Intl.DateTimeFormat("en-US", {
-		timeZone: timezone,
+		timeZone: tz,
 		year: "numeric",
 		month: "2-digit",
 		day: "2-digit",
@@ -300,8 +301,9 @@ export function utcToLocalParts(
 	date: Date,
 	timezone?: string | null,
 ): { date: string; time: string } {
+	const tz = sanitizeTimezone(timezone ?? undefined);
 	const formatter = new Intl.DateTimeFormat("en-US", {
-		timeZone: timezone ?? undefined,
+		timeZone: tz,
 		year: "numeric",
 		month: "2-digit",
 		day: "2-digit",
