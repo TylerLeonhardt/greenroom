@@ -58,7 +58,7 @@ app/
 │   ├── groups.$groupId.events.$eventId.tsx      # Event detail: cast list, confirm/decline
 │   ├── groups.$groupId.events.$eventId.edit.tsx # Edit/delete event (admin)
 │   ├── groups.$groupId.notifications.tsx # Per-group notification preferences
-│   ├── groups.$groupId.settings.tsx      # Group settings: edit name, permissions, regenerate invite code, delete group
+│   ├── groups.$groupId.settings.tsx      # Group settings: edit name, permissions, Discord webhook, regenerate invite code, delete group
 │   └── settings.tsx              # User settings: timezone preference
 ├── services/                   # Server-side business logic (*.server.ts)
 │   ├── account.server.ts       # Account deletion (soft-delete, reactivation, sole-admin handling)
@@ -74,7 +74,8 @@ app/
 │   ├── rate-limit.server.ts    # In-memory sliding window rate limiter for auth routes
 │   ├── reminder.server.ts      # Event reminder cron job (advisory lock, 24h before)
 │   ├── session.server.ts       # Cookie session storage, getUserId(), createUserSession()
-│   └── telemetry.server.ts     # Application Insights SDK init + getTelemetryClient() helper
+│   ├── telemetry.server.ts     # Application Insights SDK init + getTelemetryClient() helper
+│   └── webhook.server.ts      # Discord webhook notifications (fire-and-forget)
 └── components/                 # Reusable React components
     ├── availability-grid.tsx   # Date × status grid for submitting availability
     ├── csrf-input.tsx          # Hidden CSRF token input (reads from root loader data)
@@ -305,7 +306,7 @@ export async function action({ request }: ActionFunctionArgs) {
 | Table | Key Columns | Notes |
 |-------|-------------|-------|
 | `users` | id, email (unique), passwordHash, name, googleId (unique), emailVerified, timezone, profileImage, deletedAt | Supports email/password + Google OAuth. `passwordHash` is null for Google-only users. `timezone` is IANA timezone string, auto-detected on first visit. `deletedAt` enables soft-delete (30-day reactivation). `profileImage` from Google OAuth. |
-| `groups` | id, name, description, inviteCode (unique, 8 chars), createdById → users, membersCanCreateRequests, membersCanCreateEvents | Invite code uses chars `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (no ambiguous I/O/0/1). Permission booleans default to `false` (admin-only). |
+| `groups` | id, name, description, inviteCode (unique, 8 chars), createdById → users, membersCanCreateRequests, membersCanCreateEvents, webhookUrl | Invite code uses chars `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (no ambiguous I/O/0/1). Permission booleans default to `false` (admin-only). `webhookUrl` is nullable varchar(500) for Discord webhook integration. |
 | `group_memberships` | id, groupId → groups, userId → users, role (admin/member), notificationPreferences (JSONB) | Unique on (groupId, userId). Creator gets admin role. Per-group notification preferences. |
 | `availability_requests` | id, groupId → groups, title, requestedDates (JSONB `string[]`), status (open/closed), expiresAt, requestedStartTime, requestedEndTime, dateRangeStart, dateRangeEnd | `requestedDates` is a JSON array of ISO date strings. `requestedStartTime`/`requestedEndTime` are nullable "HH:MM" strings for time range (null = all day). `dateRangeStart`/`dateRangeEnd` are timestamps. |
 | `availability_responses` | id, requestId → availability_requests, userId → users, responses (JSONB) | `responses` is `Record<string, "available" | "maybe" | "not_available">`. Upsert on (requestId, userId) |

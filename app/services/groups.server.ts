@@ -78,6 +78,7 @@ export async function getUserGroups(
 			createdById: groups.createdById,
 			membersCanCreateRequests: groups.membersCanCreateRequests,
 			membersCanCreateEvents: groups.membersCanCreateEvents,
+			webhookUrl: groups.webhookUrl,
 			createdAt: groups.createdAt,
 			updatedAt: groups.updatedAt,
 			role: groupMemberships.role,
@@ -224,13 +225,14 @@ export async function deleteGroup(groupId: string): Promise<void> {
 
 export async function updateGroup(
 	groupId: string,
-	data: { name?: string; description?: string },
+	data: { name?: string; description?: string; webhookUrl?: string | null },
 ): Promise<Group> {
 	const [updated] = await db
 		.update(groups)
 		.set({
 			...(data.name !== undefined ? { name: data.name.trim() } : {}),
 			...(data.description !== undefined ? { description: data.description.trim() || null } : {}),
+			...(data.webhookUrl !== undefined ? { webhookUrl: data.webhookUrl } : {}),
 			updatedAt: new Date(),
 		})
 		.where(eq(groups.id, groupId))

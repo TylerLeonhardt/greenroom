@@ -13,13 +13,21 @@ import {
 	updateGroupPermissions,
 } from "~/services/groups.server";
 import { logger } from "~/services/logger.server";
+import { isValidWebhookUrl, sendTestWebhook } from "~/services/webhook.server";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
 	const groupId = params.groupId ?? "";
 	await requireGroupAdmin(request, groupId);
 	const group = await getGroupById(groupId);
 	if (!group) throw new Response("Not Found", { status: 404 });
-	return { group };
+	return {
+		group: {
+			...group,
+			// Mask the webhook URL — the token is secret and should not be sent to the client
+			webhookUrl: undefined,
+			hasWebhook: !!group.webhookUrl,
+		},
+	};
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -86,6 +94,59 @@ export async function action({ request, params }: ActionFunctionArgs) {
 				"Failed to update permissions",
 			);
 			return { error: "Failed to update permissions.", success: false };
+		}
+	}
+
+	if (intent === "update-webhook") {
+		const webhookUrl = formData.get("webhookUrl");
+		const url = typeof webhookUrl === "string" ? webhookUrl.trim() : "";
+
+		if (url && !isValidWebhookUrl(url)) {
+			return {
+				error:
+					"Invalid webhook URL. Must be a Discord webhook URL (https://discord.com/api/webhooks/...).",
+				success: false,
+			};
+		}
+
+		try {
+			await updateGroup(groupId, { webhookUrl: url || null });
+			return { success: true, message: url ? "Webhook URL saved." : "Webhook URL removed." };
+		} catch (error) {
+			logger.error(
+				{ err: error, route: "groups.$groupId.settings", intent: "update-webhook" },
+				"Failed to update webhook URL",
+			);
+			return { error: "Failed to update webhook URL.", success: false };
+		}
+	}
+
+	if (intent === "test-webhook") {
+		const group = await getGroupById(groupId);
+		if (!group?.webhookUrl) {
+			return { error: "No webhook URL configured.", success: false };
+		}
+
+		const success = await sendTestWebhook(group.webhookUrl, group.name);
+		if (success) {
+			return { success: true, message: "Test message sent! Check your Discord channel." };
+		}
+		return {
+			error: "Failed to send test message. Please verify the webhook URL is correct.",
+			success: false,
+		};
+	}
+
+	if (intent === "remove-webhook") {
+		try {
+			await updateGroup(groupId, { webhookUrl: null });
+			return { success: true, message: "Webhook URL removed." };
+		} catch (error) {
+			logger.error(
+				{ err: error, route: "groups.$groupId.settings", intent: "remove-webhook" },
+				"Failed to remove webhook URL",
+			);
+			return { error: "Failed to remove webhook URL.", success: false };
 		}
 	}
 
@@ -274,6 +335,78 @@ export default function GroupSettings() {
 						{isSubmitting ? "Saving…" : "Save Permissions"}
 					</button>
 				</Form>
+			</div>
+
+			{/* Discord Webhook */}
+			<div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+				<div className="border-b border-slate-100 px-6 py-4">
+					<h2 className="text-lg font-semibold text-slate-900">Discord Webhook</h2>
+					<p className="mt-1 text-sm text-slate-500">
+						Paste a Discord channel webhook URL to receive notifications in Discord
+					</p>
+				</div>
+				<div className="space-y-4 p-6">
+					<Form method="post" className="space-y-4">
+						<CsrfInput />
+						<input type="hidden" name="intent" value="update-webhook" />
+						<div>
+							<label htmlFor="webhookUrl" className="block text-sm font-medium text-slate-700">
+								Webhook URL
+							</label>
+							<input
+								id="webhookUrl"
+								name="webhookUrl"
+								type="url"
+								placeholder={
+									group.hasWebhook
+										? "Enter a new URL to replace the current one"
+										: "https://discord.com/api/webhooks/..."
+								}
+								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+							/>
+							{group.hasWebhook && (
+								<p className="mt-1 text-xs text-emerald-600">✓ A webhook is currently configured</p>
+							)}
+							<p className="mt-1 text-xs text-slate-500">
+								In Discord: Server Settings → Integrations → Webhooks → New Webhook → Copy Webhook
+								URL
+							</p>
+						</div>
+						<button
+							type="submit"
+							disabled={isSubmitting}
+							className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:ring-offset-2 disabled:opacity-50"
+						>
+							{isSubmitting ? "Saving…" : "Save Webhook"}
+						</button>
+					</Form>
+					{group.hasWebhook && (
+						<div className="flex items-center gap-2 border-t border-slate-100 pt-4">
+							<Form method="post">
+								<CsrfInput />
+								<input type="hidden" name="intent" value="test-webhook" />
+								<button
+									type="submit"
+									disabled={isSubmitting}
+									className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
+								>
+									{isSubmitting ? "Sending…" : "Send Test Message"}
+								</button>
+							</Form>
+							<Form method="post">
+								<CsrfInput />
+								<input type="hidden" name="intent" value="remove-webhook" />
+								<button
+									type="submit"
+									disabled={isSubmitting}
+									className="rounded-lg border border-red-300 px-3 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+								>
+									{isSubmitting ? "Removing…" : "Remove Webhook"}
+								</button>
+							</Form>
+						</div>
+					)}
+				</div>
 			</div>
 
 			{/* Danger Zone */}
