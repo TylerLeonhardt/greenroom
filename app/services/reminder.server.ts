@@ -3,8 +3,12 @@ import { and, eq, gte, isNull, lte, sql } from "drizzle-orm";
 import { db } from "../../src/db/index.js";
 import { eventAssignments, events, groupMemberships, groups, users } from "../../src/db/schema.js";
 import { formatEventTime, formatTime } from "../lib/date-utils.js";
-import { sendEventReminderNotification } from "./email.server.js";
+import {
+	sendConfirmationReminderNotification,
+	sendEventReminderNotification,
+} from "./email.server.js";
 import { logger } from "./logger.server.js";
+import { trackEvent } from "./telemetry.server.js";
 
 /**
  * Start a cron job that sends reminder emails for upcoming events.
@@ -35,6 +39,11 @@ export function startReminderJob(): void {
 			await processReminders();
 		} catch (error) {
 			logger.error({ err: error }, "Reminder job failed");
+		}
+		try {
+			await processConfirmationReminders();
+		} catch (error) {
+			logger.error({ err: error }, "Confirmation reminder job failed");
 		}
 	});
 
@@ -151,6 +160,126 @@ export async function processReminders(): Promise<void> {
 			logger.info(
 				{ eventId: event.id, attendeeCount: attendees.length },
 				"Reminder emails queued for event",
+			);
+		}
+	});
+}
+
+/**
+ * Send confirmation reminder emails to attendees who haven't confirmed yet.
+ *
+ * Finds events starting within 24–48 hours that haven't had confirmation
+ * reminders sent, then emails all pending (unconfirmed) attendees.
+ * Uses a separate advisory lock from processReminders.
+ */
+export async function processConfirmationReminders(): Promise<void> {
+	await db.transaction(async (tx) => {
+		const lockResult = await tx.execute(
+			sql`SELECT pg_try_advisory_xact_lock(hashtext('confirmation-reminder-job'))`,
+		);
+		const locked = (
+			lockResult as unknown as { rows: Array<{ pg_try_advisory_xact_lock: boolean }> }
+		).rows[0]?.pg_try_advisory_xact_lock;
+		if (!locked) {
+			logger.debug("Confirmation reminder job skipped — another instance holds the lock");
+			return;
+		}
+
+		const now = new Date();
+		const twentyFourHoursFromNow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+		const fortyEightHoursFromNow = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+
+		// Find events starting in 24–48 hours that haven't had confirmation reminders sent.
+		// Events within 24 hours are covered by the standard reminder instead.
+		const upcomingEvents = await tx
+			.select({
+				id: events.id,
+				groupId: events.groupId,
+				title: events.title,
+				eventType: events.eventType,
+				startTime: events.startTime,
+				endTime: events.endTime,
+				location: events.location,
+				groupName: groups.name,
+			})
+			.from(events)
+			.innerJoin(groups, eq(events.groupId, groups.id))
+			.where(
+				and(
+					isNull(events.confirmationReminderSentAt),
+					gte(sql`COALESCE(${events.callTime}, ${events.startTime})`, twentyFourHoursFromNow),
+					lte(sql`COALESCE(${events.callTime}, ${events.startTime})`, fortyEightHoursFromNow),
+				),
+			);
+
+		if (upcomingEvents.length === 0) {
+			logger.debug("No events needing confirmation reminders");
+			return;
+		}
+
+		logger.info({ count: upcomingEvents.length }, "Processing confirmation reminders");
+
+		const appUrl = process.env.APP_URL || "https://mycalltime.app";
+
+		for (const event of upcomingEvents) {
+			// Get pending (unconfirmed) attendees with their notification preferences
+			const pendingAttendees = await tx
+				.select({
+					userId: eventAssignments.userId,
+					email: users.email,
+					name: users.name,
+					timezone: users.timezone,
+					notificationPreferences: groupMemberships.notificationPreferences,
+				})
+				.from(eventAssignments)
+				.innerJoin(users, eq(eventAssignments.userId, users.id))
+				.innerJoin(
+					groupMemberships,
+					and(
+						eq(groupMemberships.groupId, event.groupId),
+						eq(groupMemberships.userId, eventAssignments.userId),
+					),
+				)
+				.where(and(eq(eventAssignments.eventId, event.id), eq(eventAssignments.status, "pending")));
+
+			const eventUrl = `${appUrl}/groups/${event.groupId}/events/${event.id}`;
+			const preferencesUrl = `${appUrl}/groups/${event.groupId}/notifications`;
+
+			for (const attendee of pendingAttendees) {
+				const tz = attendee.timezone ?? undefined;
+				const dateTime = formatEventTime(event.startTime, event.endTime, tz);
+
+				void sendConfirmationReminderNotification({
+					eventTitle: event.title,
+					eventType: event.eventType,
+					dateTime,
+					location: event.location,
+					groupName: event.groupName,
+					recipient: {
+						email: attendee.email,
+						name: attendee.name,
+						notificationPreferences: attendee.notificationPreferences,
+					},
+					eventUrl,
+					preferencesUrl,
+				});
+			}
+
+			// Mark confirmation reminder as sent
+			await tx
+				.update(events)
+				.set({ confirmationReminderSentAt: new Date() })
+				.where(eq(events.id, event.id));
+
+			trackEvent("ConfirmationReminderSent", {
+				groupId: event.groupId,
+				eventId: event.id,
+				pendingAttendeeCount: String(pendingAttendees.length),
+			});
+
+			logger.info(
+				{ eventId: event.id, pendingAttendeeCount: pendingAttendees.length },
+				"Confirmation reminder emails queued for event",
 			);
 		}
 	});

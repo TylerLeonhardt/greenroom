@@ -176,6 +176,9 @@ export const events = pgTable(
 		createdFromRequestId: uuid("created_from_request_id").references(() => availabilityRequests.id),
 		callTime: timestamp("call_time", { withTimezone: true }),
 		reminderSentAt: timestamp("reminder_sent_at", { withTimezone: true }),
+		confirmationReminderSentAt: timestamp("confirmation_reminder_sent_at", {
+			withTimezone: true,
+		}),
 		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 		updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 	},
