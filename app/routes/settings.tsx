@@ -12,6 +12,7 @@ import { AlertTriangle, Globe, Save, User } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { CsrfInput } from "~/components/csrf-input";
 import { COMMON_TIMEZONES, getTimezoneLabel } from "~/components/timezone-selector";
+import { isValidTimezone } from "~/lib/date-utils";
 import { requireUser, updateUserName, updateUserTimezone } from "~/services/auth.server";
 import { validateCsrfToken } from "~/services/csrf.server";
 
@@ -48,11 +49,9 @@ export async function action({ request }: ActionFunctionArgs) {
 		if (typeof timezone !== "string" || !timezone.trim()) {
 			return { error: "Timezone is required." };
 		}
-		// Validate it's a real IANA timezone
-		try {
-			Intl.DateTimeFormat(undefined, { timeZone: timezone });
-		} catch {
-			return { error: "Invalid timezone." };
+		// Validate it's a real IANA timezone (rejects abbreviations like "PST", "EST")
+		if (!isValidTimezone(timezone.trim())) {
+			return { error: "Invalid timezone. Please select a valid IANA timezone." };
 		}
 		await updateUserTimezone(user.id, timezone.trim());
 		return { success: true, message: "Timezone updated!" };

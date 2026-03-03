@@ -10,7 +10,9 @@ import {
 	formatEventTime,
 	formatTime,
 	formatTimeRange,
+	isValidTimezone,
 	localTimeToUTC,
+	sanitizeTimezone,
 	utcToLocalParts,
 } from "./date-utils";
 
@@ -275,6 +277,79 @@ describe("date-utils", () => {
 			const parts = utcToLocalParts(original, tz);
 			expect(parts.date).toBe("2026-06-20");
 			expect(parts.time).toBe("08:15");
+		});
+	});
+
+	describe("isValidTimezone", () => {
+		it("accepts valid IANA timezones", () => {
+			expect(isValidTimezone("America/Los_Angeles")).toBe(true);
+			expect(isValidTimezone("America/New_York")).toBe(true);
+			expect(isValidTimezone("America/Chicago")).toBe(true);
+			expect(isValidTimezone("America/Denver")).toBe(true);
+			expect(isValidTimezone("Europe/London")).toBe(true);
+			expect(isValidTimezone("Asia/Tokyo")).toBe(true);
+			expect(isValidTimezone("Australia/Sydney")).toBe(true);
+			expect(isValidTimezone("Pacific/Auckland")).toBe(true);
+		});
+
+		it("accepts UTC", () => {
+			expect(isValidTimezone("UTC")).toBe(true);
+		});
+
+		it("rejects timezone abbreviations", () => {
+			expect(isValidTimezone("PST")).toBe(false);
+			expect(isValidTimezone("EST")).toBe(false);
+			expect(isValidTimezone("CST")).toBe(false);
+			expect(isValidTimezone("MST")).toBe(false);
+			expect(isValidTimezone("PDT")).toBe(false);
+			expect(isValidTimezone("EDT")).toBe(false);
+			expect(isValidTimezone("CDT")).toBe(false);
+			expect(isValidTimezone("MDT")).toBe(false);
+			expect(isValidTimezone("GMT")).toBe(false);
+		});
+
+		it("rejects empty or invalid input", () => {
+			expect(isValidTimezone("")).toBe(false);
+			expect(isValidTimezone("Not/A/Real/Timezone")).toBe(false);
+			expect(isValidTimezone("Foo/Bar")).toBe(false);
+		});
+	});
+
+	describe("sanitizeTimezone", () => {
+		it("returns valid IANA timezones unchanged", () => {
+			expect(sanitizeTimezone("America/Los_Angeles")).toBe("America/Los_Angeles");
+			expect(sanitizeTimezone("UTC")).toBe("UTC");
+			expect(sanitizeTimezone("Asia/Tokyo")).toBe("Asia/Tokyo");
+		});
+
+		it("returns undefined for invalid timezone abbreviations", () => {
+			expect(sanitizeTimezone("PST")).toBeUndefined();
+			expect(sanitizeTimezone("EST")).toBeUndefined();
+			expect(sanitizeTimezone("CST")).toBeUndefined();
+		});
+
+		it("returns undefined for null/undefined/empty input", () => {
+			expect(sanitizeTimezone(null)).toBeUndefined();
+			expect(sanitizeTimezone(undefined)).toBeUndefined();
+			expect(sanitizeTimezone("")).toBeUndefined();
+		});
+	});
+
+	describe("formatEventTime with invalid timezone", () => {
+		it("does not throw with invalid timezone abbreviation", () => {
+			const start = new Date("2026-03-04T19:00:00Z");
+			const end = new Date("2026-03-04T21:00:00Z");
+			// Should not throw — sanitizeTimezone strips the bad value
+			expect(() => formatEventTime(start, end, "PST")).not.toThrow();
+		});
+
+		it("produces consistent output with invalid timezone (falls back to server default)", () => {
+			const start = new Date("2026-03-04T19:00:00Z");
+			const end = new Date("2026-03-04T21:00:00Z");
+			const withPST = formatEventTime(start, end, "PST");
+			const withUndefined = formatEventTime(start, end, undefined);
+			// Both should produce the same result since "PST" gets sanitized to undefined
+			expect(withPST).toBe(withUndefined);
 		});
 	});
 });
