@@ -8,13 +8,14 @@ import {
 	Outlet,
 	Scripts,
 	ScrollRestoration,
+	useFetcher,
 	useLoaderData,
 	useLocation,
 	useNavigation,
 	useRouteError,
 } from "@remix-run/react";
 import { Menu, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CsrfInput } from "~/components/csrf-input";
 import { getOptionalUser } from "~/services/auth.server";
 import { generateCsrfToken } from "~/services/csrf.server";
@@ -217,6 +218,27 @@ function AppFooter() {
 	);
 }
 
+function TimezoneAutoDetect() {
+	const { user, csrfToken } = useLoaderData<typeof loader>();
+	const fetcher = useFetcher();
+	const submitted = useRef(false);
+
+	useEffect(() => {
+		if (user && !user.timezone && !submitted.current) {
+			submitted.current = true;
+			const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+			if (detected) {
+				const formData = new FormData();
+				formData.set("timezone", detected);
+				formData.set("_csrf", csrfToken ?? "");
+				fetcher.submit(formData, { method: "post", action: "/api/timezone" });
+			}
+		}
+	}, [user, csrfToken, fetcher]);
+
+	return null;
+}
+
 export default function App() {
 	const location = useLocation();
 	const isLanding = location.pathname === "/";
@@ -232,6 +254,7 @@ export default function App() {
 			<body className="min-h-screen bg-slate-50">
 				<LoadingBar />
 				<NavBar />
+				<TimezoneAutoDetect />
 				{isLanding ? (
 					<Outlet />
 				) : (

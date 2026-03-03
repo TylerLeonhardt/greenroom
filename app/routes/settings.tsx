@@ -1,15 +1,6 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
-import {
-	Form,
-	Link,
-	useActionData,
-	useLoaderData,
-	useNavigation,
-	useRouteLoaderData,
-	useSubmit,
-} from "@remix-run/react";
+import { Form, Link, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
 import { AlertTriangle, Globe, Save, User } from "lucide-react";
-import { useEffect, useRef } from "react";
 import { CsrfInput } from "~/components/csrf-input";
 import { COMMON_TIMEZONES, getTimezoneLabel } from "~/components/timezone-selector";
 import { isValidTimezone } from "~/lib/date-utils";
@@ -65,24 +56,6 @@ export default function Settings() {
 	const actionData = useActionData<typeof action>();
 	const navigation = useNavigation();
 	const isSubmitting = navigation.state === "submitting";
-	const submit = useSubmit();
-	const autoDetectDone = useRef(false);
-	const rootData = useRouteLoaderData("root") as { csrfToken?: string } | undefined;
-
-	// Auto-detect timezone on first visit if not set
-	useEffect(() => {
-		if (!user.timezone && !autoDetectDone.current) {
-			autoDetectDone.current = true;
-			const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
-			if (detected) {
-				const formData = new FormData();
-				formData.set("intent", "update-timezone");
-				formData.set("timezone", detected);
-				formData.set("_csrf", rootData?.csrfToken ?? "");
-				submit(formData, { method: "post" });
-			}
-		}
-	}, [user.timezone, submit, rootData?.csrfToken]);
 
 	return (
 		<div className="mx-auto max-w-2xl">
