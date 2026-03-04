@@ -395,6 +395,7 @@ describe("event detail action — assignment notifications", () => {
 				id: "user-2",
 				name: "New Performer",
 				email: "new@example.com",
+				timezone: "UTC",
 				notificationPreferences: {},
 			},
 		]);
@@ -424,7 +425,7 @@ describe("event detail action — assignment notifications", () => {
 				expect.objectContaining({
 					eventTitle: "Friday Show",
 					eventType: "show",
-					dateTime: "Sun, Mar 15 · 12:00 PM – 2:00 PM",
+					dateTime: "Sun, Mar 15 · 7:00 PM – 9:00 PM",
 					groupName: "Test Group",
 					recipient: expect.objectContaining({
 						email: "new@example.com",
