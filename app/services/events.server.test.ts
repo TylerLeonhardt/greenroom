@@ -47,6 +47,7 @@ const {
 	createEvent,
 	createEventsFromAvailability,
 	getGroupEvents,
+	getGroupEventSummaries,
 	getEventWithAssignments,
 	updateEvent,
 	deleteEvent,
@@ -323,6 +324,64 @@ describe("events.server", () => {
 			mockSelect.mockReturnValueOnce(chain);
 
 			const result = await getGroupEvents("group-nonexistent");
+			expect(result).toEqual([]);
+		});
+	});
+
+	// ============================================================
+	// getGroupEventSummaries
+	// ============================================================
+	describe("getGroupEventSummaries", () => {
+		it("returns lightweight event summaries ordered by startTime", async () => {
+			const summaries = [
+				{ id: "event-1", title: "Rehearsal", eventType: "rehearsal", startTime: now },
+				{
+					id: "event-2",
+					title: "Show",
+					eventType: "show",
+					startTime: new Date("2026-03-08T19:00:00Z"),
+				},
+			];
+			const chain = chainMock(summaries);
+			chain.from = vi.fn().mockReturnValue(chain);
+			chain.where = vi.fn().mockReturnValue(chain);
+			chain.orderBy = vi.fn().mockReturnValue(chain);
+			mockSelect.mockReturnValueOnce(chain);
+
+			const result = await getGroupEventSummaries("group-1", "event-1");
+
+			expect(mockSelect).toHaveBeenCalled();
+			expect(result).toEqual(summaries);
+			expect(result).toHaveLength(2);
+		});
+
+		it("selects only id, title, eventType, startTime fields", async () => {
+			const chain = chainMock([]);
+			chain.from = vi.fn().mockReturnValue(chain);
+			chain.where = vi.fn().mockReturnValue(chain);
+			chain.orderBy = vi.fn().mockReturnValue(chain);
+			mockSelect.mockReturnValueOnce(chain);
+
+			await getGroupEventSummaries("group-1", "event-1");
+
+			const selectArg = mockSelect.mock.calls.at(-1)?.[0];
+			expect(selectArg).toHaveProperty("id");
+			expect(selectArg).toHaveProperty("title");
+			expect(selectArg).toHaveProperty("eventType");
+			expect(selectArg).toHaveProperty("startTime");
+			// Should NOT include heavy fields
+			expect(selectArg).not.toHaveProperty("description");
+			expect(selectArg).not.toHaveProperty("assignmentCount");
+		});
+
+		it("returns empty array when no events match", async () => {
+			const chain = chainMock([]);
+			chain.from = vi.fn().mockReturnValue(chain);
+			chain.where = vi.fn().mockReturnValue(chain);
+			chain.orderBy = vi.fn().mockReturnValue(chain);
+			mockSelect.mockReturnValueOnce(chain);
+
+			const result = await getGroupEventSummaries("group-nonexistent", "event-99");
 			expect(result).toEqual([]);
 		});
 	});
