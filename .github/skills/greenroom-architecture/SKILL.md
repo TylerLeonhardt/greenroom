@@ -297,6 +297,27 @@ Admin view of aggregated availability results. Shows per-date scores with expand
 />
 ```
 
+### EventDateCarousel
+
+Horizontal scrolling carousel for navigating between events by date. Reusable in any context that needs event date navigation within a group. Lives in `app/components/event-date-carousel.tsx`.
+
+```tsx
+<EventDateCarousel
+  events={eventSummaries}   // Array<{ id, title, eventType, startTime }>
+  currentEventId={eventId}  // Highlights the active event
+  groupId={groupId}         // Used for building links
+  timezone={user.timezone}  // Optional IANA timezone for date formatting
+/>
+```
+
+Data is provided by `getGroupEventSummaries()` in `app/services/events.server.ts`, which returns lightweight event data (id, title, eventType, startTime) for up to 15 upcoming events plus the current event. This avoids loading full event details just for navigation.
+
+```typescript
+// In a loader:
+const eventSummaries = await getGroupEventSummaries(groupId, eventId);
+return { event, eventSummaries };
+```
+
 ## UI Styling Conventions
 
 - **Color palette:** Emerald (primary), Slate (neutral), Amber (warning), Rose/Red (error/danger), Purple (shows)

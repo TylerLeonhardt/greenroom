@@ -475,6 +475,69 @@ The email service never throws — it returns `{ success: boolean; error?: strin
 
 ---
 
+## Timezone-Aware Testing
+
+Tests that involve date/time formatting **must** explicitly control the timezone. Otherwise, tests pass locally (e.g., in Pacific time) but fail on CI (which typically runs in UTC).
+
+### The Problem
+
+```typescript
+// ❌ BAD: This test assumes the local timezone is America/Los_Angeles
+const mockMember = { id: "user-1", name: "Alice", timezone: null };
+// formatDateTime will use the runtime's default timezone — different on CI!
+expect(result).toContain("Wed, Mar 4 · 2:00 PM"); // Fails on UTC CI
+```
+
+### The Fix
+
+Always set `timezone` on mock objects that flow into date formatting, and expect UTC-formatted output:
+
+```typescript
+// ✅ GOOD: Explicit timezone makes the test deterministic
+const mockMember = {
+  id: "user-1",
+  name: "Alice",
+  timezone: "UTC", // Always set this in tests
+};
+
+// Now the expected output is stable across all environments
+expect(result).toContain("Wed, Mar 4 · 10:00 PM"); // UTC time — same everywhere
+```
+
+### Rules
+
+1. **Set `timezone: "UTC"` on all mock user/member objects** that are passed to functions which format dates
+2. **Use UTC-formatted expected values** in assertions — never hardcode a timezone-specific time like "2:00 PM" without knowing exactly which timezone produced it
+3. **If testing timezone conversion itself**, use two explicit timezones and assert the difference
+4. **Reference:** PR #106 fixed a CI failure caused by a test that assumed Pacific time — the test passed locally but failed in GitHub Actions (UTC)
+
+### Common Mock Pattern
+
+```typescript
+const mockMembers = [
+  {
+    id: "user-1",
+    name: "Test User",
+    email: "test@example.com",
+    timezone: "UTC",
+    notificationPreferences: null,
+  },
+];
+
+// When the service formats dates using member.timezone,
+// the output is now deterministic
+```
+
+### Functions That Need Timezone Awareness
+
+Any test calling these (directly or indirectly) needs timezone-controlled fixtures:
+- `formatDate()`, `formatTime()`, `formatDateTime()` from `~/lib/date-utils`
+- `formatEventTime()`, `formatTimeRange()` from `~/lib/date-utils`
+- Email notification senders that format per-recipient times (e.g., `sendEventCreatedNotification`)
+- Any loader/service that passes dates through formatting with a user's timezone
+
+---
+
 ## E2E Testing with Playwright
 
 My Call Time has the `playwright-cli` skill (`.github/skills/playwright-cli/`) for browser automation.
