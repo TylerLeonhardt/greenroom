@@ -1,4 +1,4 @@
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, or, sql } from "drizzle-orm";
 import { db } from "../../src/db/index.js";
 import {
 	availabilityRequests,
@@ -147,6 +147,40 @@ export async function getGroupEvents(
 		.from(events)
 		.where(and(...conditions))
 		.orderBy(events.startTime);
+
+	return rows;
+}
+
+// --- Summaries for carousel navigation ---
+
+export async function getGroupEventSummaries(
+	groupId: string,
+	currentEventId: string,
+	limit = 15,
+): Promise<
+	Array<{
+		id: string;
+		title: string;
+		eventType: string;
+		startTime: Date;
+	}>
+> {
+	const rows = await db
+		.select({
+			id: events.id,
+			title: events.title,
+			eventType: events.eventType,
+			startTime: events.startTime,
+		})
+		.from(events)
+		.where(
+			and(
+				eq(events.groupId, groupId),
+				or(gte(events.startTime, new Date()), eq(events.id, currentEventId)),
+			),
+		)
+		.orderBy(events.startTime)
+		.limit(limit);
 
 	return rows;
 }

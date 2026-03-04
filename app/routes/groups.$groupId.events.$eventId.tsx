@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { CsrfInput } from "~/components/csrf-input";
+import { EventDateCarousel } from "~/components/event-date-carousel";
 import { formatDateLong, formatEventTime, formatTime, utcToLocalParts } from "~/lib/date-utils";
 import { validateCsrfToken } from "~/services/csrf.server";
 import { sendEventAssignmentNotification } from "~/services/email.server";
@@ -36,6 +37,7 @@ import {
 	getAvailabilityForEventDate,
 	getAvailabilityRequestGroupId,
 	getEventWithAssignments,
+	getGroupEventSummaries,
 	removeAssignment,
 	updateAssignmentStatus,
 } from "~/services/events.server";
@@ -61,6 +63,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 	if (!data || data.event.groupId !== groupId) {
 		throw new Response("Not Found", { status: 404 });
 	}
+
+	const siblingEvents = await getGroupEventSummaries(groupId, eventId);
 
 	let members: Array<{
 		id: string;
@@ -94,6 +98,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 		userId: user.id,
 		members,
 		availabilityData,
+		siblingEvents,
 	};
 }
 
@@ -232,7 +237,7 @@ const STATUS_CONFIG: Record<string, { label: string; badgeClass: string }> = {
 };
 
 export default function EventDetail() {
-	const { event, assignments, isAdmin, userId, members, availabilityData } =
+	const { event, assignments, isAdmin, userId, members, availabilityData, siblingEvents } =
 		useLoaderData<typeof loader>();
 	const { groupId } = useParams();
 	const parentData = useRouteLoaderData<typeof groupLayoutLoader>("routes/groups.$groupId");
@@ -299,6 +304,15 @@ export default function EventDetail() {
 					<ArrowLeft className="h-3.5 w-3.5" />
 					Back to Events
 				</Link>
+
+				{/* Event Date Carousel */}
+				<EventDateCarousel
+					events={siblingEvents}
+					currentEventId={event.id}
+					groupId={groupId ?? ""}
+					timezone={timezone}
+				/>
+
 				<div className="mt-2 flex items-start justify-between gap-4">
 					<div>
 						<div className="flex items-center gap-2">

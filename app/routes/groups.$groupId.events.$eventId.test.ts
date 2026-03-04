@@ -29,6 +29,7 @@ vi.mock("~/services/groups.server", () => ({
 // Mock events service
 vi.mock("~/services/events.server", () => ({
 	getEventWithAssignments: vi.fn(),
+	getGroupEventSummaries: vi.fn().mockResolvedValue([]),
 	assignToEvent: vi.fn(),
 	updateAssignmentStatus: vi.fn(),
 	removeAssignment: vi.fn(),
