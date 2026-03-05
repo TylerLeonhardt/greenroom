@@ -469,6 +469,7 @@ Production telemetry is powered by Azure Application Insights, initialized in `a
 - **Auto-instrumentation:** The `applicationinsights` SDK is imported at the very top of `app/entry.server.tsx` (before all other imports) so it can patch Node.js modules for automatic request, exception, dependency, and performance tracking.
 - **Graceful degradation:** If `APPLICATIONINSIGHTS_CONNECTION_STRING` is not set, telemetry is a no-op — the app runs normally without any monitoring overhead.
 - **Custom email telemetry:** `sendEmail()` in `app/services/email.server.ts` tracks `EmailSent` events (with success/failure) and exceptions via `getTelemetryClient()`.
+- **Client-error success override:** A telemetry processor marks all responses with status < 500 as `success = true` so client errors (4xx — bot-scanner 404s, auth 401/403s, rate-limit 429s, etc.) don't inflate the `requests/failed` metric or trigger error-rate alerts.
 
 ### Azure Resources
 
@@ -485,6 +486,7 @@ Production telemetry is powered by Azure Application Insights, initialized in `a
 |-------|------|-----------|----------|--------|
 | `mycalltime-exception-spike` | Scheduled Query | >5 exceptions in 5 min | Sev 1 | 5 min |
 | `mycalltime-slow-response` | Metric | Avg response time >5s | Sev 2 | 5 min |
+| `mycalltime-high-error-rate` | Metric | >5 failed requests in 5 min (5xx only) | Sev 2 | 5 min |
 | `mycalltime-availability-alert` | Webtest Availability | ≥2 locations fail | Sev 1 | 3 min |
 
 All alerts notify the `mycalltime-alerts` action group (tylerl0706@gmail.com).

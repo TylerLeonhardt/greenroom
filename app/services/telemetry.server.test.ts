@@ -44,6 +44,7 @@ describe("telemetry.server", () => {
 				}),
 				defaultClient: {
 					trackEvent: mockTrackEvent,
+					addTelemetryProcessor: vi.fn(),
 					context: { tags: {}, keys: { cloudRole: "cloudRole" } },
 				},
 			},
@@ -57,5 +58,76 @@ describe("telemetry.server", () => {
 			name: "UserCreated",
 			properties: { method: "email" },
 		});
+	});
+
+	it("registers a telemetry processor that marks client errors (4xx) as successful", async () => {
+		const processors: Array<(envelope: unknown) => boolean> = [];
+		vi.doMock("applicationinsights", () => ({
+			default: {
+				setup: vi.fn().mockReturnValue({
+					setAutoCollectRequests: vi.fn().mockReturnValue({
+						setAutoCollectExceptions: vi.fn().mockReturnValue({
+							setAutoCollectDependencies: vi.fn().mockReturnValue({
+								setAutoCollectPerformance: vi.fn().mockReturnValue({
+									setSendLiveMetrics: vi.fn().mockReturnValue({
+										start: vi.fn(),
+									}),
+								}),
+							}),
+						}),
+					}),
+				}),
+				defaultClient: {
+					trackEvent: vi.fn(),
+					addTelemetryProcessor: vi.fn((fn: (envelope: unknown) => boolean) => processors.push(fn)),
+					context: { tags: {}, keys: { cloudRole: "cloudRole" } },
+				},
+			},
+		}));
+
+		vi.stubEnv("APPLICATIONINSIGHTS_CONNECTION_STRING", "InstrumentationKey=test-key");
+		await import("./telemetry.server");
+
+		expect(processors).toHaveLength(1);
+		const processor = processors[0];
+
+		// 404 (Not Found) should be marked as successful
+		const envelope404 = {
+			data: { baseData: { responseCode: "404", success: false } },
+		};
+		expect(processor(envelope404)).toBe(true);
+		expect(envelope404.data.baseData.success).toBe(true);
+
+		// 405 (Method Not Allowed) should be marked as successful
+		const envelope405 = {
+			data: { baseData: { responseCode: "405", success: false } },
+		};
+		expect(processor(envelope405)).toBe(true);
+		expect(envelope405.data.baseData.success).toBe(true);
+
+		// 429 (Too Many Requests) should be marked as successful
+		const envelope429 = {
+			data: { baseData: { responseCode: "429", success: false } },
+		};
+		expect(processor(envelope429)).toBe(true);
+		expect(envelope429.data.baseData.success).toBe(true);
+
+		// 500 (Server Error) should remain unchanged
+		const envelope500 = {
+			data: { baseData: { responseCode: "500", success: false } },
+		};
+		expect(processor(envelope500)).toBe(true);
+		expect(envelope500.data.baseData.success).toBe(false);
+
+		// 200 (OK) should remain successful
+		const envelope200 = {
+			data: { baseData: { responseCode: "200", success: true } },
+		};
+		expect(processor(envelope200)).toBe(true);
+		expect(envelope200.data.baseData.success).toBe(true);
+
+		// Envelope without baseData should not crash
+		const envelopeEmpty = { data: {} };
+		expect(processor(envelopeEmpty)).toBe(true);
 	});
 });

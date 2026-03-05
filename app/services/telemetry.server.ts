@@ -16,6 +16,22 @@ if (connectionString) {
 	appInsights.defaultClient.context.tags[appInsights.defaultClient.context.keys.cloudRole] =
 		"mycalltime";
 
+	// Mark all client-error responses (4xx) as successful so they don't inflate the
+	// requests/failed metric. Bot scanners, auth challenges, and rate-limit responses
+	// are client errors, not server failures, and shouldn't trigger error-rate alerts.
+	appInsights.defaultClient.addTelemetryProcessor((envelope) => {
+		if (envelope.data?.baseData) {
+			const code = parseInt(
+				(envelope.data.baseData as { responseCode?: string }).responseCode ?? "",
+				10,
+			);
+			if (!isNaN(code) && code < 500) {
+				(envelope.data.baseData as { success?: boolean }).success = true;
+			}
+		}
+		return true;
+	});
+
 	logger.info("Application Insights initialized");
 }
 
