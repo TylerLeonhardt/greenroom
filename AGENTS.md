@@ -469,7 +469,7 @@ Production telemetry is powered by Azure Application Insights, initialized in `a
 - **Auto-instrumentation:** The `applicationinsights` SDK is imported at the very top of `app/entry.server.tsx` (before all other imports) so it can patch Node.js modules for automatic request, exception, dependency, and performance tracking.
 - **Graceful degradation:** If `APPLICATIONINSIGHTS_CONNECTION_STRING` is not set, telemetry is a no-op — the app runs normally without any monitoring overhead.
 - **Custom email telemetry:** `sendEmail()` in `app/services/email.server.ts` tracks `EmailSent` events (with success/failure) and exceptions via `getTelemetryClient()`.
-- **404 success override:** A telemetry processor marks 404 responses as `success = true` so bot-scanner 404s don't inflate the `requests/failed` metric or trigger error-rate alerts.
+- **Client-error success override:** A telemetry processor marks all responses with status < 500 as `success = true` so client errors (4xx — bot-scanner 404s, auth 401/403s, rate-limit 429s, etc.) don't inflate the `requests/failed` metric or trigger error-rate alerts.
 
 ### Azure Resources
 

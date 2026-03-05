@@ -16,14 +16,18 @@ if (connectionString) {
 	appInsights.defaultClient.context.tags[appInsights.defaultClient.context.keys.cloudRole] =
 		"mycalltime";
 
-	// Mark 404 responses as successful so they don't inflate the requests/failed metric.
-	// Bot scanners generate many 404s which trigger false-positive error-rate alerts.
+	// Mark all client-error responses (4xx) as successful so they don't inflate the
+	// requests/failed metric. Bot scanners, auth challenges, and rate-limit responses
+	// are client errors, not server failures, and shouldn't trigger error-rate alerts.
 	appInsights.defaultClient.addTelemetryProcessor((envelope) => {
-		if (
-			envelope.data?.baseData &&
-			(envelope.data.baseData as { responseCode?: string }).responseCode === "404"
-		) {
-			(envelope.data.baseData as { success?: boolean }).success = true;
+		if (envelope.data?.baseData) {
+			const code = parseInt(
+				(envelope.data.baseData as { responseCode?: string }).responseCode ?? "",
+				10,
+			);
+			if (!isNaN(code) && code < 500) {
+				(envelope.data.baseData as { success?: boolean }).success = true;
+			}
 		}
 		return true;
 	});

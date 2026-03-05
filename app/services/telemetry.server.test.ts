@@ -60,7 +60,7 @@ describe("telemetry.server", () => {
 		});
 	});
 
-	it("registers a telemetry processor that marks 404s as successful", async () => {
+	it("registers a telemetry processor that marks client errors (4xx) as successful", async () => {
 		const processors: Array<(envelope: unknown) => boolean> = [];
 		vi.doMock("applicationinsights", () => ({
 			default: {
@@ -91,21 +91,35 @@ describe("telemetry.server", () => {
 		expect(processors).toHaveLength(1);
 		const processor = processors[0];
 
-		// 404 request should be marked as successful
+		// 404 (Not Found) should be marked as successful
 		const envelope404 = {
 			data: { baseData: { responseCode: "404", success: false } },
 		};
 		expect(processor(envelope404)).toBe(true);
 		expect(envelope404.data.baseData.success).toBe(true);
 
-		// 500 request should remain unchanged
+		// 405 (Method Not Allowed) should be marked as successful
+		const envelope405 = {
+			data: { baseData: { responseCode: "405", success: false } },
+		};
+		expect(processor(envelope405)).toBe(true);
+		expect(envelope405.data.baseData.success).toBe(true);
+
+		// 429 (Too Many Requests) should be marked as successful
+		const envelope429 = {
+			data: { baseData: { responseCode: "429", success: false } },
+		};
+		expect(processor(envelope429)).toBe(true);
+		expect(envelope429.data.baseData.success).toBe(true);
+
+		// 500 (Server Error) should remain unchanged
 		const envelope500 = {
 			data: { baseData: { responseCode: "500", success: false } },
 		};
 		expect(processor(envelope500)).toBe(true);
 		expect(envelope500.data.baseData.success).toBe(false);
 
-		// 200 request should remain unchanged
+		// 200 (OK) should remain successful
 		const envelope200 = {
 			data: { baseData: { responseCode: "200", success: true } },
 		};
