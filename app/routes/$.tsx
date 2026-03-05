@@ -1,9 +1,17 @@
-import type { MetaFunction } from "@remix-run/node";
+import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { Link } from "@remix-run/react";
 
 export const meta: MetaFunction = () => {
 	return [{ title: "Page Not Found — My Call Time" }];
 };
+
+export function loader(_args: LoaderFunctionArgs) {
+	throw new Response("Not Found", { status: 404, statusText: "Not Found" });
+}
+
+export function action(_args: ActionFunctionArgs) {
+	throw new Response("Method Not Allowed", { status: 405, statusText: "Method Not Allowed" });
+}
 
 export default function CatchAll() {
 	return (
