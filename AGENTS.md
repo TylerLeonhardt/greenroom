@@ -488,10 +488,11 @@ Production telemetry is powered by Azure Application Insights, initialized in `a
 | `mycalltime-slow-response` | Metric | Avg response time >5s | Sev 2 | 5 min |
 | `mycalltime-high-error-rate` | Metric | >5 failed requests in 5 min (5xx only) | Sev 2 | 5 min |
 | `mycalltime-availability-alert` | Webtest Availability | ≥2 locations fail | Sev 2 | 5 min |
+| `mycalltime-app-unhealthy` | Metric | Availability <95% | Sev 2 | 5 min |
 
 All alerts notify the `mycalltime-alerts` action group (tylerl0706@gmail.com).
 
-The **availability test** (`mycalltime-health-ping`) pings `https://mycalltime.app/api/health` every 5 minutes from 5 locations (US East, US West, North Central US, UK, Netherlands). It validates HTTP 200 and SSL certificate validity (7-day expiry warning).
+The **availability test** (`mycalltime-health-ping`) pings `https://mycalltime.app/api/health` every 5 minutes from 3 US locations (East US, West US, North Central US). EU locations were removed because the Container Apps environment returns 403 to non-US IPs. It validates HTTP 200 and SSL certificate validity (7-day expiry warning).
 
 ```bash
 # List alert rules
