@@ -69,8 +69,12 @@ const NOTIFICATION_CATEGORIES = [
 	},
 	{
 		key: "showReminders" as const,
-		label: "Show reminders",
-		description: "Get reminder emails before events you're confirmed for",
+		label: "Event reminders",
+		description: "Get reminder emails before upcoming events:",
+		details: [
+			"48 hours before — a confirmation nudge if you haven't confirmed yet",
+			"24 hours before — a reminder for events you've confirmed",
+		],
 	},
 ];
 
@@ -105,13 +109,20 @@ export default function GroupNotifications() {
 					<input type="hidden" name="intent" value="update-preferences" />
 					<div className="space-y-4">
 						{NOTIFICATION_CATEGORIES.map((category) => (
-							<label
-								key={category.key}
-								className="flex items-start justify-between gap-3 sm:items-center sm:gap-4"
-							>
+							<label key={category.key} className="flex items-start justify-between gap-3 sm:gap-4">
 								<div className="min-w-0">
 									<span className="text-sm font-medium text-slate-700">{category.label}</span>
 									<p className="text-xs text-slate-500">{category.description}</p>
+									{"details" in category && category.details && (
+										<ul className="mt-1 space-y-0.5 text-xs text-slate-500">
+											{category.details.map((detail) => (
+												<li key={detail} className="flex gap-1.5">
+													<span className="select-none">•</span>
+													<span>{detail}</span>
+												</li>
+											))}
+										</ul>
+									)}
 								</div>
 								<input
 									type="checkbox"
