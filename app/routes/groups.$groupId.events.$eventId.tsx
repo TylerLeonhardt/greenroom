@@ -263,6 +263,7 @@ export default function EventDetail() {
 		: assignments;
 	const canSelfRegister = !myAssignment && !isAdmin;
 	const canDelete = isAdmin || event.createdById === userId;
+	const canEdit = isAdmin || event.createdById === userId;
 	const confirmedCount = assignments.filter((a) => a.status === "confirmed").length;
 
 	const dateStr = formatDateLong(event.startTime, timezone);
@@ -332,7 +333,7 @@ export default function EventDetail() {
 						>
 							<Download className="h-3.5 w-3.5" /> Add to Calendar
 						</a>
-						{isAdmin && (
+						{canEdit && (
 							<Link
 								to={`/groups/${groupId}/events/${event.id}/edit`}
 								className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"

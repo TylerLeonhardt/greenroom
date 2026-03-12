@@ -8,7 +8,7 @@ import {
 	useNavigation,
 	useRouteLoaderData,
 } from "@remix-run/react";
-import { ArrowLeft, Clock, Lock, LockOpen, Trash2, Users } from "lucide-react";
+import { ArrowLeft, Clock, Lock, LockOpen, Pencil, Trash2, Users } from "lucide-react";
 import { useState } from "react";
 import { AvailabilityGrid } from "~/components/availability-grid";
 import { CsrfInput } from "~/components/csrf-input";
@@ -143,6 +143,7 @@ export default function AvailabilityRequestDetail() {
 	const timeRange = formatTimeRange(availRequest.requestedStartTime, availRequest.requestedEndTime);
 	const hasTimeRange = timeRange !== "All day";
 	const canDelete = isAdmin || availRequest.createdById === user.id;
+	const canEdit = isAdmin || availRequest.createdById === user.id;
 
 	return (
 		<div className="max-w-4xl">
@@ -192,22 +193,32 @@ export default function AvailabilityRequestDetail() {
 							)}
 						</div>
 					</div>
-					{isAdmin && (
-						<Form method="post">
-							<CsrfInput />
-							<input type="hidden" name="intent" value={isClosed ? "reopen" : "close"} />
-							<button
-								type="submit"
-								className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-									isClosed
-										? "border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-										: "border-slate-300 text-slate-600 hover:bg-slate-50"
-								}`}
+					<div className="flex items-center gap-2">
+						{canEdit && (
+							<Link
+								to={`/groups/${availRequest.groupId}/availability/${availRequest.id}/edit`}
+								className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
 							>
-								{isClosed ? "Reopen Request" : "Close Request"}
-							</button>
-						</Form>
-					)}
+								<Pencil className="h-3.5 w-3.5" /> Edit
+							</Link>
+						)}
+						{isAdmin && (
+							<Form method="post">
+								<CsrfInput />
+								<input type="hidden" name="intent" value={isClosed ? "reopen" : "close"} />
+								<button
+									type="submit"
+									className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+										isClosed
+											? "border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+											: "border-slate-300 text-slate-600 hover:bg-slate-50"
+									}`}
+								>
+									{isClosed ? "Reopen Request" : "Close Request"}
+								</button>
+							</Form>
+						)}
+					</div>
 				</div>
 			</div>
 

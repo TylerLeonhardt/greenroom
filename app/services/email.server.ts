@@ -541,3 +541,183 @@ ${ctaButton(options.eventUrl, "Confirm Attendance")}
 		text,
 	});
 }
+
+// --- Edit Notification Senders ---
+
+function changesList(changes: string[]): string {
+	if (changes.length === 0) return "";
+	const items = changes
+		.map((c) => `<li style="margin:4px 0;color:#475569;">${escapeHtml(c)}</li>`)
+		.join("\n");
+	return `<ul style="padding-left:20px;margin:12px 0;">\n${items}\n</ul>`;
+}
+
+function changesText(changes: string[]): string {
+	return changes.map((c) => `• ${c}`).join("\n");
+}
+
+export async function sendEventEditedNotification(options: {
+	eventTitle: string;
+	eventType: string;
+	startTime: string | Date;
+	endTime: string | Date;
+	location?: string | null;
+	groupName: string;
+	changes: string[];
+	recipients: Array<{
+		email: string;
+		name: string;
+		timezone?: string | null;
+		notificationPreferences?: NotificationPreferences;
+	}>;
+	eventUrl: string;
+	preferencesUrl?: string;
+}): Promise<void> {
+	const typeEmoji =
+		options.eventType === "show" ? "🎭" : options.eventType === "rehearsal" ? "🎯" : "📅";
+	const changesHtml = changesList(options.changes);
+	const changesPlain = changesText(options.changes);
+
+	for (const recipient of options.recipients) {
+		const prefs = mergeWithDefaults(recipient.notificationPreferences);
+		if (!prefs.eventNotifications.email) continue;
+
+		const dateTime = formatEventTime(
+			options.startTime,
+			options.endTime,
+			recipient.timezone ?? undefined,
+		);
+
+		const html = emailLayout(
+			`
+<h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0f172a;">Event Updated</h2>
+<p style="color:#475569;margin:0 0 12px;">Hi ${escapeHtml(recipient.name)}, an event in your group has been updated.</p>
+${infoCard([
+	`<p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0f172a;">${typeEmoji} ${escapeHtml(options.eventTitle)}</p>`,
+	`<p style="margin:0 0 4px;font-size:13px;color:#475569;">${escapeHtml(options.groupName)} · ${escapeHtml(dateTime)}</p>`,
+	options.location
+		? `<p style="margin:0;font-size:13px;color:#475569;">📍 ${escapeHtml(options.location)}</p>`
+		: "",
+])}
+<p style="color:#475569;font-weight:600;margin:16px 0 4px;">What changed:</p>
+${changesHtml}
+${ctaButton(options.eventUrl, "View Updated Event")}`,
+			{ preferencesUrl: options.preferencesUrl },
+		);
+
+		const text = `Hi ${recipient.name},\n\nAn event in your group has been updated.\n\nEvent: ${options.eventTitle}\nGroup: ${options.groupName}\nWhen: ${dateTime}${options.location ? `\nWhere: ${options.location}` : ""}\n\nWhat changed:\n${changesPlain}\n\nView details: ${options.eventUrl}`;
+
+		void sendEmail({
+			to: recipient.email,
+			subject: `✏️ "${options.eventTitle}" updated — ${options.groupName}`,
+			html,
+			text,
+		});
+	}
+}
+
+export async function sendEventReconfirmationNotification(options: {
+	eventTitle: string;
+	eventType: string;
+	startTime: string | Date;
+	endTime: string | Date;
+	location?: string | null;
+	groupName: string;
+	changes: string[];
+	recipients: Array<{
+		email: string;
+		name: string;
+		timezone?: string | null;
+		notificationPreferences?: NotificationPreferences;
+	}>;
+	eventUrl: string;
+	preferencesUrl?: string;
+}): Promise<void> {
+	const typeEmoji =
+		options.eventType === "show" ? "🎭" : options.eventType === "rehearsal" ? "🎯" : "📅";
+	const changesHtml = changesList(options.changes);
+	const changesPlain = changesText(options.changes);
+
+	for (const recipient of options.recipients) {
+		const prefs = mergeWithDefaults(recipient.notificationPreferences);
+		if (!prefs.eventNotifications.email) continue;
+
+		const dateTime = formatEventTime(
+			options.startTime,
+			options.endTime,
+			recipient.timezone ?? undefined,
+		);
+
+		const html = emailLayout(
+			`
+<h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0f172a;">Please Re-confirm Your Attendance</h2>
+<p style="color:#475569;margin:0 0 12px;">Hi ${escapeHtml(recipient.name)}, an event has been updated and your confirmation has been reset.</p>
+${infoCard([
+	`<p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0f172a;">${typeEmoji} ${escapeHtml(options.eventTitle)}</p>`,
+	`<p style="margin:0 0 4px;font-size:13px;color:#475569;">${escapeHtml(options.groupName)} · ${escapeHtml(dateTime)}</p>`,
+	options.location
+		? `<p style="margin:0;font-size:13px;color:#475569;">📍 ${escapeHtml(options.location)}</p>`
+		: "",
+])}
+<p style="color:#475569;font-weight:600;margin:16px 0 4px;">What changed:</p>
+${changesHtml}
+${ctaButton(options.eventUrl, "Confirm Attendance")}
+<p style="color:#64748b;font-size:13px;margin:0;">Please confirm or decline so your group knows who's coming.</p>`,
+			{ preferencesUrl: options.preferencesUrl },
+		);
+
+		const text = `Hi ${recipient.name},\n\nAn event has been updated and your confirmation has been reset. Please re-confirm.\n\nEvent: ${options.eventTitle}\nGroup: ${options.groupName}\nWhen: ${dateTime}${options.location ? `\nWhere: ${options.location}` : ""}\n\nWhat changed:\n${changesPlain}\n\nConfirm your attendance: ${options.eventUrl}`;
+
+		void sendEmail({
+			to: recipient.email,
+			subject: `🔄 "${options.eventTitle}" updated — please re-confirm`,
+			html,
+			text,
+		});
+	}
+}
+
+export async function sendAvailabilityRequestEditedNotification(options: {
+	requestTitle: string;
+	groupName: string;
+	changes: string[];
+	recipients: Array<{
+		email: string;
+		name: string;
+		notificationPreferences?: NotificationPreferences;
+	}>;
+	requestUrl: string;
+	preferencesUrl?: string;
+}): Promise<void> {
+	const changesHtml = changesList(options.changes);
+	const changesPlain = changesText(options.changes);
+
+	for (const recipient of options.recipients) {
+		const prefs = mergeWithDefaults(recipient.notificationPreferences);
+		if (!prefs.availabilityRequests.email) continue;
+
+		const html = emailLayout(
+			`
+<h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0f172a;">Availability Request Updated</h2>
+<p style="color:#475569;margin:0 0 12px;">Hi ${escapeHtml(recipient.name)}, an availability request has been updated.</p>
+${infoCard([
+	`<p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0f172a;">📋 ${escapeHtml(options.requestTitle)}</p>`,
+	`<p style="margin:0;font-size:13px;color:#475569;">${escapeHtml(options.groupName)}</p>`,
+])}
+<p style="color:#475569;font-weight:600;margin:16px 0 4px;">What changed:</p>
+${changesHtml}
+${ctaButton(options.requestUrl, "View Updated Request")}
+<p style="color:#64748b;font-size:13px;margin:0;">You may want to review and update your response.</p>`,
+			{ preferencesUrl: options.preferencesUrl },
+		);
+
+		const text = `Hi ${recipient.name},\n\nAn availability request has been updated.\n\nRequest: ${options.requestTitle}\nGroup: ${options.groupName}\n\nWhat changed:\n${changesPlain}\n\nView updated request: ${options.requestUrl}`;
+
+		void sendEmail({
+			to: recipient.email,
+			subject: `✏️ "${options.requestTitle}" updated — ${options.groupName}`,
+			html,
+			text,
+		});
+	}
+}
