@@ -51,7 +51,13 @@ export function getTimezoneLabel(tz: string): string {
  * Inline timezone indicator with dropdown to change.
  * Saves to user profile via /settings action using useFetcher.
  */
-export function InlineTimezoneSelector({ timezone }: { timezone: string | null }) {
+export function InlineTimezoneSelector({
+	timezone,
+	onChange,
+}: {
+	timezone: string | null;
+	onChange?: (tz: string) => void;
+}) {
 	const fetcher = useFetcher();
 	const [isEditing, setIsEditing] = useState(false);
 	const selectRef = useRef<HTMLSelectElement>(null);
@@ -70,6 +76,7 @@ export function InlineTimezoneSelector({ timezone }: { timezone: string | null }
 			{ method: "post", action: "/settings" },
 		);
 		setIsEditing(false);
+		onChange?.(newTimezone);
 	};
 
 	return (

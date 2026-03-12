@@ -27,6 +27,7 @@ export async function createEvent(data: {
 	createdById: string;
 	createdFromRequestId?: string;
 	callTime?: Date;
+	timezone?: string;
 }): Promise<Event> {
 	const [event] = await db
 		.insert(events)
@@ -41,6 +42,7 @@ export async function createEvent(data: {
 			createdById: data.createdById,
 			createdFromRequestId: data.createdFromRequestId ?? null,
 			callTime: data.callTime ?? null,
+			timezone: data.timezone ?? "America/Los_Angeles",
 		})
 		.returning();
 	if (!event) throw new Error("Failed to create event.");
@@ -74,6 +76,7 @@ export async function createEventsFromAvailability(data: {
 			location: data.location,
 			createdById: data.createdById,
 			createdFromRequestId: data.requestId,
+			timezone: data.timezone ?? undefined,
 		});
 
 		if (data.autoAssignAvailable) {
@@ -131,6 +134,7 @@ export async function getGroupEvents(
 			createdById: events.createdById,
 			createdFromRequestId: events.createdFromRequestId,
 			callTime: events.callTime,
+			timezone: events.timezone,
 			reminderSentAt: events.reminderSentAt,
 			confirmationReminderSentAt: events.confirmationReminderSentAt,
 			createdAt: events.createdAt,
@@ -210,6 +214,7 @@ export async function getEventWithAssignments(eventId: string): Promise<{
 			createdById: events.createdById,
 			createdFromRequestId: events.createdFromRequestId,
 			callTime: events.callTime,
+			timezone: events.timezone,
 			reminderSentAt: events.reminderSentAt,
 			confirmationReminderSentAt: events.confirmationReminderSentAt,
 			createdAt: events.createdAt,
@@ -261,6 +266,7 @@ export async function updateEvent(
 		endTime: Date;
 		location: string;
 		callTime: Date | null;
+		timezone: string;
 	}>,
 ): Promise<Event> {
 	const [updated] = await db
@@ -275,6 +281,7 @@ export async function updateEvent(
 			...(data.endTime !== undefined ? { endTime: data.endTime } : {}),
 			...(data.location !== undefined ? { location: data.location.trim() || null } : {}),
 			...(data.callTime !== undefined ? { callTime: data.callTime } : {}),
+			...(data.timezone !== undefined ? { timezone: data.timezone } : {}),
 			// Reset reminders when event is rescheduled so new reminders are sent
 			...(data.startTime !== undefined
 				? { reminderSentAt: null, confirmationReminderSentAt: null }
@@ -362,6 +369,7 @@ export async function getUserUpcomingEvents(
 			createdById: events.createdById,
 			createdFromRequestId: events.createdFromRequestId,
 			callTime: events.callTime,
+			timezone: events.timezone,
 			reminderSentAt: events.reminderSentAt,
 			confirmationReminderSentAt: events.confirmationReminderSentAt,
 			createdAt: events.createdAt,

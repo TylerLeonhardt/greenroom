@@ -83,13 +83,12 @@ export async function processReminders(): Promise<void> {
 				endTime: events.endTime,
 				location: events.location,
 				callTime: events.callTime,
+				timezone: events.timezone,
 				groupName: groups.name,
 				webhookUrl: groups.webhookUrl,
-				creatorTimezone: users.timezone,
 			})
 			.from(events)
 			.innerJoin(groups, eq(events.groupId, groups.id))
-			.leftJoin(users, eq(events.createdById, users.id))
 			.where(
 				and(
 					isNull(events.reminderSentAt),
@@ -163,8 +162,7 @@ export async function processReminders(): Promise<void> {
 
 			// Fire-and-forget Discord webhook (one message per event, not per attendee)
 			if (event.webhookUrl) {
-				// Use event creator's timezone, falling back to first attendee's timezone
-				const webhookTz = event.creatorTimezone ?? attendees[0]?.timezone ?? undefined;
+				const webhookTz = event.timezone ?? undefined;
 				const webhookDateTime = formatEventTime(event.startTime, event.endTime, webhookTz);
 				const tzAbbrev = getTimezoneAbbreviation(event.startTime, webhookTz);
 				sendEventReminderWebhook(event.webhookUrl, {

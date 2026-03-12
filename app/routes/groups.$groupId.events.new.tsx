@@ -78,6 +78,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	const fromRequestId = formData.get("fromRequestId");
 	const callTime = formData.get("callTime");
 	const performerIds = formData.getAll("performerIds");
+	const formTimezone = formData.get("timezone");
+	const timezone =
+		typeof formTimezone === "string" && formTimezone ? formTimezone : (user.timezone ?? undefined);
 
 	if (typeof title !== "string" || !title.trim()) {
 		return { error: "Title is required." };
@@ -119,13 +122,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		title: title.trim(),
 		description: typeof description === "string" ? description.trim() || undefined : undefined,
 		eventType: eventType as "rehearsal" | "show" | "other",
-		startTime: localTimeToUTC(date, startTime, user.timezone),
-		endTime: localTimeToUTC(date, endTime, user.timezone),
+		startTime: localTimeToUTC(date, startTime, timezone),
+		endTime: localTimeToUTC(date, endTime, timezone),
 		location: typeof location === "string" ? location.trim() || undefined : undefined,
 		createdById: user.id,
 		createdFromRequestId:
 			typeof fromRequestId === "string" && fromRequestId ? fromRequestId : undefined,
-		callTime: hasCallTime ? localTimeToUTC(date, callTime.trim(), user.timezone) : undefined,
+		callTime: hasCallTime ? localTimeToUTC(date, callTime.trim(), timezone) : undefined,
+		timezone,
 	});
 
 	// Assign performers for show events
@@ -255,7 +259,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
 		// Fire-and-forget Discord webhook
 		if (groupData.group.webhookUrl) {
-			const tz = user.timezone ?? undefined;
+			const tz = event.timezone ?? undefined;
 			const webhookDateTime = formatEventTime(event.startTime, event.endTime, tz);
 			const tzAbbrev = getTimezoneAbbreviation(event.startTime, tz);
 			sendEventCreatedWebhook(groupData.group.webhookUrl, {
@@ -281,6 +285,9 @@ export default function NewEvent() {
 	const isSubmitting = navigation.state === "submitting";
 
 	const [eventType, setEventType] = useState("rehearsal");
+	const [timezone, setTimezone] = useState(
+		() => userTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
+	);
 	const [selectedPerformers, setSelectedPerformers] = useState<Set<string>>(() => {
 		// Pre-select available members when creating from availability
 		if (availabilityData.length > 0) {
@@ -411,7 +418,8 @@ export default function NewEvent() {
 				<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
 					<h3 className="mb-4 text-sm font-semibold text-slate-900">Date & Time</h3>
 					<div className="mb-4">
-						<InlineTimezoneSelector timezone={userTimezone} />
+						<InlineTimezoneSelector timezone={timezone} onChange={setTimezone} />
+						<input type="hidden" name="timezone" value={timezone} />
 					</div>
 					<div className="grid gap-4 sm:grid-cols-3">
 						<div>

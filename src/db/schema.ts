@@ -176,6 +176,7 @@ export const events = pgTable(
 		createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
 		createdFromRequestId: uuid("created_from_request_id").references(() => availabilityRequests.id),
 		callTime: timestamp("call_time", { withTimezone: true }),
+		timezone: varchar("timezone", { length: 100 }).default("America/Los_Angeles").notNull(),
 		reminderSentAt: timestamp("reminder_sent_at", { withTimezone: true }),
 		confirmationReminderSentAt: timestamp("confirmation_reminder_sent_at", {
 			withTimezone: true,
