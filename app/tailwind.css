@@ -1,1 +1,20 @@
 @import "tailwindcss";
+
+@theme {
+	--animate-copy-success: copy-success 0.35s ease-out;
+}
+
+@keyframes copy-success {
+	0% {
+		transform: scale(1);
+	}
+	25% {
+		transform: scale(0.92);
+	}
+	65% {
+		transform: scale(1.07);
+	}
+	100% {
+		transform: scale(1);
+	}
+}

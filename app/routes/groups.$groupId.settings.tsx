@@ -2,6 +2,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
 import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
 import { useState } from "react";
+import { CopyButton } from "~/components/copy-button";
 import { CsrfInput } from "~/components/csrf-input";
 import { validateCsrfToken } from "~/services/csrf.server";
 import {
@@ -252,13 +253,9 @@ export default function GroupSettings() {
 						<code className="flex-1 rounded-lg bg-slate-100 px-4 py-3 text-center font-mono text-xl tracking-widest text-slate-900">
 							{group.inviteCode}
 						</code>
-						<button
-							type="button"
-							onClick={() => navigator.clipboard.writeText(group.inviteCode)}
-							className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50"
-						>
+						<CopyButton value={group.inviteCode} className="px-3 py-2 text-sm">
 							Copy
-						</button>
+						</CopyButton>
 					</div>
 					<Form method="post" className="mt-4">
 						<CsrfInput />
