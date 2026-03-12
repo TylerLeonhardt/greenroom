@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { Form, Link, useLoaderData, useRouteLoaderData } from "@remix-run/react";
 import { CalendarDays } from "lucide-react";
+import { CopyButton, CopyIconButton } from "~/components/copy-button";
 import { CsrfInput } from "~/components/csrf-input";
 import { EventCard } from "~/components/event-card";
 import { getOpenAvailabilityRequestCount } from "~/services/availability.server";
@@ -193,37 +194,11 @@ export default function GroupOverview() {
 							<code className="flex-1 rounded-lg bg-slate-100 px-3 py-2 text-center font-mono text-lg tracking-widest text-slate-900">
 								{group.inviteCode}
 							</code>
-							<button
-								type="button"
-								onClick={() => navigator.clipboard.writeText(group.inviteCode)}
-								className="rounded-lg border border-slate-300 p-2 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"
-								title="Copy invite code"
-							>
-								<svg
-									className="h-4 w-4"
-									fill="none"
-									viewBox="0 0 24 24"
-									strokeWidth={1.5}
-									stroke="currentColor"
-								>
-									<title>Copy</title>
-									<path
-										strokeLinecap="round"
-										strokeLinejoin="round"
-										d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9.75a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184"
-									/>
-								</svg>
-							</button>
+							<CopyIconButton value={group.inviteCode} title="Copy invite code" />
 						</div>
-						<button
-							type="button"
-							onClick={() => {
-								navigator.clipboard.writeText(inviteLink);
-							}}
-							className="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-						>
+						<CopyButton value={inviteLink} className="mt-3 w-full px-3 py-2 text-sm font-medium">
 							📋 Copy Invite Link
-						</button>
+						</CopyButton>
 					</div>
 				)}
 			</div>
