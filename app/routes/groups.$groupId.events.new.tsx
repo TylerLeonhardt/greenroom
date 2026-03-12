@@ -12,7 +12,7 @@ import { ArrowLeft, Clock, Users } from "lucide-react";
 import { useState } from "react";
 import { CsrfInput } from "~/components/csrf-input";
 import { InlineTimezoneSelector } from "~/components/timezone-selector";
-import { formatEventTime, localTimeToUTC } from "~/lib/date-utils";
+import { formatEventTime, getTimezoneAbbreviation, localTimeToUTC } from "~/lib/date-utils";
 import { getAvailabilityRequest } from "~/services/availability.server";
 import { validateCsrfToken } from "~/services/csrf.server";
 import {
@@ -255,11 +255,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
 		// Fire-and-forget Discord webhook
 		if (groupData.group.webhookUrl) {
+			const tz = user.timezone ?? undefined;
+			const webhookDateTime = formatEventTime(event.startTime, event.endTime, tz);
+			const tzAbbrev = getTimezoneAbbreviation(event.startTime, tz);
 			sendEventCreatedWebhook(groupData.group.webhookUrl, {
 				groupName: groupData.group.name,
 				eventTitle: event.title,
 				eventType: event.eventType,
-				dateTime: formatEventTime(event.startTime, event.endTime),
+				dateTime: tzAbbrev ? `${webhookDateTime} (${tzAbbrev})` : webhookDateTime,
 				location: event.location ?? undefined,
 				eventUrl,
 			});

@@ -42,6 +42,21 @@ export function sanitizeTimezone(timezone?: string | null): string | undefined {
 }
 
 /**
+ * Get the short timezone abbreviation (e.g., "PDT", "EST") for a date in a specific timezone.
+ * Returns an empty string if no valid timezone is provided.
+ */
+export function getTimezoneAbbreviation(date: string | Date, timezone?: string | null): string {
+	const tz = sanitizeTimezone(timezone);
+	if (!tz) return "";
+	const d = typeof date === "string" ? new Date(date) : date;
+	const parts = new Intl.DateTimeFormat("en-US", {
+		timeZoneName: "short",
+		timeZone: tz,
+	}).formatToParts(d);
+	return parts.find((p) => p.type === "timeZoneName")?.value ?? "";
+}
+
+/**
  * Format a date as "Wed, Mar 4, 2026"
  */
 export function formatDate(date: string | Date, timezone?: string): string {
