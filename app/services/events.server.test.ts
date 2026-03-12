@@ -79,6 +79,7 @@ const mockEvent = {
 	createdById: "user-1",
 	createdFromRequestId: null,
 	callTime: null,
+	timezone: "America/Los_Angeles",
 	reminderSentAt: null,
 	confirmationReminderSentAt: null,
 	createdAt: now,
@@ -135,6 +136,7 @@ describe("events.server", () => {
 					location: null,
 					createdFromRequestId: null,
 					callTime: null,
+					timezone: "America/Los_Angeles",
 				}),
 			);
 			expect(result).toEqual(mockEvent);

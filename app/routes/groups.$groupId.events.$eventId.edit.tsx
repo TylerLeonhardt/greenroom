@@ -11,6 +11,7 @@ import {
 import { ArrowLeft, Clock, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { CsrfInput } from "~/components/csrf-input";
+import { InlineTimezoneSelector } from "~/components/timezone-selector";
 import { localTimeToUTC, utcToLocalParts } from "~/lib/date-utils";
 import { validateCsrfToken } from "~/services/csrf.server";
 import { deleteEvent, getEventWithAssignments, updateEvent } from "~/services/events.server";
@@ -30,15 +31,16 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 		throw new Response("Not Found", { status: 404 });
 	}
 
-	const startParts = utcToLocalParts(new Date(data.event.startTime), user.timezone);
-	const endParts = utcToLocalParts(new Date(data.event.endTime), user.timezone);
+	const eventTimezone = data.event.timezone ?? user.timezone;
+	const startParts = utcToLocalParts(new Date(data.event.startTime), eventTimezone);
+	const endParts = utcToLocalParts(new Date(data.event.endTime), eventTimezone);
 	const ctParts = data.event.callTime
-		? utcToLocalParts(new Date(data.event.callTime), user.timezone)
+		? utcToLocalParts(new Date(data.event.callTime), eventTimezone)
 		: null;
 
 	return {
 		event: data.event,
-		userTimezone: user.timezone,
+		eventTimezone,
 		prefill: {
 			date: startParts.date,
 			startTime: startParts.time,
@@ -76,6 +78,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	const location = formData.get("location");
 	const description = formData.get("description");
 	const callTime = formData.get("callTime");
+	const formTimezone = formData.get("timezone");
+	const timezone =
+		typeof formTimezone === "string" && formTimezone ? formTimezone : (user.timezone ?? undefined);
 
 	if (typeof title !== "string" || !title.trim()) {
 		return { error: "Title is required." };
@@ -116,14 +121,15 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		title: title.trim(),
 		description: typeof description === "string" ? description : undefined,
 		eventType,
-		startTime: localTimeToUTC(date, startTime, user.timezone),
-		endTime: localTimeToUTC(date, endTime, user.timezone),
+		startTime: localTimeToUTC(date, startTime, timezone),
+		endTime: localTimeToUTC(date, endTime, timezone),
 		location: typeof location === "string" ? location : undefined,
 		callTime: hasCallTime
-			? localTimeToUTC(date, callTime.trim(), user.timezone)
+			? localTimeToUTC(date, callTime.trim(), timezone)
 			: eventType === "show"
 				? undefined
 				: null,
+		timezone,
 	});
 
 	return redirect(`/groups/${groupId}/events/${eventId}`);
@@ -136,6 +142,7 @@ export default function EditEvent() {
 	const navigation = useNavigation();
 	const isSubmitting = navigation.state === "submitting";
 	const [eventType, setEventType] = useState(event.eventType);
+	const [timezone, setTimezone] = useState(() => event.timezone ?? "America/Los_Angeles");
 	const isShow = eventType === "show";
 
 	return (
@@ -225,6 +232,10 @@ export default function EditEvent() {
 				{/* Date & Time */}
 				<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
 					<h3 className="mb-4 text-sm font-semibold text-slate-900">Date & Time</h3>
+					<div className="mb-4">
+						<InlineTimezoneSelector timezone={timezone} onChange={setTimezone} />
+						<input type="hidden" name="timezone" value={timezone} />
+					</div>
 					<div className="grid gap-4 sm:grid-cols-3">
 						<div>
 							<label htmlFor="date" className="block text-sm font-medium text-slate-700">
