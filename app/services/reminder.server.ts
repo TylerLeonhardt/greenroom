@@ -2,7 +2,7 @@ import { CronJob } from "cron";
 import { and, eq, gte, isNull, lte, sql } from "drizzle-orm";
 import { db } from "../../src/db/index.js";
 import { eventAssignments, events, groupMemberships, groups, users } from "../../src/db/schema.js";
-import { formatEventTime, formatTime } from "../lib/date-utils.js";
+import { formatEventTime, formatTime, getTimezoneAbbreviation } from "../lib/date-utils.js";
 import {
 	sendConfirmationReminderNotification,
 	sendEventReminderNotification,
@@ -85,9 +85,11 @@ export async function processReminders(): Promise<void> {
 				callTime: events.callTime,
 				groupName: groups.name,
 				webhookUrl: groups.webhookUrl,
+				creatorTimezone: users.timezone,
 			})
 			.from(events)
 			.innerJoin(groups, eq(events.groupId, groups.id))
+			.leftJoin(users, eq(events.createdById, users.id))
 			.where(
 				and(
 					isNull(events.reminderSentAt),
@@ -161,11 +163,14 @@ export async function processReminders(): Promise<void> {
 
 			// Fire-and-forget Discord webhook (one message per event, not per attendee)
 			if (event.webhookUrl) {
-				const webhookDateTime = formatEventTime(event.startTime, event.endTime);
+				// Use event creator's timezone, falling back to first attendee's timezone
+				const webhookTz = event.creatorTimezone ?? attendees[0]?.timezone ?? undefined;
+				const webhookDateTime = formatEventTime(event.startTime, event.endTime, webhookTz);
+				const tzAbbrev = getTimezoneAbbreviation(event.startTime, webhookTz);
 				sendEventReminderWebhook(event.webhookUrl, {
 					groupName: event.groupName,
 					eventTitle: event.title,
-					dateTime: webhookDateTime,
+					dateTime: tzAbbrev ? `${webhookDateTime} (${tzAbbrev})` : webhookDateTime,
 					location: event.location,
 					eventUrl,
 				});

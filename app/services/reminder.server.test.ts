@@ -28,6 +28,11 @@ vi.mock("./email.server.js", () => ({
 	sendConfirmationReminderNotification: mockSendConfirmationReminderNotification,
 }));
 
+const mockSendEventReminderWebhook = vi.fn();
+vi.mock("./webhook.server.js", () => ({
+	sendEventReminderWebhook: mockSendEventReminderWebhook,
+}));
+
 vi.mock("./logger.server.js", () => ({
 	logger: {
 		info: vi.fn(),
@@ -45,6 +50,7 @@ vi.mock("./telemetry.server.js", () => ({
 vi.mock("../lib/date-utils.js", () => ({
 	formatEventTime: vi.fn(() => "Sun, Mar 1 · 7:00 PM – 9:00 PM"),
 	formatTime: vi.fn(() => "6:00 PM"),
+	getTimezoneAbbreviation: vi.fn(() => "PST"),
 }));
 
 const { processReminders, processConfirmationReminders, startReminderJob } = await import(
@@ -66,6 +72,8 @@ const mockUpcomingEvent = {
 	location: "Theater",
 	callTime: new Date("2026-03-02T01:00:00Z"),
 	groupName: "Comedy Team",
+	creatorTimezone: "America/Los_Angeles",
+	webhookUrl: "https://discord.com/api/webhooks/123/abc",
 };
 
 const mockAttendees = [
@@ -289,6 +297,114 @@ describe("reminder.server", () => {
 
 			// Should still mark as sent even with no attendees (to avoid retrying)
 			expect(mockSendEventReminderNotification).not.toHaveBeenCalled();
+		});
+
+		it("sends Discord webhook with creator's timezone", async () => {
+			const { formatEventTime, getTimezoneAbbreviation } = await import("../lib/date-utils.js");
+
+			mockTransaction.mockImplementation(async (fn) => {
+				const eventChain = txChainMock(null);
+				eventChain.where = vi.fn().mockResolvedValue([mockUpcomingEvent]);
+				eventChain.innerJoin = vi.fn().mockReturnValue(eventChain);
+				eventChain.from = vi.fn().mockReturnValue(eventChain);
+
+				const attendeeChain = txChainMock(null);
+				attendeeChain.where = vi.fn().mockResolvedValue(mockAttendees);
+				attendeeChain.innerJoin = vi.fn().mockReturnValue(attendeeChain);
+				attendeeChain.from = vi.fn().mockReturnValue(attendeeChain);
+
+				let selectCallCount = 0;
+				const tx = {
+					execute: vi.fn().mockResolvedValue({
+						rows: [{ pg_try_advisory_xact_lock: true }],
+					}),
+					select: vi.fn().mockImplementation(() => {
+						selectCallCount++;
+						return selectCallCount === 1 ? eventChain : attendeeChain;
+					}),
+					update: vi.fn().mockReturnValue({
+						set: vi.fn().mockReturnValue({
+							where: vi.fn().mockResolvedValue(undefined),
+						}),
+					}),
+				};
+				return fn(tx);
+			});
+
+			await processReminders();
+
+			// Verify webhook was called with timezone-formatted dateTime
+			expect(mockSendEventReminderWebhook).toHaveBeenCalledWith(
+				"https://discord.com/api/webhooks/123/abc",
+				expect.objectContaining({
+					groupName: "Comedy Team",
+					eventTitle: "Show Night",
+					dateTime: expect.stringContaining("PST"),
+				}),
+			);
+
+			// Verify formatEventTime was called with the creator's timezone
+			expect(formatEventTime).toHaveBeenCalledWith(
+				mockUpcomingEvent.startTime,
+				mockUpcomingEvent.endTime,
+				"America/Los_Angeles",
+			);
+
+			// Verify getTimezoneAbbreviation was called with the creator's timezone
+			expect(getTimezoneAbbreviation).toHaveBeenCalledWith(
+				mockUpcomingEvent.startTime,
+				"America/Los_Angeles",
+			);
+		});
+
+		it("falls back to first attendee's timezone when creator is deleted", async () => {
+			const { formatEventTime } = await import("../lib/date-utils.js");
+			const eventWithoutCreator = {
+				...mockUpcomingEvent,
+				creatorTimezone: null,
+			};
+			const attendeesWithTimezone = [
+				{ ...mockAttendees[0], timezone: "America/New_York" },
+				{ ...mockAttendees[1], timezone: "America/Chicago" },
+			];
+
+			mockTransaction.mockImplementation(async (fn) => {
+				const eventChain = txChainMock(null);
+				eventChain.where = vi.fn().mockResolvedValue([eventWithoutCreator]);
+				eventChain.innerJoin = vi.fn().mockReturnValue(eventChain);
+				eventChain.from = vi.fn().mockReturnValue(eventChain);
+
+				const attendeeChain = txChainMock(null);
+				attendeeChain.where = vi.fn().mockResolvedValue(attendeesWithTimezone);
+				attendeeChain.innerJoin = vi.fn().mockReturnValue(attendeeChain);
+				attendeeChain.from = vi.fn().mockReturnValue(attendeeChain);
+
+				let selectCallCount = 0;
+				const tx = {
+					execute: vi.fn().mockResolvedValue({
+						rows: [{ pg_try_advisory_xact_lock: true }],
+					}),
+					select: vi.fn().mockImplementation(() => {
+						selectCallCount++;
+						return selectCallCount === 1 ? eventChain : attendeeChain;
+					}),
+					update: vi.fn().mockReturnValue({
+						set: vi.fn().mockReturnValue({
+							where: vi.fn().mockResolvedValue(undefined),
+						}),
+					}),
+				};
+				return fn(tx);
+			});
+
+			await processReminders();
+
+			// Should fall back to first attendee's timezone
+			expect(formatEventTime).toHaveBeenCalledWith(
+				eventWithoutCreator.startTime,
+				eventWithoutCreator.endTime,
+				"America/New_York",
+			);
 		});
 	});
 

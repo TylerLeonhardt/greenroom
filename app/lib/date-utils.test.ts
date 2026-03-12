@@ -10,6 +10,7 @@ import {
 	formatEventTime,
 	formatTime,
 	formatTimeRange,
+	getTimezoneAbbreviation,
 	isValidTimezone,
 	localTimeToUTC,
 	sanitizeTimezone,
@@ -350,6 +351,47 @@ describe("date-utils", () => {
 			const withUndefined = formatEventTime(start, end, undefined);
 			// Both should produce the same result since "PST" gets sanitized to undefined
 			expect(withPST).toBe(withUndefined);
+		});
+	});
+
+	describe("getTimezoneAbbreviation", () => {
+		it("returns timezone abbreviation for a valid timezone", () => {
+			const result = getTimezoneAbbreviation(testDate, "America/Los_Angeles");
+			// March 4 in LA is PST (standard time, before spring DST)
+			expect(result).toBe("PST");
+		});
+
+		it("returns UTC abbreviation", () => {
+			const result = getTimezoneAbbreviation(testDate, "UTC");
+			expect(result).toBe("UTC");
+		});
+
+		it("returns correct abbreviation for Eastern timezone", () => {
+			const result = getTimezoneAbbreviation(testDate, "America/New_York");
+			expect(result).toBe("EST");
+		});
+
+		it("returns empty string when no timezone is provided", () => {
+			expect(getTimezoneAbbreviation(testDate)).toBe("");
+			expect(getTimezoneAbbreviation(testDate, undefined)).toBe("");
+			expect(getTimezoneAbbreviation(testDate, null)).toBe("");
+		});
+
+		it("returns empty string for invalid timezone abbreviations", () => {
+			expect(getTimezoneAbbreviation(testDate, "PST")).toBe("");
+			expect(getTimezoneAbbreviation(testDate, "EST")).toBe("");
+		});
+
+		it("accepts string date input", () => {
+			const result = getTimezoneAbbreviation("2026-03-04T19:00:00Z", "America/Chicago");
+			expect(result).toBe("CST");
+		});
+
+		it("reflects DST changes", () => {
+			// March 15 is after spring DST in the US (second Sunday of March)
+			const dstDate = new Date("2026-03-15T19:00:00Z");
+			const result = getTimezoneAbbreviation(dstDate, "America/Los_Angeles");
+			expect(result).toBe("PDT");
 		});
 	});
 });
