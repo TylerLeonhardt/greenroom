@@ -290,6 +290,30 @@ export async function reopenAvailabilityRequest(requestId: string): Promise<void
 		.where(eq(availabilityRequests.id, requestId));
 }
 
+// --- Update ---
+
+export async function updateAvailabilityRequest(
+	requestId: string,
+	data: Partial<{
+		title: string;
+		description: string;
+		requestedDates: string[];
+		dateRangeStart: Date;
+		dateRangeEnd: Date;
+	}>,
+): Promise<void> {
+	await db
+		.update(availabilityRequests)
+		.set({
+			...(data.title !== undefined ? { title: data.title.trim() } : {}),
+			...(data.description !== undefined ? { description: data.description.trim() || null } : {}),
+			...(data.requestedDates !== undefined ? { requestedDates: data.requestedDates } : {}),
+			...(data.dateRangeStart !== undefined ? { dateRangeStart: data.dateRangeStart } : {}),
+			...(data.dateRangeEnd !== undefined ? { dateRangeEnd: data.dateRangeEnd } : {}),
+		})
+		.where(eq(availabilityRequests.id, requestId));
+}
+
 // --- Delete ---
 
 export async function deleteAvailabilityRequest(requestId: string): Promise<void> {

@@ -12,10 +12,36 @@ import { ArrowLeft, Clock, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { CsrfInput } from "~/components/csrf-input";
 import { InlineTimezoneSelector } from "~/components/timezone-selector";
-import { localTimeToUTC, utcToLocalParts } from "~/lib/date-utils";
+import {
+	formatEventTime,
+	getTimezoneAbbreviation,
+	localTimeToUTC,
+	utcToLocalParts,
+} from "~/lib/date-utils";
+import {
+	detectEventChanges,
+	formatEventChangeSummary,
+	hasAnyChanges,
+	hasScheduleChanges,
+} from "~/lib/edit-utils";
 import { validateCsrfToken } from "~/services/csrf.server";
-import { deleteEvent, getEventWithAssignments, updateEvent } from "~/services/events.server";
-import { requireGroupAdmin } from "~/services/groups.server";
+import {
+	sendEventEditedNotification,
+	sendEventReconfirmationNotification,
+} from "~/services/email.server";
+import {
+	deleteEvent,
+	getEventWithAssignments,
+	resetEventConfirmations,
+	updateEvent,
+} from "~/services/events.server";
+import {
+	getGroupById,
+	getGroupMembersWithPreferences,
+	isGroupAdmin,
+	requireGroupMember,
+} from "~/services/groups.server";
+import { sendEventEditedWebhook } from "~/services/webhook.server";
 
 export const meta: MetaFunction = () => {
 	return [{ title: "Edit Event — My Call Time" }];
@@ -24,11 +50,17 @@ export const meta: MetaFunction = () => {
 export async function loader({ request, params }: LoaderFunctionArgs) {
 	const groupId = params.groupId ?? "";
 	const eventId = params.eventId ?? "";
-	const user = await requireGroupAdmin(request, groupId);
+	const user = await requireGroupMember(request, groupId);
+	const admin = await isGroupAdmin(user.id, groupId);
 
 	const data = await getEventWithAssignments(eventId);
 	if (!data || data.event.groupId !== groupId) {
 		throw new Response("Not Found", { status: 404 });
+	}
+
+	// Only admin or creator can edit
+	if (!admin && data.event.createdById !== user.id) {
+		throw new Response("Forbidden", { status: 403 });
 	}
 
 	const eventTimezone = data.event.timezone ?? user.timezone;
@@ -41,6 +73,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 	return {
 		event: data.event,
 		eventTimezone,
+		hasAssignments: data.assignments.length > 0,
 		prefill: {
 			date: startParts.date,
 			startTime: startParts.time,
@@ -53,12 +86,18 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 export async function action({ request, params }: ActionFunctionArgs) {
 	const groupId = params.groupId ?? "";
 	const eventId = params.eventId ?? "";
-	const user = await requireGroupAdmin(request, groupId);
+	const user = await requireGroupMember(request, groupId);
+	const admin = await isGroupAdmin(user.id, groupId);
 
 	// Verify the event belongs to this group before any mutation
 	const data = await getEventWithAssignments(eventId);
 	if (!data || data.event.groupId !== groupId) {
 		throw new Response("Not Found", { status: 404 });
+	}
+
+	// Only admin or creator can edit
+	if (!admin && data.event.createdById !== user.id) {
+		throw new Response("Forbidden", { status: 403 });
 	}
 
 	const formData = await request.formData();
@@ -81,6 +120,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	const formTimezone = formData.get("timezone");
 	const timezone =
 		typeof formTimezone === "string" && formTimezone ? formTimezone : (user.timezone ?? undefined);
+	const notifyMembers = formData.get("notifyMembers") === "on";
+	const requestReconfirmation = formData.get("requestReconfirmation") === "on";
 
 	if (typeof title !== "string" || !title.trim()) {
 		return { error: "Title is required." };
@@ -117,27 +158,156 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		return { error: "Description must be 2,000 characters or less." };
 	}
 
+	// Build new event snapshot for change detection
+	const newStartTime = localTimeToUTC(date, startTime, timezone);
+	const newEndTime = localTimeToUTC(date, endTime, timezone);
+	const newCallTime = hasCallTime
+		? localTimeToUTC(date, callTime.trim(), timezone)
+		: null;
+
+	const oldEvent = data.event;
+	const changes = detectEventChanges(
+		{
+			title: oldEvent.title,
+			eventType: oldEvent.eventType,
+			startTime: new Date(oldEvent.startTime),
+			endTime: new Date(oldEvent.endTime),
+			location: oldEvent.location,
+			description: oldEvent.description,
+			callTime: oldEvent.callTime ? new Date(oldEvent.callTime) : null,
+		},
+		{
+			title: title.trim(),
+			eventType,
+			startTime: newStartTime,
+			endTime: newEndTime,
+			location: typeof location === "string" ? location.trim() || null : null,
+			description: typeof description === "string" ? description.trim() || null : null,
+			callTime: newCallTime,
+		},
+	);
+
+	// If nothing changed, just redirect back
+	if (!hasAnyChanges(changes)) {
+		return redirect(`/groups/${groupId}/events/${eventId}`);
+	}
+
 	await updateEvent(eventId, {
 		title: title.trim(),
 		description: typeof description === "string" ? description : undefined,
 		eventType,
-		startTime: localTimeToUTC(date, startTime, timezone),
-		endTime: localTimeToUTC(date, endTime, timezone),
+		startTime: newStartTime,
+		endTime: newEndTime,
 		location: typeof location === "string" ? location : undefined,
-		callTime: hasCallTime
-			? localTimeToUTC(date, callTime.trim(), timezone)
-			: eventType === "show"
-				? undefined
-				: null,
+		callTime: newCallTime,
 		timezone,
 	});
+
+	// Handle re-confirmation: reset confirmed attendees to pending
+	if (requestReconfirmation && data.assignments.length > 0) {
+		await resetEventConfirmations(eventId);
+	}
+
+	// Fire-and-forget notifications
+	if (notifyMembers && hasAnyChanges(changes)) {
+		const changeSummary = formatEventChangeSummary(changes, timezone);
+		const appUrl = process.env.APP_URL ?? "http://localhost:5173";
+		const preferencesUrl = `${appUrl}/groups/${groupId}/notifications`;
+		const eventUrl = `${appUrl}/groups/${groupId}/events/${eventId}`;
+
+		void Promise.all([getGroupById(groupId), getGroupMembersWithPreferences(groupId)]).then(
+			([group, members]) => {
+				if (!group) return;
+				const recipients = members
+					.filter((m) => m.id !== user.id)
+					.map((m) => ({
+						email: m.email,
+						name: m.name,
+						timezone: m.timezone,
+						notificationPreferences: m.notificationPreferences,
+					}));
+				if (recipients.length === 0) return;
+
+				if (requestReconfirmation && data.assignments.length > 0) {
+					// Send re-confirmation email to assignees (excluding editor)
+					const assigneeIds = new Set(data.assignments.map((a) => a.userId));
+					const assigneeRecipients = recipients.filter((r) => {
+						const member = members.find((m) => m.email === r.email);
+						return member && assigneeIds.has(member.id);
+					});
+					if (assigneeRecipients.length > 0) {
+						void sendEventReconfirmationNotification({
+							eventTitle: title.trim(),
+							eventType,
+							startTime: newStartTime,
+							endTime: newEndTime,
+							location: typeof location === "string" ? location.trim() || undefined : undefined,
+							groupName: group.name,
+							changes: changeSummary,
+							recipients: assigneeRecipients,
+							eventUrl,
+							preferencesUrl,
+						});
+					}
+					// Send regular edit notification to non-assignees
+					const nonAssigneeRecipients = recipients.filter((r) => {
+						const member = members.find((m) => m.email === r.email);
+						return member && !assigneeIds.has(member.id);
+					});
+					if (nonAssigneeRecipients.length > 0) {
+						void sendEventEditedNotification({
+							eventTitle: title.trim(),
+							eventType,
+							startTime: newStartTime,
+							endTime: newEndTime,
+							location: typeof location === "string" ? location.trim() || undefined : undefined,
+							groupName: group.name,
+							changes: changeSummary,
+							recipients: nonAssigneeRecipients,
+							eventUrl,
+							preferencesUrl,
+						});
+					}
+				} else {
+					void sendEventEditedNotification({
+						eventTitle: title.trim(),
+						eventType,
+						startTime: newStartTime,
+						endTime: newEndTime,
+						location: typeof location === "string" ? location.trim() || undefined : undefined,
+						groupName: group.name,
+						changes: changeSummary,
+						recipients,
+						eventUrl,
+						preferencesUrl,
+					});
+				}
+
+				// Discord webhook
+				if (group.webhookUrl) {
+					const tz = timezone ?? oldEvent.timezone;
+					const dateTime = formatEventTime(newStartTime, newEndTime, tz);
+					const tzAbbr = getTimezoneAbbreviation(newStartTime, tz);
+					sendEventEditedWebhook(group.webhookUrl, {
+						groupName: group.name,
+						eventTitle: title.trim(),
+						eventType,
+						dateTime: `${dateTime} ${tzAbbr}`,
+						location: typeof location === "string" ? location.trim() || undefined : undefined,
+						changes: changeSummary,
+						eventUrl,
+					});
+				}
+			},
+		);
+	}
 
 	return redirect(`/groups/${groupId}/events/${eventId}`);
 }
 
 export default function EditEvent() {
 	const { groupId } = useParams();
-	const { event, prefill } = useLoaderData<typeof loader>();
+	const { event, prefill, hasAssignments } = useLoaderData<typeof loader>();
 	const actionData = useActionData<typeof action>();
 	const navigation = useNavigation();
 	const isSubmitting = navigation.state === "submitting";
@@ -328,6 +498,46 @@ export default function EditEvent() {
 								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 							/>
 						</div>
+					</div>
+				</div>
+
+				{/* Notification Options */}
+				<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+					<h3 className="mb-3 text-sm font-semibold text-slate-900">Notification Options</h3>
+					<div className="space-y-3">
+						<label className="flex cursor-pointer items-start gap-3">
+							<input
+								type="checkbox"
+								name="notifyMembers"
+								defaultChecked
+								className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/20"
+							/>
+							<div>
+								<span className="text-sm font-medium text-slate-700">
+									Notify members of this change
+								</span>
+								<p className="text-xs text-slate-500">
+									Sends an email to group members and posts to Discord (if configured)
+								</p>
+							</div>
+						</label>
+						{hasAssignments && (
+							<label className="flex cursor-pointer items-start gap-3">
+								<input
+									type="checkbox"
+									name="requestReconfirmation"
+									className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/20"
+								/>
+								<div>
+									<span className="text-sm font-medium text-slate-700">
+										Request re-confirmation from attendees
+									</span>
+									<p className="text-xs text-slate-500">
+										Resets all attendee confirmations and asks them to confirm again
+									</p>
+								</div>
+							</label>
+						)}
 					</div>
 				</div>
 

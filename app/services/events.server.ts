@@ -331,6 +331,14 @@ export async function updateAssignmentStatus(
 		.where(and(eq(eventAssignments.eventId, eventId), eq(eventAssignments.userId, userId)));
 }
 
+/** Reset all confirmed/declined assignments back to "pending" for re-confirmation. */
+export async function resetEventConfirmations(eventId: string): Promise<void> {
+	await db
+		.update(eventAssignments)
+		.set({ status: "pending" })
+		.where(eq(eventAssignments.eventId, eventId));
+}
+
 export async function bulkAssignToEvent(
 	eventId: string,
 	userIds: string[],

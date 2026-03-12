@@ -183,3 +183,70 @@ export async function sendTestWebhook(webhookUrl: string, groupName: string): Pr
 		{ groupId: groupName, type: "test" },
 	);
 }
+
+export function sendEventEditedWebhook(
+	webhookUrl: string,
+	params: {
+		groupName: string;
+		eventTitle: string;
+		eventType: string;
+		dateTime: string;
+		location?: string | null;
+		changes: string[];
+		eventUrl: string;
+	},
+): void {
+	const typeLabel = params.eventType.charAt(0).toUpperCase() + params.eventType.slice(1);
+	const changesText = params.changes.map((c) => `• ${c}`).join("\n");
+
+	const fields: DiscordField[] = [
+		{ name: "Group", value: params.groupName, inline: true },
+		{ name: "Type", value: typeLabel, inline: true },
+		{ name: "When", value: params.dateTime },
+	];
+	if (params.location) {
+		fields.push({ name: "Where", value: params.location });
+	}
+	if (changesText) {
+		fields.push({ name: "Changes", value: changesText });
+	}
+
+	void sendWebhook(
+		webhookUrl,
+		{
+			title: `✏️ Updated ${typeLabel}: ${params.eventTitle}`,
+			url: params.eventUrl,
+			fields,
+			footer: { text: "View details on My Call Time" },
+		},
+		{ groupId: params.groupName, type: "event_edited" },
+	);
+}
+
+export function sendAvailabilityRequestEditedWebhook(
+	webhookUrl: string,
+	params: {
+		groupName: string;
+		title: string;
+		changes: string[];
+		requestUrl: string;
+	},
+): void {
+	const changesText = params.changes.map((c) => `• ${c}`).join("\n");
+
+	const fields: DiscordField[] = [{ name: "Group", value: params.groupName, inline: true }];
+	if (changesText) {
+		fields.push({ name: "Changes", value: changesText });
+	}
+
+	void sendWebhook(
+		webhookUrl,
+		{
+			title: `✏️ Updated Availability Request: ${params.title}`,
+			url: params.requestUrl,
+			fields,
+			footer: { text: "View details on My Call Time" },
+		},
+		{ groupId: params.groupName, type: "availability_request_edited" },
+	);
+}
