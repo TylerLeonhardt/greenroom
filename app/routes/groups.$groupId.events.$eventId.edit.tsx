@@ -161,9 +161,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	// Build new event snapshot for change detection
 	const newStartTime = localTimeToUTC(date, startTime, timezone);
 	const newEndTime = localTimeToUTC(date, endTime, timezone);
-	const newCallTime = hasCallTime
-		? localTimeToUTC(date, callTime.trim(), timezone)
-		: null;
+	const newCallTime = hasCallTime ? localTimeToUTC(date, callTime.trim(), timezone) : null;
 
 	const oldEvent = data.event;
 	const changes = detectEventChanges(

@@ -25,7 +25,7 @@ if (connectionString) {
 				(envelope.data.baseData as { responseCode?: string }).responseCode ?? "",
 				10,
 			);
-			if (!isNaN(code) && code < 500) {
+			if (!Number.isNaN(code) && code < 500) {
 				(envelope.data.baseData as { success?: boolean }).success = true;
 			}
 		}
