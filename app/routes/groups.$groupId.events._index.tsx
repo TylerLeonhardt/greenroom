@@ -94,10 +94,25 @@ export default function Events() {
 					</select>
 
 					{canCreateEvents && (
-						<Link
-							to={`/groups/${groupId}/events/new`}
-							className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
-						>
+						<>
+							<Link
+								to={`/groups/${groupId}/events/batch`}
+								className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-600 bg-white px-4 py-2 text-sm font-medium text-emerald-600 transition-colors hover:bg-emerald-50"
+							>
+								<Plus className="h-4 w-4" />
+								Batch Create
+							</Link>
+							<Link
+								to={`/groups/${groupId}/events/new`}
+								className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+							>
+								<Plus className="h-4 w-4" /> Create Event
+							</Link>
+						</>
+					)}
+				</div>
+			</div>
+
 							<Plus className="h-4 w-4" /> Create Event
 						</Link>
 					)}
