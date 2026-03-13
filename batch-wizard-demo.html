@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Batch Wizard Demo - GreenRoom</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+        body {
+            background: rgb(248, 250, 252);
+        }
+    </style>
+</head>
+<body class="p-8">
+    <div id="app" class="mx-auto max-w-4xl">
+        <!-- Header -->
+        <div class="mb-6">
+            <div class="mb-4 inline-flex items-center gap-2 text-sm text-slate-600">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+                Back to Events
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-slate-900">Batch Create Events</h1>
+                <p class="mt-1 text-sm text-slate-600">Create multiple events at once with one notification</p>
+            </div>
+        </div>
+
+        <!-- Step Indicator -->
+        <div id="step-indicator" class="mb-8 flex items-center justify-center gap-2"></div>
+
+        <!-- Step Content -->
+        <div class="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
+            <div id="step-content"></div>
+
+            <!-- Navigation Buttons -->
+            <div id="nav-buttons" class="mt-8 flex items-center justify-between border-t border-slate-200 pt-6">
+                <button id="back-btn" class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                    </svg>
+                    Back
+                </button>
+                <div class="text-sm text-slate-500">Step <span id="current-step">1</span> of 4</div>
+                <button id="next-btn" class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700">
+                    Next
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentStep = 1;
+        const eventRows = [
+            { date: '2026-03-19', startTime: '19:00', endTime: '21:00', location: 'Studio A - Main Space' },
+            { date: '2026-03-26', startTime: '19:00', endTime: '21:00', location: 'Studio B - Black Box' },
+            { date: '2026-04-02', startTime: '19:00', endTime: '21:00', location: 'Studio A - Main Space' },
+            { date: '2026-04-09', startTime: '19:00', endTime: '21:00', location: 'Community Center - Room 201' },
+            { date: '2026-04-16', startTime: '19:00', endTime: '21:00', location: 'Studio A - Main Space' },
+            { date: '2026-04-23', startTime: '19:00', endTime: '21:00', location: 'Studio B - Black Box' },
+            { date: '2026-04-30', startTime: '19:00', endTime: '21:00', location: 'Studio A - Main Space' },
+            { date: '2026-05-07', startTime: '19:00', endTime: '21:00', location: 'Studio A - Main Space' },
+            { date: '2026-05-14', startTime: '19:00', endTime: '21:00', location: 'Studio B - Black Box' },
+            { date: '2026-05-21', startTime: '19:00', endTime: '21:00', location: 'Community Center - Room 201' },
+            { date: '2026-05-28', startTime: '19:00', endTime: '21:00', location: 'Studio A - Main Space' },
+            { date: '2026-06-04', startTime: '19:00', endTime: '21:00', location: 'Studio A - Main Space' }
+        ];
+
+        function formatDate(dateStr) {
+            const date = new Date(dateStr + 'T00:00:00');
+            return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
+        function renderStepIndicator() {
+            const indicator = document.getElementById('step-indicator');
+            indicator.innerHTML = '';
+            
+            for (let i = 1; i <= 4; i++) {
+                const stepDiv = document.createElement('div');
+                stepDiv.className = 'flex items-center';
+                
+                const circle = document.createElement('div');
+                let classes = 'flex h-10 w-10 items-center justify-center rounded-full border-2 text-sm font-semibold transition-all ';
+                if (i === currentStep) {
+                    classes += 'border-emerald-600 bg-emerald-600 text-white';
+                } else if (i < currentStep) {
+                    classes += 'border-emerald-600 bg-emerald-50 text-emerald-600';
+                } else {
+                    classes += 'border-slate-200 bg-white text-slate-400';
+                }
+                circle.className = classes;
+                
+                if (i < currentStep) {
+                    circle.innerHTML = '<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+                } else {
+                    circle.textContent = i;
+                }
+                
+                stepDiv.appendChild(circle);
+                
+                if (i < 4) {
+                    const line = document.createElement('div');
+                    line.className = `mx-2 h-0.5 w-12 ${i < currentStep ? 'bg-emerald-600' : 'bg-slate-200'}`;
+                    stepDiv.appendChild(line);
+                }
+                
+                indicator.appendChild(stepDiv);
+            }
+        }
+
+        function renderStep1() {
+            return `
+                <div class="space-y-6">
+                    <div>
+                        <h2 class="mb-4 text-xl font-bold text-slate-900">Step 1: Shared Details</h2>
+                        <p class="text-sm text-slate-600">These details will apply to all events (you can customize per event in the next step)</p>
+                    </div>
+
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-slate-700">Event Title <span class="text-red-500">*</span></label>
+                        <input type="text" value="Thursday Rehearsal" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+                    </div>
+
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-slate-700">Event Type <span class="text-red-500">*</span></label>
+                        <select class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+                            <option selected>🎯 Rehearsal</option>
+                            <option>🎭 Show</option>
+                            <option>📅 Other</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-slate-700">Description (Optional)</label>
+                        <textarea rows="3" placeholder="Add any details that apply to all these events..." class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"></textarea>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-slate-700">Default Start Time <span class="text-red-500">*</span></label>
+                            <input type="time" value="19:00" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-slate-700">Default End Time <span class="text-red-500">*</span></label>
+                            <input type="time" value="21:00" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-slate-700">Default Location (Optional)</label>
+                        <input type="text" value="Studio A - Main Space" placeholder="e.g., Studio A" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderStep2() {
+            let rowsHtml = eventRows.slice(0, 6).map((row, idx) => `
+                <div class="grid grid-cols-12 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <div class="col-span-3">
+                        <label class="mb-1 block text-xs font-medium text-slate-600">Date</label>
+                        <input type="date" value="${row.date}" class="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/20">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="mb-1 block text-xs font-medium text-slate-600">Start</label>
+                        <input type="time" value="${row.startTime}" class="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/20">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="mb-1 block text-xs font-medium text-slate-600">End</label>
+                        <input type="time" value="${row.endTime}" class="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/20">
+                    </div>
+                    <div class="col-span-4">
+                        <label class="mb-1 block text-xs font-medium text-slate-600">Location</label>
+                        <input type="text" value="${row.location}" placeholder="Location" class="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/20">
+                    </div>
+                    <div class="col-span-1 flex items-end">
+                        <button class="rounded-md p-1.5 text-red-500 hover:bg-red-50 transition-colors">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+
+            return `
+                <div class="space-y-6">
+                    <div>
+                        <h2 class="mb-4 text-xl font-bold text-slate-900">Step 2: Select Dates</h2>
+                        <p class="text-sm text-slate-600">Choose the dates for your events and customize times/locations as needed</p>
+                    </div>
+
+                    <div class="space-y-3">
+                        ${rowsHtml}
+                        <div class="text-center text-sm text-slate-500">... ${eventRows.length - 6} more dates ...</div>
+                    </div>
+
+                    <button class="inline-flex items-center gap-2 rounded-lg border-2 border-dashed border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:border-emerald-600 hover:text-emerald-600">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        Add Another Date
+                    </button>
+
+                    <div class="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                        <p class="text-sm text-blue-700"><strong>Tip:</strong> In the full version, you could import dates from an availability request or use quick shortcuts like "Every Thursday for 8 weeks"</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderStep3() {
+            let eventsHtml = eventRows.map((row, idx) => `
+                <div class="flex items-center gap-4 rounded-lg border border-slate-200 bg-white p-4">
+                    <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-xl">🎯</div>
+                    <div class="flex-1">
+                        <div class="font-semibold text-slate-900">Thursday Rehearsal</div>
+                        <div class="mt-1 flex flex-wrap gap-3 text-xs text-slate-600">
+                            <span class="inline-flex items-center gap-1">
+                                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                ${formatDate(row.date)}
+                            </span>
+                            <span class="inline-flex items-center gap-1">
+                                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                ${row.startTime} - ${row.endTime}
+                            </span>
+                            <span class="inline-flex items-center gap-1">
+                                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                ${row.location}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            return `
+                <div class="space-y-6">
+                    <div>
+                        <h2 class="mb-4 text-xl font-bold text-slate-900">Step 3: Review</h2>
+                        <p class="text-sm text-slate-600">Review all events before creating. You can edit any details inline.</p>
+                    </div>
+
+                    <div class="rounded-lg border-2 border-emerald-200 bg-emerald-50 p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-emerald-900">Ready to create ${eventRows.length} events</p>
+                                <p class="mt-0.5 text-xs text-emerald-700">1 consolidated email notification will be sent to members</p>
+                            </div>
+                            <div class="text-2xl font-bold text-emerald-700">${eventRows.length}</div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2 max-h-96 overflow-y-auto">
+                        ${eventsHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderStep4() {
+            document.getElementById('nav-buttons').style.display = 'none';
+            
+            return `
+                <div class="space-y-6 text-center">
+                    <div class="flex justify-center">
+                        <div class="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100">
+                            <svg class="h-12 w-12 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h2 class="mb-2 text-2xl font-bold text-slate-900">All Set!</h2>
+                        <p class="text-slate-600">Successfully created ${eventRows.length} events.</p>
+                        <p class="mt-1 text-sm text-slate-500">1 notification email has been sent to group members.</p>
+                    </div>
+
+                    <div class="flex justify-center gap-3">
+                        <button class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700">
+                            View All Events
+                        </button>
+                        <button onclick="currentStep = 1; render()" class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-6 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50">
+                            Create More Events
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function render() {
+            renderStepIndicator();
+            
+            const content = document.getElementById('step-content');
+            document.getElementById('current-step').textContent = currentStep;
+            
+            if (currentStep === 1) {
+                content.innerHTML = renderStep1();
+            } else if (currentStep === 2) {
+                content.innerHTML = renderStep2();
+            } else if (currentStep === 3) {
+                content.innerHTML = renderStep3();
+            } else if (currentStep === 4) {
+                content.innerHTML = renderStep4();
+            }
+
+            const backBtn = document.getElementById('back-btn');
+            const nextBtn = document.getElementById('next-btn');
+            const navButtons = document.getElementById('nav-buttons');
+
+            if (currentStep === 4) {
+                navButtons.style.display = 'none';
+            } else {
+                navButtons.style.display = 'flex';
+                backBtn.disabled = currentStep === 1;
+                backBtn.style.opacity = currentStep === 1 ? '0.5' : '1';
+                backBtn.style.cursor = currentStep === 1 ? 'not-allowed' : 'pointer';
+                
+                nextBtn.textContent = currentStep === 3 ? 'Create Events' : 'Next';
+                if (currentStep !== 3) {
+                    nextBtn.innerHTML = 'Next <svg class="h-4 w-4 inline ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>';
+                }
+            }
+        }
+
+        document.getElementById('back-btn').addEventListener('click', () => {
+            if (currentStep > 1) {
+                currentStep--;
+                render();
+            }
+        });
+
+        document.getElementById('next-btn').addEventListener('click', () => {
+            if (currentStep < 4) {
+                currentStep++;
+                render();
+            }
+        });
+
+        // Initial render
+        render();
+    </script>
+</body>
+</html>
