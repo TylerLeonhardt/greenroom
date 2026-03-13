@@ -12,6 +12,8 @@ export async function setup() {
 	try {
 		const result = await adminPool.query("SELECT 1 FROM pg_database WHERE datname = $1", [TEST_DB]);
 		if (result.rowCount === 0) {
+			// DDL doesn't support parameterized identifiers; validate the constant
+			if (!/^[a-z_][a-z0-9_]*$/.test(TEST_DB)) throw new Error("Invalid database name");
 			await adminPool.query(`CREATE DATABASE ${TEST_DB}`);
 			console.log(`Created database ${TEST_DB}`);
 		}
