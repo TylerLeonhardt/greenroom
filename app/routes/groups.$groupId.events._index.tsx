@@ -113,11 +113,6 @@ export default function Events() {
 				</div>
 			</div>
 
-							<Plus className="h-4 w-4" /> Create Event
-						</Link>
-					)}
-				</div>
-			</div>
 
 			{/* List View */}
 			{view === "list" && (
