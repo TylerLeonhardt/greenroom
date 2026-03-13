@@ -128,6 +128,49 @@ This happens per-recipient, so the cron job doesn't need to filter — it sends 
 | `app/services/reminder.server.test.ts` | Cron job logic, timing windows, preference filtering, advisory locks, telemetry |
 | `app/services/notification-preferences.test.ts` | `mergeWithDefaults()`, defaults, forward-compat |
 | `app/services/email-notification-filtering.test.ts` | Per-recipient preference enforcement across email types |
+| `app/services/batch-email-notification.test.ts` | Batch notification segmentation, preference filtering, empty arrays |
+| `app/services/batch-webhook.test.ts` | Batch Discord webhook formatting |
+
+## Batch Event Notifications
+
+When creating multiple events at once (from the availability heatmap), a **single consolidated email** is sent per member instead of one email per event.
+
+### Email Function
+
+`sendBatchEventsFromAvailabilityNotification()` in `app/services/email.server.ts`:
+
+- Accepts pre-segmented recipient arrays: `availableRecipients`, `maybeRecipients`, `noResponseRecipients`
+- Each recipient gets **one email** listing ALL events with per-recipient timezone formatting
+- Events rendered as a green-bordered card with dividers between entries
+- Respects `eventNotifications.email` preference per recipient
+
+| Segment | Heading | Subject Pattern | Tone |
+|---------|---------|----------------|------|
+| Available (for any date) | "You're Booked!" | `📅 You're booked for N events!` | Celebratory |
+| Maybe (for any, not available for none) | "Can You Make It?" | `📅 Can you make it? N events scheduled` | Asks for confirmation |
+| No response | "New Events Scheduled" | `📅 N new events — {groupName}` | Neutral/informational |
+| Not available (all dates) | *(no email)* | — | Skipped |
+
+### Segmentation Logic (in batch route action)
+
+The batch route (`groups.$groupId.availability.$requestId_.batch.tsx`) segments members by "best status" across all batch dates:
+
+1. For each selected date, calls `getAvailabilityForEventDate(requestId, date)`
+2. Builds per-member best status: `available > maybe > not_available > no_response`
+3. Members who said "not_available" for ALL batch dates get **no email**
+4. Members who responded to the request but didn't mark any batch dates → `noResponseRecipients`
+5. Creator is always excluded
+
+### Discord Webhook
+
+`sendBatchEventsCreatedWebhook()` sends one Discord embed listing all events with their schedule (date/time + location per event).
+
+### Key Patterns
+
+- **Consolidated notifications** reduce inbox noise: 1 email instead of 12
+- **Same fire-and-forget pattern** as single event: `void (async () => { ... })()`
+- **Same preference checking** via `mergeWithDefaults()`
+- **Events URL** points to `/groups/:groupId/events` (list view, not individual event)
 
 ## Common Tasks
 
