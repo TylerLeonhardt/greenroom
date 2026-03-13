@@ -7,12 +7,14 @@ import {
 	useLoaderData,
 	useNavigation,
 	useParams,
+	useNavigate,
 } from "@remix-run/react";
 import { ArrowLeft, Clock, Users } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CsrfInput } from "~/components/csrf-input";
 import { InlineTimezoneSelector } from "~/components/timezone-selector";
 import { formatEventTime, getTimezoneAbbreviation, localTimeToUTC } from "~/lib/date-utils";
+import { saveDraftEvent } from "~/lib/draft-storage";
 import { getAvailabilityRequest } from "~/services/availability.server";
 import { validateCsrfToken } from "~/services/csrf.server";
 import {
@@ -282,6 +284,7 @@ export default function NewEvent() {
 		useLoaderData<typeof loader>();
 	const actionData = useActionData<typeof action>();
 	const navigation = useNavigation();
+	const navigate = useNavigate();
 	const isSubmitting = navigation.state === "submitting";
 
 	const [eventType, setEventType] = useState("rehearsal");
@@ -295,6 +298,36 @@ export default function NewEvent() {
 		}
 		return new Set();
 	});
+
+	const handleSaveAsDraft = (e: React.FormEvent) => {
+		e.preventDefault();
+		const form = e.currentTarget as HTMLFormElement;
+		const formData = new FormData(form);
+		
+		const title = formData.get("title") as string;
+		const date = formData.get("date") as string;
+		const startTime = formData.get("startTime") as string;
+		const endTime = formData.get("endTime") as string;
+		
+		if (!title || !date || !startTime || !endTime) {
+			alert("Please fill in all required fields (Title, Date, Start Time, End Time)");
+			return;
+		}
+
+		saveDraftEvent({
+			title: title.trim(),
+			eventType: eventType as "rehearsal" | "show" | "other",
+			date,
+			startTime,
+			endTime,
+			location: (formData.get("location") as string)?.trim() || undefined,
+			description: (formData.get("description") as string)?.trim() || undefined,
+			timezone,
+			groupId: groupId ?? "",
+		});
+
+		navigate(`/groups/${groupId}/events/drafts`);
+	};
 
 	const isShow = eventType === "show";
 
@@ -671,7 +704,14 @@ export default function NewEvent() {
 						disabled={isSubmitting}
 						className="rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
 					>
-						{isSubmitting ? "Creating..." : "Create Event"}
+						{isSubmitting ? "Creating..." : "Create & Publish"}
+					</button>
+					<button
+						type="button"
+						onClick={handleSaveAsDraft}
+						className="rounded-lg border-2 border-amber-400 bg-amber-50 px-6 py-2.5 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:ring-offset-2"
+					>
+						Save as Draft
 					</button>
 					<Link
 						to={`/groups/${groupId}/events`}

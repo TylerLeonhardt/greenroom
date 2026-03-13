@@ -1,5 +1,7 @@
 import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { Link, Outlet, useLoaderData, useLocation } from "@remix-run/react";
+import { useEffect, useState } from "react";
+import { getDraftCount } from "~/lib/draft-storage";
 import { getGroupById, getUserRole, requireGroupMember } from "~/services/groups.server";
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
@@ -43,6 +45,13 @@ export default function GroupLayout() {
 	const location = useLocation();
 	const basePath = `/groups/${group.id}`;
 
+	const [draftCount, setDraftCount] = useState(0);
+
+	useEffect(() => {
+		// Update draft count on mount and when location changes
+		setDraftCount(getDraftCount(group.id));
+	}, [group.id, location.pathname]);
+
 	const isOverview = location.pathname === basePath || location.pathname === `${basePath}/`;
 	const isAvailability = location.pathname.startsWith(`${basePath}/availability`);
 	const isEvents = location.pathname.startsWith(`${basePath}/events`);
@@ -67,7 +76,14 @@ export default function GroupLayout() {
 					Availability
 				</TabLink>
 				<TabLink to={`${basePath}/events`} active={isEvents}>
-					Events
+					<span className="flex items-center gap-2">
+						Events
+						{draftCount > 0 && (
+							<span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1.5 text-xs font-bold text-white">
+								{draftCount}
+							</span>
+						)}
+					</span>
 				</TabLink>
 				<TabLink to={`${basePath}/notifications`} active={isNotifications}>
 					Notifications

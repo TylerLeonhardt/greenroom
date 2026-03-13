@@ -1,10 +1,11 @@
 import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { Link, useLoaderData, useRouteLoaderData, useSearchParams } from "@remix-run/react";
-import { CalendarDays, List, Plus } from "lucide-react";
-import { useState } from "react";
+import { CalendarDays, List, Plus, FileText } from "lucide-react";
+import { useState, useEffect } from "react";
 import { EventCalendar } from "~/components/event-calendar";
 import { EventCard } from "~/components/event-card";
 import { formatDateLong } from "~/lib/date-utils";
+import { getDraftCount } from "~/lib/draft-storage";
 import { getGroupEvents } from "~/services/events.server";
 import { requireGroupMember } from "~/services/groups.server";
 import type { loader as groupLayoutLoader } from "./groups.$groupId";
@@ -35,6 +36,11 @@ export default function Events() {
 	const [typeFilter, setTypeFilter] = useState<string>("all");
 	const [showPast, setShowPast] = useState(false);
 	const [calendarSelectedDate, setCalendarSelectedDate] = useState<string | null>(null);
+	const [draftCount, setDraftCount] = useState(0);
+
+	useEffect(() => {
+		setDraftCount(getDraftCount(groupId));
+	}, [groupId]);
 
 	const now = new Date();
 	const filtered = typeFilter === "all" ? events : events.filter((e) => e.eventType === typeFilter);
@@ -56,6 +62,17 @@ export default function Events() {
 			<div className="mb-6 flex flex-wrap items-center justify-between gap-4">
 				<h2 className="text-xl font-bold text-slate-900">Events</h2>
 				<div className="flex items-center gap-3">
+					{/* Draft Link */}
+					{draftCount > 0 && (
+						<Link
+							to={`/groups/${groupId}/events/drafts`}
+							className="inline-flex items-center gap-2 rounded-lg border-2 border-amber-400 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100"
+						>
+							<FileText className="h-4 w-4" />
+							{draftCount} Draft{draftCount !== 1 ? "s" : ""}
+						</Link>
+					)}
+
 					{/* View Toggle */}
 					<div className="flex rounded-lg border border-slate-200 bg-white">
 						<button
