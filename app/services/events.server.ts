@@ -53,8 +53,9 @@ export async function createEvent(data: {
 export async function createEventsFromAvailability(data: {
 	groupId: string;
 	requestId: string;
-	dates: Array<{ date: string; startTime: string; endTime: string }>;
+	dates: Array<{ date: string; startTime: string; endTime: string; location?: string }>;
 	title: string;
+	description?: string;
 	eventType: "rehearsal" | "show" | "other";
 	location?: string;
 	createdById: string;
@@ -70,10 +71,11 @@ export async function createEventsFromAvailability(data: {
 		const event = await createEvent({
 			groupId: data.groupId,
 			title: data.title,
+			description: data.description,
 			eventType: data.eventType,
 			startTime,
 			endTime,
-			location: data.location,
+			location: dateInfo.location ?? data.location,
 			createdById: data.createdById,
 			createdFromRequestId: data.requestId,
 			timezone: data.timezone ?? undefined,

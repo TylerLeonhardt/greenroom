@@ -721,3 +721,142 @@ ${ctaButton(options.requestUrl, "View Updated Request")}
 		});
 	}
 }
+
+export async function sendBatchEventsFromAvailabilityNotification(options: {
+	events: Array<{
+		title: string;
+		eventType: string;
+		startTime: string | Date;
+		endTime: string | Date;
+		location?: string;
+		eventUrl: string;
+	}>;
+	groupName: string;
+	availableRecipients: Array<{
+		email: string;
+		name: string;
+		timezone?: string | null;
+		notificationPreferences?: NotificationPreferences;
+	}>;
+	maybeRecipients: Array<{
+		email: string;
+		name: string;
+		timezone?: string | null;
+		notificationPreferences?: NotificationPreferences;
+	}>;
+	noResponseRecipients: Array<{
+		email: string;
+		name: string;
+		timezone?: string | null;
+		notificationPreferences?: NotificationPreferences;
+	}>;
+	eventsUrl: string;
+	preferencesUrl?: string;
+}): Promise<void> {
+	function buildEventListHtml(tz?: string): string {
+		const items = options.events.map((event, i) => {
+			const emoji =
+				event.eventType === "show" ? "🎭" : event.eventType === "rehearsal" ? "🎯" : "📅";
+			const dateTime = formatEventTime(event.startTime, event.endTime, tz);
+			const locLine = event.location
+				? `<p style="margin:2px 0 0;font-size:13px;color:#475569;">📍 ${escapeHtml(event.location)}</p>`
+				: "";
+			const divider = i > 0 ? '<div style="border-top:1px solid #bbf7d0;"></div>' : "";
+			return `${divider}<div style="padding:12px 16px;">
+<p style="margin:0 0 4px;font-size:14px;font-weight:600;color:#0f172a;">${emoji} ${escapeHtml(event.title)}</p>
+<p style="margin:0;font-size:13px;color:#475569;">${escapeHtml(dateTime)}</p>
+${locLine}</div>`;
+		});
+		return `<div style="background:#f0fdf4;border-left:4px solid #059669;border-radius:4px;padding:0;margin:20px 0;overflow:hidden;">\n${items.join("\n")}\n</div>`;
+	}
+
+	function buildEventListText(tz?: string): string {
+		return options.events
+			.map((event, i) => {
+				const dateTime = formatEventTime(event.startTime, event.endTime, tz);
+				const loc = event.location ? `\n   📍 ${event.location}` : "";
+				return `${i + 1}. ${event.title} — ${dateTime}${loc}`;
+			})
+			.join("\n\n");
+	}
+
+	const count = options.events.length;
+	const s = count !== 1 ? "s" : "";
+	const haveHas = count !== 1 ? "s have" : " has";
+	const layoutOpts = { preferencesUrl: options.preferencesUrl };
+
+	for (const recipient of options.availableRecipients) {
+		const prefs = mergeWithDefaults(recipient.notificationPreferences);
+		if (!prefs.eventNotifications.email) continue;
+		const tz = recipient.timezone ?? undefined;
+
+		const html = emailLayout(
+			`
+<h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0f172a;">You're Booked!</h2>
+<p style="color:#475569;margin:0 0 20px;">Great news, ${escapeHtml(recipient.name)} — ${count} event${haveHas} been scheduled based on your availability.</p>
+${buildEventListHtml(tz)}
+${ctaButton(options.eventsUrl, "View Events")}
+<p style="color:#64748b;font-size:13px;margin:0;">You indicated you were available for ${count === 1 ? "this date" : "these dates"}. See you there!</p>`,
+			layoutOpts,
+		);
+
+		const text = `Hi ${recipient.name},\n\nGreat news! ${count} event${haveHas} been scheduled based on your availability.\n\n${buildEventListText(tz)}\n\nView events: ${options.eventsUrl}`;
+
+		void sendEmail({
+			to: recipient.email,
+			subject: `📅 You're booked for ${count} event${s}!`,
+			html,
+			text,
+		});
+	}
+
+	for (const recipient of options.maybeRecipients) {
+		const prefs = mergeWithDefaults(recipient.notificationPreferences);
+		if (!prefs.eventNotifications.email) continue;
+		const tz = recipient.timezone ?? undefined;
+
+		const html = emailLayout(
+			`
+<h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0f172a;">Can You Make It?</h2>
+<p style="color:#475569;margin:0 0 20px;">Hi ${escapeHtml(recipient.name)}, ${count} event${haveHas} been scheduled — you said you might be free!</p>
+${buildEventListHtml(tz)}
+${ctaButton(options.eventsUrl, "View Events")}
+<p style="color:#64748b;font-size:13px;margin:0;">Please let your group know if you can make it.</p>`,
+			layoutOpts,
+		);
+
+		const text = `Hi ${recipient.name},\n\n${count} event${haveHas} been scheduled. You said you might be free!\n\n${buildEventListText(tz)}\n\nView events: ${options.eventsUrl}`;
+
+		void sendEmail({
+			to: recipient.email,
+			subject: `📅 Can you make it? ${count} event${s} scheduled`,
+			html,
+			text,
+		});
+	}
+
+	for (const recipient of options.noResponseRecipients) {
+		const prefs = mergeWithDefaults(recipient.notificationPreferences);
+		if (!prefs.eventNotifications.email) continue;
+		const tz = recipient.timezone ?? undefined;
+
+		const html = emailLayout(
+			`
+<h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0f172a;">New Events Scheduled</h2>
+<p style="color:#475569;margin:0 0 20px;">Hi ${escapeHtml(recipient.name)}, ${count} new event${haveHas} been scheduled for ${escapeHtml(options.groupName)}.</p>
+${buildEventListHtml(tz)}
+${ctaButton(options.eventsUrl, "View Events")}
+<p style="color:#64748b;font-size:13px;margin:0;">Check out the details and let your group know if you can attend.</p>`,
+			layoutOpts,
+		);
+
+		const text = `Hi ${recipient.name},\n\n${count} new event${haveHas} been scheduled for ${options.groupName}.\n\n${buildEventListText(tz)}\n\nView events: ${options.eventsUrl}`;
+
+		void sendEmail({
+			to: recipient.email,
+			subject: `📅 ${count} new event${s} — ${options.groupName}`,
+			html,
+			text,
+		});
+	}
+}
