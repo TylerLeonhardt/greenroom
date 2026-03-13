@@ -10,6 +10,9 @@ declare module "@remix-run/node" {
 }
 
 export default defineConfig({
+	server: {
+		port: 3003,
+	},
 	resolve: {
 		alias: {
 			"~": path.resolve(__dirname, "app"),

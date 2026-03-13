@@ -1,41 +1,11 @@
-import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
-import {
-	Form,
-	Link,
-	redirect,
-	useActionData,
-	useLoaderData,
-	useNavigation,
-	useParams,
-} from "@remix-run/react";
+import type { MetaFunction } from "@remix-run/node";
+import { Link, useParams } from "@remix-run/react";
 import { ArrowLeft, ArrowRight, Calendar, Check, MapPin, Clock, Plus, X } from "lucide-react";
 import { useState } from "react";
-import { CsrfInput } from "~/components/csrf-input";
-import { InlineTimezoneSelector } from "~/components/timezone-selector";
-import { localTimeToUTC } from "~/lib/date-utils";
-import { validateCsrfToken } from "~/services/csrf.server";
-import { requireGroupAdminOrPermission } from "~/services/groups.server";
 
 export const meta: MetaFunction = () => {
 	return [{ title: "Batch Create Events — My Call Time" }];
 };
-
-export async function loader({ request, params }: LoaderFunctionArgs) {
-	const groupId = params.groupId ?? "";
-	const user = await requireGroupAdminOrPermission(request, groupId, "membersCanCreateEvents");
-	return { groupId, userTimezone: user.timezone };
-}
-
-export async function action({ request, params }: ActionFunctionArgs) {
-	const groupId = params.groupId ?? "";
-	await requireGroupAdminOrPermission(request, groupId, "membersCanCreateEvents");
-	const formData = await request.formData();
-	await validateCsrfToken(request, formData);
-
-	// In a real implementation, this would create multiple events
-	// For now, just redirect to events page
-	return redirect(`/groups/${groupId}/events`);
-}
 
 interface EventRow {
 	id: string;
@@ -46,10 +16,8 @@ interface EventRow {
 }
 
 export default function BatchCreateEvents() {
-	const { groupId, userTimezone } = useLoaderData<typeof loader>();
-	const actionData = useActionData<typeof action>();
-	const navigation = useNavigation();
-	const isSubmitting = navigation.state === "submitting";
+	const { groupId } = useParams();
+	const userTimezone = "America/Chicago";
 
 	// State management
 	const [step, setStep] = useState(1);
@@ -312,7 +280,12 @@ export default function BatchCreateEvents() {
 							<label className="mb-1.5 block text-sm font-medium text-slate-700">
 								Timezone
 							</label>
-							<InlineTimezoneSelector value={timezone} onChange={setTimezone} />
+							<input
+								type="text"
+								value={timezone}
+								readOnly
+								className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600"
+							/>
 						</div>
 					</div>
 				)}

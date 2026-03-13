@@ -1,18 +1,17 @@
 import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { Link, Outlet, useLoaderData, useLocation } from "@remix-run/react";
-import { getGroupById, getUserRole, requireGroupMember } from "~/services/groups.server";
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
 	return [{ title: data ? `${data.group.name} — My Call Time` : "Group — My Call Time" }];
 };
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ params }: LoaderFunctionArgs) {
 	const groupId = params.groupId ?? "";
-	const user = await requireGroupMember(request, groupId);
-	const group = await getGroupById(groupId);
-	if (!group) throw new Response("Not Found", { status: 404 });
-	const role = await getUserRole(user.id, groupId);
-	return { group, user, role };
+	return {
+		group: { id: groupId, name: "Demo Improv Group", description: "A demo group for the batch wizard prototype" },
+		user: { id: "demo-user", name: "Demo User", timezone: "America/Chicago" },
+		role: "admin" as const,
+	};
 }
 
 function TabLink({
