@@ -7,12 +7,15 @@ import {
 	useLoaderData,
 	useNavigation,
 	useRouteLoaderData,
+	useNavigate,
+	useSearchParams,
 } from "@remix-run/react";
-import { ArrowLeft, Clock, Lock, LockOpen, Trash2, Users } from "lucide-react";
+import { ArrowLeft, Clock, Lock, LockOpen, Trash2, Users, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
 import { AvailabilityGrid } from "~/components/availability-grid";
 import { CsrfInput } from "~/components/csrf-input";
 import { ResultsHeatmap } from "~/components/results-heatmap";
+import { ResultsHeatmapBatch } from "~/components/results-heatmap-batch";
 import { formatDateMedium, formatTimeRange } from "~/lib/date-utils";
 import {
 	closeAvailabilityRequest,
@@ -132,6 +135,8 @@ export default function AvailabilityRequestDetail() {
 	const timezone = parentData?.user?.timezone ?? undefined;
 	const actionData = useActionData<typeof action>();
 	const navigation = useNavigation();
+	const navigate = useNavigate();
+	const [searchParams] = useSearchParams();
 	const isSubmitting = navigation.state === "submitting";
 
 	const dates = availRequest.requestedDates as string[];
@@ -143,6 +148,15 @@ export default function AvailabilityRequestDetail() {
 	const timeRange = formatTimeRange(availRequest.requestedStartTime, availRequest.requestedEndTime);
 	const hasTimeRange = timeRange !== "All day";
 	const canDelete = isAdmin || availRequest.createdById === user.id;
+
+	const batchSuccess = searchParams.get("batchSuccess");
+	const batchCount = searchParams.get("count");
+
+	const handleBatchCreate = (selectedDates: string[]) => {
+		navigate(
+			`/groups/${availRequest.groupId}/availability/${availRequest.id}/batch?dates=${selectedDates.join(",")}`,
+		);
+	};
 
 	return (
 		<div className="max-w-4xl">
@@ -212,6 +226,23 @@ export default function AvailabilityRequestDetail() {
 			</div>
 
 			{/* Feedback */}
+			{batchSuccess && batchCount && (
+				<div className="mb-6 rounded-lg border-2 border-emerald-300 bg-emerald-100 px-5 py-4">
+					<div className="flex items-start gap-3">
+						<div className="rounded-full bg-emerald-600 p-1">
+							<CheckCircle2 className="h-5 w-5 text-white" />
+						</div>
+						<div>
+							<p className="font-semibold text-emerald-900">
+								Success! {batchCount} events created
+							</p>
+							<p className="mt-0.5 text-sm text-emerald-700">
+								One consolidated notification has been sent to the group.
+							</p>
+						</div>
+					</div>
+				</div>
+			)}
 			{actionData && "message" in actionData && actionData.success && (
 				<div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
 					{actionData.message}
@@ -295,7 +326,7 @@ export default function AvailabilityRequestDetail() {
 				<div className="space-y-6">
 					<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
 						<h3 className="mb-4 text-lg font-semibold text-slate-900">Results</h3>
-						<ResultsHeatmap
+						<ResultsHeatmapBatch
 							dates={results.dates}
 							totalMembers={results.totalMembers}
 							totalResponded={results.totalResponded}
@@ -303,6 +334,7 @@ export default function AvailabilityRequestDetail() {
 							requestId={availRequest.id}
 							timeRange={hasTimeRange ? timeRange : null}
 							timezone={timezone}
+							onBatchCreate={handleBatchCreate}
 						/>
 					</div>
 
