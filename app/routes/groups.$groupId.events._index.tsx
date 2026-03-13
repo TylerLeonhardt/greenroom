@@ -113,7 +113,6 @@ export default function Events() {
 				</div>
 			</div>
 
-
 			{/* List View */}
 			{view === "list" && (
 				<div className="space-y-6">
