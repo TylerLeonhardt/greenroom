@@ -203,7 +203,9 @@ export function ResultsHeatmapBatch({
 								<th className="px-3 py-3 text-center text-xs font-medium text-rose-600">❌</th>
 								<th className="px-3 py-3 text-center text-xs font-medium text-slate-400">—</th>
 								<th className="px-4 py-3 text-center text-xs font-medium text-slate-500">Score</th>
-								{!batchMode && <th className="px-4 py-3 text-right text-xs font-medium text-slate-500" />}
+								{!batchMode && (
+									<th className="px-4 py-3 text-right text-xs font-medium text-slate-500" />
+								)}
 							</tr>
 						</thead>
 						<tbody className="divide-y divide-slate-100">
