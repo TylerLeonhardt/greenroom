@@ -52,7 +52,7 @@ vi.mock("~/services/webhook.server", () => ({
 	sendEventEditedWebhook: vi.fn(),
 }));
 
-import { action } from "~/routes/groups.$groupId.events.$eventId.edit";
+import { action } from "~/routes/groups.$groupId.events.$eventId_.edit";
 import {
 	deleteEvent,
 	getEventWithAssignments,
