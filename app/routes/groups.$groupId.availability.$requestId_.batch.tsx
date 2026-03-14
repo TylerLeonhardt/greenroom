@@ -655,14 +655,16 @@ function ConfigureStep({
 
 					{/* Apply to All */}
 					<div className="mt-4 flex gap-2">
-						<input
-							type="text"
-							value={applyAllLocation}
-							onChange={(e) => onApplyAllLocationChange(e.target.value)}
-							maxLength={200}
-							className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-							placeholder="Same location for all dates"
-						/>
+						<div className="min-w-0 flex-1">
+							<input
+								type="text"
+								value={applyAllLocation}
+								onChange={(e) => onApplyAllLocationChange(e.target.value)}
+								maxLength={200}
+								className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+								placeholder="Same location for all dates"
+							/>
+						</div>
 						<button
 							type="button"
 							onClick={onApplyAll}
@@ -682,14 +684,16 @@ function ConfigureStep({
 										<span className="text-sm font-medium text-slate-700">{dayOfWeek}</span>
 										<span className="ml-1 text-sm text-slate-500">{display}</span>
 									</div>
-									<input
-										type="text"
-										value={locations[date] ?? ""}
-										onChange={(e) => onLocationChange(date, e.target.value)}
-										maxLength={200}
-										className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-										placeholder="Location"
-									/>
+									<div className="min-w-0 flex-1">
+										<input
+											type="text"
+											value={locations[date] ?? ""}
+											onChange={(e) => onLocationChange(date, e.target.value)}
+											maxLength={200}
+											className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+											placeholder="Location"
+										/>
+									</div>
 								</div>
 							);
 						})}
