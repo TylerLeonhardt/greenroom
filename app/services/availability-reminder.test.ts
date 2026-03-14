@@ -40,8 +40,17 @@ vi.mock("./telemetry.server.js", () => ({
 	trackEvent: vi.fn(),
 }));
 
+vi.mock("./logger.server.js", () => ({
+	logger: {
+		warn: vi.fn(),
+		info: vi.fn(),
+		error: vi.fn(),
+	},
+}));
+
 import { db } from "../../src/db/index.js";
-import { getNonRespondents } from "./availability.server";
+import { getNonRespondents, getReminderSentAt, updateReminderSentAt } from "./availability.server";
+import { logger } from "./logger.server.js";
 
 describe("getNonRespondents", () => {
 	beforeEach(() => {
@@ -159,5 +168,81 @@ describe("getNonRespondents", () => {
 
 		expect(result).toHaveLength(0);
 		expect(db.select).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("getReminderSentAt", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("returns reminderSentAt when column exists", async () => {
+		const sentDate = new Date("2025-03-10T12:00:00.000Z");
+		const chain = createChainWithLimit([{ reminderSentAt: sentDate }]);
+		vi.mocked(db.select).mockImplementation(() => chain as never);
+
+		const result = await getReminderSentAt("r1");
+
+		expect(result).toEqual(sentDate);
+	});
+
+	it("returns null when request not found", async () => {
+		const chain = createChainWithLimit([]);
+		vi.mocked(db.select).mockImplementation(() => chain as never);
+
+		const result = await getReminderSentAt("nonexistent");
+
+		expect(result).toBeNull();
+	});
+
+	it("returns null when reminder has not been sent", async () => {
+		const chain = createChainWithLimit([{ reminderSentAt: null }]);
+		vi.mocked(db.select).mockImplementation(() => chain as never);
+
+		const result = await getReminderSentAt("r1");
+
+		expect(result).toBeNull();
+	});
+
+	it("returns null gracefully when column does not exist (migration not run)", async () => {
+		const chain: Record<string, ReturnType<typeof vi.fn>> = {};
+		chain.limit = vi.fn().mockRejectedValue(new Error('column "reminder_sent_at" does not exist'));
+		chain.where = vi.fn().mockReturnValue(chain);
+		chain.from = vi.fn().mockReturnValue(chain);
+		vi.mocked(db.select).mockImplementation(() => chain as never);
+
+		const result = await getReminderSentAt("r1");
+
+		expect(result).toBeNull();
+		expect(logger.warn).toHaveBeenCalledWith(
+			expect.objectContaining({ requestId: "r1" }),
+			expect.stringContaining("reminderSentAt"),
+		);
+	});
+});
+
+describe("updateReminderSentAt", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("updates without error when column exists", async () => {
+		await updateReminderSentAt("r1");
+
+		expect(db.update).toHaveBeenCalled();
+	});
+
+	it("does not throw when column does not exist (migration not run)", async () => {
+		vi.mocked(db.update).mockImplementation(() => {
+			throw new Error('column "reminder_sent_at" does not exist');
+		});
+
+		// Should not throw
+		await updateReminderSentAt("r1");
+
+		expect(logger.warn).toHaveBeenCalledWith(
+			expect.objectContaining({ requestId: "r1" }),
+			expect.stringContaining("Failed to update reminderSentAt"),
+		);
 	});
 });
