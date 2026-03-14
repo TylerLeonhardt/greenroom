@@ -43,6 +43,7 @@ vi.mock("~/services/availability.server", () => ({
 	deleteAvailabilityRequest: vi.fn(),
 	getNonRespondents: vi.fn(),
 	updateReminderSentAt: vi.fn(),
+	getReminderSentAt: vi.fn().mockResolvedValue(null),
 }));
 
 // Mock CSRF validation — allow all by default
@@ -55,11 +56,12 @@ vi.mock("~/services/rate-limit.server", () => ({
 	checkReminderRateLimit: vi.fn().mockReturnValue({ limited: false }),
 }));
 
-import { action } from "~/routes/groups.$groupId.availability.$requestId";
+import { action, loader } from "~/routes/groups.$groupId.availability.$requestId";
 import {
 	deleteAvailabilityRequest,
 	getAvailabilityRequest,
 	getNonRespondents,
+	getReminderSentAt,
 	submitAvailabilityResponse,
 	updateReminderSentAt,
 } from "~/services/availability.server";
@@ -619,5 +621,140 @@ describe("availability request sendReminder action", () => {
 			error: "Reminder already sent recently. Try again in 300 seconds.",
 		});
 		expect(getNonRespondents).not.toHaveBeenCalled();
+	});
+});
+
+import { getAggregatedResults, getUserResponse } from "~/services/availability.server";
+
+describe("availability request loader", () => {
+	const mockAvailRequest = {
+		id: "r1",
+		groupId: "g1",
+		title: "March Rehearsals",
+		description: null,
+		status: "open",
+		dateRangeStart: "2025-03-01T00:00:00.000Z",
+		dateRangeEnd: "2025-03-28T00:00:00.000Z",
+		requestedDates: ["2025-03-15", "2025-03-16"],
+		requestedStartTime: null,
+		requestedEndTime: null,
+		expiresAt: null,
+		createdById: "user-1",
+		createdAt: "2025-03-01T00:00:00.000Z",
+		createdByName: "Test User",
+	};
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		(requireGroupMember as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: "user-1",
+			email: "test@example.com",
+			name: "Test User",
+			profileImage: null,
+		});
+		(isGroupAdmin as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+		(getAvailabilityRequest as ReturnType<typeof vi.fn>).mockResolvedValue(mockAvailRequest);
+		(getUserResponse as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+		(getReminderSentAt as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+	});
+
+	it("loads availability request detail page", async () => {
+		const request = new Request("http://localhost/groups/g1/availability/r1");
+		const result = await loader({
+			request,
+			params: { groupId: "g1", requestId: "r1" },
+			context: {},
+		});
+
+		expect(result.availRequest).toEqual(mockAvailRequest);
+		expect(result.reminderSentAt).toBeNull();
+	});
+
+	it("returns reminderSentAt when available", async () => {
+		const sentDate = "2025-03-10T12:00:00.000Z";
+		(getReminderSentAt as ReturnType<typeof vi.fn>).mockResolvedValue(sentDate);
+
+		const request = new Request("http://localhost/groups/g1/availability/r1");
+		const result = await loader({
+			request,
+			params: { groupId: "g1", requestId: "r1" },
+			context: {},
+		});
+
+		expect(result.reminderSentAt).toBe(sentDate);
+		expect(getReminderSentAt).toHaveBeenCalledWith("r1");
+	});
+
+	it("page loads even when getReminderSentAt fails (missing column)", async () => {
+		(getReminderSentAt as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+
+		const request = new Request("http://localhost/groups/g1/availability/r1");
+		const result = await loader({
+			request,
+			params: { groupId: "g1", requestId: "r1" },
+			context: {},
+		});
+
+		expect(result.availRequest).toEqual(mockAvailRequest);
+		expect(result.reminderSentAt).toBeNull();
+		expect(result.isAdmin).toBe(false);
+	});
+
+	it("throws 404 when request not found", async () => {
+		(getAvailabilityRequest as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+
+		const request = new Request("http://localhost/groups/g1/availability/r1");
+		try {
+			await loader({
+				request,
+				params: { groupId: "g1", requestId: "r1" },
+				context: {},
+			});
+			expect.fail("Should have thrown 404");
+		} catch (response) {
+			expect(response).toBeInstanceOf(Response);
+			expect((response as Response).status).toBe(404);
+		}
+	});
+
+	it("throws 404 when request belongs to different group", async () => {
+		(getAvailabilityRequest as ReturnType<typeof vi.fn>).mockResolvedValue({
+			...mockAvailRequest,
+			groupId: "other-group",
+		});
+
+		const request = new Request("http://localhost/groups/g1/availability/r1");
+		try {
+			await loader({
+				request,
+				params: { groupId: "g1", requestId: "r1" },
+				context: {},
+			});
+			expect.fail("Should have thrown 404");
+		} catch (response) {
+			expect(response).toBeInstanceOf(Response);
+			expect((response as Response).status).toBe(404);
+		}
+	});
+
+	it("includes aggregated results for admins", async () => {
+		(isGroupAdmin as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+		const mockResults = {
+			dates: [],
+			totalMembers: 5,
+			totalResponded: 3,
+		};
+		(getAggregatedResults as ReturnType<typeof vi.fn>).mockResolvedValue(mockResults);
+
+		const request = new Request("http://localhost/groups/g1/availability/r1");
+		const result = await loader({
+			request,
+			params: { groupId: "g1", requestId: "r1" },
+			context: {},
+		});
+
+		expect(result.isAdmin).toBe(true);
+		expect(result.results).toEqual(mockResults);
+		expect(result.nonRespondentCount).toBe(2);
 	});
 });

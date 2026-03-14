@@ -8,6 +8,7 @@ import {
 	type NotificationPreferences,
 	users,
 } from "../../src/db/schema.js";
+import { logger } from "./logger.server.js";
 import { trackEvent } from "./telemetry.server.js";
 
 type AvailabilityRequest = typeof availabilityRequests.$inferSelect;
@@ -50,7 +51,7 @@ export async function createAvailabilityRequest(data: {
 
 export async function getGroupAvailabilityRequests(groupId: string): Promise<
 	Array<
-		AvailabilityRequest & {
+		Omit<AvailabilityRequest, "reminderSentAt"> & {
 			responseCount: number;
 			memberCount: number;
 			createdByName: string;
@@ -72,7 +73,6 @@ export async function getGroupAvailabilityRequests(groupId: string): Promise<
 			createdById: availabilityRequests.createdById,
 			createdAt: availabilityRequests.createdAt,
 			expiresAt: availabilityRequests.expiresAt,
-			reminderSentAt: availabilityRequests.reminderSentAt,
 			createdByName: users.name,
 			responseCount: sql<number>`cast((
 				select count(*) from availability_responses
@@ -101,7 +101,7 @@ export async function getGroupAvailabilityRequests(groupId: string): Promise<
 
 export async function getAvailabilityRequest(
 	requestId: string,
-): Promise<(AvailabilityRequest & { createdByName: string }) | null> {
+): Promise<(Omit<AvailabilityRequest, "reminderSentAt"> & { createdByName: string }) | null> {
 	const [row] = await db
 		.select({
 			id: availabilityRequests.id,
@@ -117,7 +117,6 @@ export async function getAvailabilityRequest(
 			createdById: availabilityRequests.createdById,
 			createdAt: availabilityRequests.createdAt,
 			expiresAt: availabilityRequests.expiresAt,
-			reminderSentAt: availabilityRequests.reminderSentAt,
 			createdByName: users.name,
 		})
 		.from(availabilityRequests)
@@ -334,6 +333,28 @@ export async function deleteAvailabilityRequest(requestId: string): Promise<void
 
 // --- Reminders ---
 
+/**
+ * Fetches reminderSentAt separately from core queries. Returns null gracefully
+ * if the column doesn't exist (e.g., migration 0012 hasn't run yet).
+ */
+export async function getReminderSentAt(requestId: string): Promise<Date | null> {
+	try {
+		const [row] = await db
+			.select({ reminderSentAt: availabilityRequests.reminderSentAt })
+			.from(availabilityRequests)
+			.where(eq(availabilityRequests.id, requestId))
+			.limit(1);
+		return row?.reminderSentAt ?? null;
+	} catch (error) {
+		// Log unexpected errors but still return null to keep the page functional
+		logger.warn(
+			{ requestId, err: error },
+			"Failed to fetch reminderSentAt — migration 0012 may not have run yet",
+		);
+		return null;
+	}
+}
+
 export async function getNonRespondents(
 	requestId: string,
 	groupId: string,
@@ -385,8 +406,15 @@ export async function getNonRespondents(
 }
 
 export async function updateReminderSentAt(requestId: string): Promise<void> {
-	await db
-		.update(availabilityRequests)
-		.set({ reminderSentAt: new Date() })
-		.where(eq(availabilityRequests.id, requestId));
+	try {
+		await db
+			.update(availabilityRequests)
+			.set({ reminderSentAt: new Date() })
+			.where(eq(availabilityRequests.id, requestId));
+	} catch (error) {
+		logger.warn(
+			{ requestId, err: error },
+			"Failed to update reminderSentAt — migration 0012 may not have run yet",
+		);
+	}
 }

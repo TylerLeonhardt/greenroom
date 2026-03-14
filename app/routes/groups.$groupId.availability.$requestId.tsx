@@ -32,6 +32,7 @@ import {
 	getAggregatedResults,
 	getAvailabilityRequest,
 	getNonRespondents,
+	getReminderSentAt,
 	getUserResponse,
 	reopenAvailabilityRequest,
 	submitAvailabilityResponse,
@@ -68,6 +69,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 			? results.totalMembers - results.totalResponded
 			: 0;
 
+	// Fetch reminderSentAt separately — gracefully returns null if migration 0012 hasn't run
+	const reminderSentAt = await getReminderSentAt(requestId);
+
 	return {
 		availRequest,
 		userResponse,
@@ -75,7 +79,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 		isAdmin: admin,
 		user,
 		nonRespondentCount,
-		reminderSentAt: availRequest.reminderSentAt,
+		reminderSentAt,
 	};
 }
 
