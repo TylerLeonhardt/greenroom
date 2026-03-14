@@ -250,3 +250,39 @@ export function sendAvailabilityRequestEditedWebhook(
 		{ groupId: params.groupName, type: "availability_request_edited" },
 	);
 }
+
+export function sendBatchEventsCreatedWebhook(
+	webhookUrl: string,
+	params: {
+		groupName: string;
+		title: string;
+		eventType: string;
+		events: Array<{ dateTime: string; location?: string }>;
+		eventsUrl: string;
+	},
+): void {
+	const count = params.events.length;
+	const typeLabel = params.eventType.charAt(0).toUpperCase() + params.eventType.slice(1);
+
+	const eventList = params.events
+		.map((e, i) => {
+			const location = e.location ? ` · ${e.location}` : "";
+			return `${i + 1}. ${e.dateTime}${location}`;
+		})
+		.join("\n");
+
+	void sendWebhook(
+		webhookUrl,
+		{
+			title: `🎭 ${count} New ${typeLabel}${count !== 1 ? "s" : ""}: ${params.title}`,
+			url: params.eventsUrl,
+			fields: [
+				{ name: "Group", value: params.groupName, inline: true },
+				{ name: "Type", value: typeLabel, inline: true },
+				{ name: "Schedule", value: eventList },
+			],
+			footer: { text: "View details on My Call Time" },
+		},
+		{ groupId: params.groupName, type: "batch_events_created" },
+	);
+}

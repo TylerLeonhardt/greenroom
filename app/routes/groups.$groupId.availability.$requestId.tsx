@@ -5,10 +5,12 @@ import {
 	redirect,
 	useActionData,
 	useLoaderData,
+	useNavigate,
 	useNavigation,
 	useRouteLoaderData,
+	useSearchParams,
 } from "@remix-run/react";
-import { ArrowLeft, Clock, Lock, LockOpen, Pencil, Trash2, Users } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Lock, LockOpen, Pencil, Trash2, Users } from "lucide-react";
 import { useState } from "react";
 import { AvailabilityGrid } from "~/components/availability-grid";
 import { CsrfInput } from "~/components/csrf-input";
@@ -132,6 +134,10 @@ export default function AvailabilityRequestDetail() {
 	const timezone = parentData?.user?.timezone ?? undefined;
 	const actionData = useActionData<typeof action>();
 	const navigation = useNavigation();
+	const navigate = useNavigate();
+	const [searchParams] = useSearchParams();
+	const batchSuccess = searchParams.get("batchSuccess") === "true";
+	const batchCount = searchParams.get("count");
 	const isSubmitting = navigation.state === "submitting";
 
 	const dates = availRequest.requestedDates as string[];
@@ -234,6 +240,25 @@ export default function AvailabilityRequestDetail() {
 				</div>
 			)}
 
+			{/* Batch creation success banner */}
+			{batchSuccess && batchCount && (
+				<div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+					<div className="flex items-center gap-2">
+						<Calendar className="h-4 w-4 text-emerald-600" />
+						<p className="text-sm font-medium text-emerald-700">
+							Successfully created {batchCount} event{Number(batchCount) !== 1 ? "s" : ""}! Members
+							have been notified.
+						</p>
+					</div>
+					<Link
+						to={`/groups/${availRequest.groupId}/events`}
+						className="mt-2 inline-block text-sm font-medium text-emerald-600 hover:text-emerald-700"
+					>
+						View Events →
+					</Link>
+				</div>
+			)}
+
 			{/* Tab toggle for admins */}
 			{isAdmin && results && (
 				<div className="mb-6 flex gap-0 border-b border-slate-200">
@@ -314,6 +339,12 @@ export default function AvailabilityRequestDetail() {
 							requestId={availRequest.id}
 							timeRange={hasTimeRange ? timeRange : null}
 							timezone={timezone}
+							batchMode={isAdmin}
+							onBatchCreate={(dates) => {
+								navigate(
+									`/groups/${availRequest.groupId}/availability/${availRequest.id}/batch?dates=${dates.join(",")}`,
+								);
+							}}
 						/>
 					</div>
 
