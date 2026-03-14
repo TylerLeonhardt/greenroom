@@ -61,6 +61,7 @@ export async function createEventsFromAvailability(data: {
 	createdById: string;
 	autoAssignAvailable?: boolean;
 	timezone?: string | null;
+	callTime?: string;
 }): Promise<Event[]> {
 	const createdEvents: Event[] = [];
 
@@ -79,6 +80,9 @@ export async function createEventsFromAvailability(data: {
 			createdById: data.createdById,
 			createdFromRequestId: data.requestId,
 			timezone: data.timezone ?? undefined,
+			callTime: data.callTime
+				? localTimeToUTC(dateInfo.date, data.callTime, data.timezone)
+				: undefined,
 		});
 
 		if (data.autoAssignAvailable) {
