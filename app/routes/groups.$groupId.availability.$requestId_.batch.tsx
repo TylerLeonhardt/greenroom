@@ -578,7 +578,7 @@ function ConfigureStep({
 								type="time"
 								value={startTime}
 								onChange={(e) => onStartTimeChange(e.target.value)}
-								className="mt-1 block w-full appearance-none rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+								className="mt-1 block w-full min-w-0 appearance-none rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 							/>
 						</div>
 						<div>
@@ -590,7 +590,7 @@ function ConfigureStep({
 								type="time"
 								value={endTime}
 								onChange={(e) => onEndTimeChange(e.target.value)}
-								className="mt-1 block w-full appearance-none rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+								className="mt-1 block w-full min-w-0 appearance-none rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 							/>
 						</div>
 					</div>
@@ -610,7 +610,7 @@ function ConfigureStep({
 								type="time"
 								value={callTime}
 								onChange={(e) => onCallTimeChange(e.target.value)}
-								className="mt-1 block w-full appearance-none rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors sm:max-w-[200px] focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+								className="mt-1 block w-full min-w-0 appearance-none rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors sm:max-w-[200px] focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
 							/>
 						</div>
 					)}
