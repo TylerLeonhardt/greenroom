@@ -67,10 +67,22 @@ export function ResultsHeatmap({
 	batchMode,
 	onBatchCreate,
 }: ResultsHeatmapProps) {
-	const [expandedDate, setExpandedDate] = useState<string | null>(null);
+	const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
 	const [sortBy, setSortBy] = useState<"date" | "score">("date");
 	const [batchSelecting, setBatchSelecting] = useState(false);
 	const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set());
+
+	const toggleExpanded = useCallback((date: string) => {
+		setExpandedDates((prev) => {
+			const next = new Set(prev);
+			if (next.has(date)) {
+				next.delete(date);
+			} else {
+				next.add(date);
+			}
+			return next;
+		});
+	}, []);
 
 	const toggleDate = useCallback((date: string) => {
 		setSelectedDates((prev) => {
@@ -239,7 +251,7 @@ export function ResultsHeatmap({
 						<tbody className="divide-y divide-slate-100">
 							{sortedDates.map((row) => {
 								const { dayOfWeek, display } = formatDateDisplay(row.date, timezone ?? undefined);
-								const isExpanded = expandedDate === row.date;
+								const isExpanded = expandedDates.has(row.date);
 								const isBest = topDateSet.has(row.date) && row.score > 0;
 								return (
 									<Fragment key={row.date}>
@@ -253,25 +265,51 @@ export function ResultsHeatmap({
 												if (batchSelecting) {
 													toggleDate(row.date);
 												} else {
-													setExpandedDate(isExpanded ? null : row.date);
+													toggleExpanded(row.date);
 												}
 											}}
 										>
 											{batchSelecting && (
 												<td className="px-2 py-3 text-center">
-													{selectedDates.has(row.date) ? (
-														<CheckSquare className="inline h-4 w-4 text-emerald-600" />
-													) : (
-														<Square className="inline h-4 w-4 text-slate-400" />
-													)}
+													<button
+														type="button"
+														onClick={(e) => {
+															e.stopPropagation();
+															toggleDate(row.date);
+														}}
+														onKeyDown={(e) => {
+															if (e.key === "Enter" || e.key === " ") {
+																e.stopPropagation();
+															}
+														}}
+													>
+														{selectedDates.has(row.date) ? (
+															<CheckSquare className="inline h-4 w-4 text-emerald-600" />
+														) : (
+															<Square className="inline h-4 w-4 text-slate-400" />
+														)}
+													</button>
 												</td>
 											)}
 											<td className="px-3 py-3 text-center">
-												{isExpanded ? (
-													<ChevronDown className="inline h-4 w-4 text-slate-400" />
-												) : (
-													<ChevronRight className="inline h-4 w-4 text-slate-400" />
-												)}
+												<button
+													type="button"
+													onClick={(e) => {
+														e.stopPropagation();
+														toggleExpanded(row.date);
+													}}
+													onKeyDown={(e) => {
+														if (e.key === "Enter" || e.key === " ") {
+															e.stopPropagation();
+														}
+													}}
+												>
+													{isExpanded ? (
+														<ChevronDown className="inline h-4 w-4 text-slate-400" />
+													) : (
+														<ChevronRight className="inline h-4 w-4 text-slate-400" />
+													)}
+												</button>
 											</td>
 											<td className="px-4 py-3">
 												<div className="flex items-center gap-2">
@@ -342,7 +380,7 @@ export function ResultsHeatmap({
 			<div className="space-y-2 sm:hidden">
 				{sortedDates.map((row) => {
 					const { dayOfWeek, display } = formatDateDisplay(row.date, timezone ?? undefined);
-					const isExpanded = expandedDate === row.date;
+					const isExpanded = expandedDates.has(row.date);
 					const isBest = topDateSet.has(row.date) && row.score > 0;
 					return (
 						<div
@@ -353,26 +391,49 @@ export function ResultsHeatmap({
 									: `border-slate-200 ${getHeatColor(row.score, maxScore)}`
 							}`}
 						>
-							<button
-								type="button"
+							{/* biome-ignore lint/a11y/useSemanticElements: div required to avoid nested button nesting violation */}
+							<div
+								role="button"
+								tabIndex={0}
 								onClick={() => {
 									if (batchSelecting) {
 										toggleDate(row.date);
 									} else {
-										setExpandedDate(isExpanded ? null : row.date);
+										toggleExpanded(row.date);
+									}
+								}}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" || e.key === " ") {
+										e.preventDefault();
+										if (batchSelecting) {
+											toggleDate(row.date);
+										} else {
+											toggleExpanded(row.date);
+										}
 									}
 								}}
 								className="flex w-full items-center justify-between p-4 text-left"
 							>
 								<div className="flex items-center gap-3">
 									{batchSelecting && (
-										<span>
+										<button
+											type="button"
+											onClick={(e) => {
+												e.stopPropagation();
+												toggleDate(row.date);
+											}}
+											onKeyDown={(e) => {
+												if (e.key === "Enter" || e.key === " ") {
+													e.stopPropagation();
+												}
+											}}
+										>
 											{selectedDates.has(row.date) ? (
 												<CheckSquare className="h-4 w-4 text-emerald-600" />
 											) : (
 												<Square className="h-4 w-4 text-slate-400" />
 											)}
-										</span>
+										</button>
 									)}
 									<div>
 										<div className="flex items-center gap-2">
@@ -391,15 +452,28 @@ export function ResultsHeatmap({
 									<span className="rounded-full bg-slate-900/5 px-2 py-0.5 text-xs font-semibold text-slate-700">
 										{row.score}
 									</span>
-									{!batchSelecting &&
-										(isExpanded ? (
+									<button
+										type="button"
+										onClick={(e) => {
+											e.stopPropagation();
+											toggleExpanded(row.date);
+										}}
+										onKeyDown={(e) => {
+											if (e.key === "Enter" || e.key === " ") {
+												e.stopPropagation();
+											}
+										}}
+										className="p-1"
+									>
+										{isExpanded ? (
 											<ChevronDown className="h-4 w-4 text-slate-400" />
 										) : (
 											<ChevronRight className="h-4 w-4 text-slate-400" />
-										))}
+										)}
+									</button>
 								</div>
-							</button>
-							{isExpanded && !batchSelecting && (
+							</div>
+							{isExpanded && (
 								<div className="border-t border-slate-200 bg-white p-4">
 									<div className="space-y-2">
 										{row.respondents.length > 0 ? (

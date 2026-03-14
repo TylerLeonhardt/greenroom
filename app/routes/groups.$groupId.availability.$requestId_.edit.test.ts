@@ -49,7 +49,7 @@ vi.mock("~/services/webhook.server", () => ({
 	sendAvailabilityRequestEditedWebhook: vi.fn(),
 }));
 
-import { action } from "~/routes/groups.$groupId.availability.$requestId.edit";
+import { action } from "~/routes/groups.$groupId.availability.$requestId_.edit";
 import { getAvailabilityRequest, updateAvailabilityRequest } from "~/services/availability.server";
 import { isGroupAdmin, requireGroupMember } from "~/services/groups.server";
 
