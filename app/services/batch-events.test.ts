@@ -194,4 +194,51 @@ describe("batch events — createEventsFromAvailability per-date features", () =
 
 		expect(mockValues).toHaveBeenCalledWith(expect.objectContaining({ location: null }));
 	});
+
+	it("passes callTime to each created event when provided", async () => {
+		mockReturning
+			.mockResolvedValueOnce([
+				{ ...mockEvent, id: "ev-1", callTime: new Date("2026-03-15T18:00:00Z") },
+			])
+			.mockResolvedValueOnce([
+				{ ...mockEvent, id: "ev-2", callTime: new Date("2026-03-16T18:00:00Z") },
+			]);
+
+		await createEventsFromAvailability({
+			groupId: "group-1",
+			requestId: "req-1",
+			dates: [
+				{ date: "2026-03-15", startTime: "19:00", endTime: "21:00" },
+				{ date: "2026-03-16", startTime: "19:00", endTime: "21:00" },
+			],
+			title: "Big Show",
+			eventType: "show",
+			createdById: "user-1",
+			callTime: "18:00",
+		});
+
+		const calls = mockValues.mock.calls;
+		// Each event should have callTime converted via localTimeToUTC
+		expect(calls[0][0]).toEqual(
+			expect.objectContaining({ callTime: new Date("2026-03-15T18:00:00Z") }),
+		);
+		expect(calls[1][0]).toEqual(
+			expect.objectContaining({ callTime: new Date("2026-03-16T18:00:00Z") }),
+		);
+	});
+
+	it("defaults callTime to null when not provided", async () => {
+		mockReturning.mockResolvedValueOnce([mockEvent]);
+
+		await createEventsFromAvailability({
+			groupId: "group-1",
+			requestId: "req-1",
+			dates: [{ date: "2026-03-15", startTime: "19:00", endTime: "21:00" }],
+			title: "Rehearsal",
+			eventType: "rehearsal",
+			createdById: "user-1",
+		});
+
+		expect(mockValues).toHaveBeenCalledWith(expect.objectContaining({ callTime: null }));
+	});
 });

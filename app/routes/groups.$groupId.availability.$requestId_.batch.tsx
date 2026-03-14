@@ -7,7 +7,7 @@ import {
 	useLoaderData,
 	useNavigation,
 } from "@remix-run/react";
-import { ArrowLeft, Calendar, Check, MapPin, Plus } from "lucide-react";
+import { ArrowLeft, Calendar, Check, Clock, MapPin, Plus } from "lucide-react";
 import { useState } from "react";
 import { CsrfInput } from "~/components/csrf-input";
 import { InlineTimezoneSelector } from "~/components/timezone-selector";
@@ -78,6 +78,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	const description = formData.get("description");
 	const startTime = formData.get("startTime");
 	const endTime = formData.get("endTime");
+	const callTime = formData.get("callTime");
 	const dates = formData.get("dates");
 	const formTimezone = formData.get("timezone");
 	const timezone =
@@ -110,6 +111,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	if (startTime >= endTime) {
 		return { error: "End time must be after start time." };
 	}
+
+	const hasCallTime =
+		eventType === "show" && typeof callTime === "string" && callTime.trim() !== "";
+	if (hasCallTime && callTime.trim() >= startTime) {
+		return { error: "Call time must be before start time." };
+	}
+
 	if (typeof dates !== "string" || !dates) {
 		return { error: "No dates selected." };
 	}
@@ -141,6 +149,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		eventType: eventType as "rehearsal" | "show" | "other",
 		createdById: user.id,
 		timezone,
+		callTime: hasCallTime ? callTime.trim() : undefined,
 	});
 
 	// Fire-and-forget notifications
@@ -289,6 +298,7 @@ export default function BatchCreateEvents() {
 	const [description, setDescription] = useState("");
 	const [startTime, setStartTime] = useState(availRequest.requestedStartTime ?? DEFAULT_START_TIME);
 	const [endTime, setEndTime] = useState(availRequest.requestedEndTime ?? DEFAULT_END_TIME);
+	const [callTime, setCallTime] = useState("18:00");
 	const [timezone, setTimezone] = useState<string | null>(userTimezone ?? null);
 	const [locations, setLocations] = useState<Record<string, string>>({});
 	const [applyAllLocation, setApplyAllLocation] = useState("");
@@ -369,6 +379,8 @@ export default function BatchCreateEvents() {
 					onStartTimeChange={setStartTime}
 					endTime={endTime}
 					onEndTimeChange={setEndTime}
+					callTime={callTime}
+					onCallTimeChange={setCallTime}
 					timezone={timezone}
 					onTimezoneChange={setTimezone}
 					selectedDates={selectedDates}
@@ -401,6 +413,7 @@ export default function BatchCreateEvents() {
 					description={description}
 					startTime={startTime}
 					endTime={endTime}
+					callTime={callTime}
 					timezone={timezone}
 					selectedDates={selectedDates}
 					locations={locations}
@@ -424,6 +437,8 @@ function ConfigureStep({
 	onStartTimeChange,
 	endTime,
 	onEndTimeChange,
+	callTime,
+	onCallTimeChange,
 	timezone,
 	onTimezoneChange,
 	selectedDates,
@@ -450,6 +465,8 @@ function ConfigureStep({
 	onStartTimeChange: (v: string) => void;
 	endTime: string;
 	onEndTimeChange: (v: string) => void;
+	callTime: string;
+	onCallTimeChange: (v: string) => void;
 	timezone: string | null;
 	onTimezoneChange: (v: string) => void;
 	selectedDates: string[];
@@ -551,7 +568,7 @@ function ConfigureStep({
 					)}
 
 					{/* Time Inputs */}
-					<div className="grid grid-cols-2 gap-4">
+					<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
 						<div>
 							<label htmlFor="startTime" className="block text-sm font-medium text-slate-700">
 								Start Time <span className="text-red-500">*</span>
@@ -577,6 +594,26 @@ function ConfigureStep({
 							/>
 						</div>
 					</div>
+
+					{/* Call Time — show only */}
+					{eventType === "show" && (
+						<div>
+							<label htmlFor="callTime" className="block text-sm font-medium text-slate-700">
+								<Clock className="mr-1 inline h-4 w-4 text-purple-500" />
+								Call Time
+								<span className="ml-1 text-xs font-normal text-slate-500">
+									(when performers need to arrive)
+								</span>
+							</label>
+							<input
+								id="callTime"
+								type="time"
+								value={callTime}
+								onChange={(e) => onCallTimeChange(e.target.value)}
+								className="mt-1 block w-full max-w-[200px] rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+							/>
+						</div>
+					)}
 
 					{/* Timezone */}
 					<div>
@@ -681,6 +718,7 @@ function ReviewStep({
 	description,
 	startTime,
 	endTime,
+	callTime,
 	timezone,
 	selectedDates,
 	locations,
@@ -693,6 +731,7 @@ function ReviewStep({
 	description: string;
 	startTime: string;
 	endTime: string;
+	callTime: string;
 	timezone: string | null;
 	selectedDates: string[];
 	locations: Record<string, string>;
@@ -702,6 +741,13 @@ function ReviewStep({
 }) {
 	const typeLabel = EVENT_TYPE_OPTIONS.find((o) => o.value === eventType)?.label ?? eventType;
 	const timeDisplay = formatTimeRange(startTime, endTime);
+	const showCallTime = eventType === "show" && callTime;
+	const formatHHMM = (t: string) => {
+		const [h, m] = t.split(":").map(Number);
+		const period = h >= 12 ? "PM" : "AM";
+		const hour12 = h % 12 || 12;
+		return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
+	};
 
 	return (
 		<div className="space-y-6">
@@ -743,6 +789,12 @@ function ReviewStep({
 										<span>·</span>
 										<span>{timeDisplay}</span>
 									</div>
+									{showCallTime && (
+										<div className="mt-1 flex items-center gap-1 text-sm text-purple-600">
+											<Clock className="h-3.5 w-3.5" />
+											Call Time: {formatHHMM(callTime)}
+										</div>
+									)}
 									{location && (
 										<div className="mt-1 flex items-center gap-1 text-sm text-slate-500">
 											<MapPin className="h-3.5 w-3.5" />
@@ -764,6 +816,7 @@ function ReviewStep({
 				{description && <input type="hidden" name="description" value={description} />}
 				<input type="hidden" name="startTime" value={startTime} />
 				<input type="hidden" name="endTime" value={endTime} />
+				{showCallTime && <input type="hidden" name="callTime" value={callTime} />}
 				<input type="hidden" name="timezone" value={timezone ?? ""} />
 				<input type="hidden" name="dates" value={selectedDates.join(",")} />
 				{selectedDates.map((date) =>

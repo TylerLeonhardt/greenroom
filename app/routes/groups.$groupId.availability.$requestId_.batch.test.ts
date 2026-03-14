@@ -470,3 +470,132 @@ describe("batch action with default times (fast path)", () => {
 		);
 	});
 });
+
+describe("batch action call time (show events)", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		(getAvailabilityRequest as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: "req-1",
+			groupId: "g1",
+			title: "March Schedule",
+			status: "open",
+			requestedDates: ["2026-03-15", "2026-03-16"],
+		});
+		(createEventsFromAvailability as ReturnType<typeof vi.fn>).mockResolvedValue([
+			{
+				id: "ev-1",
+				groupId: "g1",
+				title: "Big Show",
+				eventType: "show",
+				startTime: new Date("2026-03-15T19:00:00Z"),
+				endTime: new Date("2026-03-15T21:00:00Z"),
+				location: null,
+				description: null,
+			},
+		]);
+	});
+
+	it("returns error when call time is after start time", async () => {
+		const formData = createFormData({
+			...validFormData,
+			eventType: "show",
+			callTime: "20:00",
+		});
+		const result = await action(actionArgs(formData));
+
+		expect(result).toEqual({ error: "Call time must be before start time." });
+	});
+
+	it("returns error when call time equals start time", async () => {
+		const formData = createFormData({
+			...validFormData,
+			eventType: "show",
+			callTime: "19:00",
+		});
+		const result = await action(actionArgs(formData));
+
+		expect(result).toEqual({ error: "Call time must be before start time." });
+	});
+
+	it("accepts call time before start time for shows", async () => {
+		const formData = createFormData({
+			...validFormData,
+			eventType: "show",
+			callTime: "18:00",
+		});
+
+		let response: Response | undefined;
+		try {
+			const result = await action(actionArgs(formData));
+			if (result instanceof Response) response = result;
+		} catch (thrown) {
+			if (thrown instanceof Response) response = thrown;
+		}
+
+		expect(response).toBeInstanceOf(Response);
+		expect(response?.status).toBe(302);
+	});
+
+	it("passes call time to createEventsFromAvailability for shows", async () => {
+		const formData = createFormData({
+			...validFormData,
+			eventType: "show",
+			callTime: "18:00",
+		});
+
+		try {
+			await action(actionArgs(formData));
+		} catch {
+			// redirect expected
+		}
+
+		expect(createEventsFromAvailability).toHaveBeenCalledWith(
+			expect.objectContaining({
+				eventType: "show",
+				callTime: "18:00",
+			}),
+		);
+	});
+
+	it("ignores call time for non-show event types", async () => {
+		const formData = createFormData({
+			...validFormData,
+			eventType: "rehearsal",
+			callTime: "18:00",
+		});
+
+		try {
+			await action(actionArgs(formData));
+		} catch {
+			// redirect expected
+		}
+
+		expect(createEventsFromAvailability).toHaveBeenCalledWith(
+			expect.objectContaining({
+				eventType: "rehearsal",
+				callTime: undefined,
+			}),
+		);
+	});
+
+	it("does not pass call time when empty string for shows", async () => {
+		const formData = createFormData({
+			...validFormData,
+			eventType: "show",
+			callTime: "",
+		});
+
+		try {
+			await action(actionArgs(formData));
+		} catch {
+			// redirect expected
+		}
+
+		expect(createEventsFromAvailability).toHaveBeenCalledWith(
+			expect.objectContaining({
+				eventType: "show",
+				callTime: undefined,
+			}),
+		);
+	});
+});
