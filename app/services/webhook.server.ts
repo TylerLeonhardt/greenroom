@@ -98,6 +98,41 @@ export function sendAvailabilityRequestWebhook(
 	);
 }
 
+export function sendAvailabilityReminderWebhook(
+	webhookUrl: string,
+	params: {
+		groupName: string;
+		title: string;
+		nonRespondentNames: string[];
+		requestUrl: string;
+	},
+): void {
+	const count = params.nonRespondentNames.length;
+	const memberWord = count === 1 ? "member" : "members";
+	const needWord = count === 1 ? "needs" : "need";
+
+	const MAX_NAMES = 10;
+	const displayNames =
+		count <= MAX_NAMES
+			? params.nonRespondentNames.join(", ")
+			: `${params.nonRespondentNames.slice(0, MAX_NAMES).join(", ")} and ${count - MAX_NAMES} more`;
+
+	void sendWebhook(
+		webhookUrl,
+		{
+			title: `🔔 Availability Reminder: ${params.title}`,
+			description: `**${count}** ${memberWord} still ${needWord} to respond`,
+			url: params.requestUrl,
+			fields: [
+				{ name: "Group", value: params.groupName },
+				{ name: "Waiting on", value: displayNames },
+			],
+			footer: { text: "Submit your availability on My Call Time" },
+		},
+		{ groupId: params.groupName, type: "availability_reminder" },
+	);
+}
+
 export function sendEventCreatedWebhook(
 	webhookUrl: string,
 	params: {

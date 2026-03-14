@@ -82,6 +82,12 @@ export function checkResendVerificationRateLimit(email: string) {
 	return checkRateLimit(`resend-verification:${email}`, 1, ONE_MINUTE_MS);
 }
 
+const FIVE_MINUTES_MS = 5 * 60 * 1000;
+
+export function checkReminderRateLimit(requestId: string) {
+	return checkRateLimit(`availability-reminder:${requestId}`, 1, FIVE_MINUTES_MS);
+}
+
 /** Visible for testing */
 export function _resetForTests() {
 	windows.clear();

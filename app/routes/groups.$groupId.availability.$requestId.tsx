@@ -10,7 +10,17 @@ import {
 	useRouteLoaderData,
 	useSearchParams,
 } from "@remix-run/react";
-import { ArrowLeft, Calendar, Clock, Lock, LockOpen, Pencil, Trash2, Users } from "lucide-react";
+import {
+	ArrowLeft,
+	Bell,
+	Calendar,
+	Clock,
+	Lock,
+	LockOpen,
+	Pencil,
+	Trash2,
+	Users,
+} from "lucide-react";
 import { useState } from "react";
 import { AvailabilityGrid } from "~/components/availability-grid";
 import { CsrfInput } from "~/components/csrf-input";
@@ -21,12 +31,17 @@ import {
 	deleteAvailabilityRequest,
 	getAggregatedResults,
 	getAvailabilityRequest,
+	getNonRespondents,
 	getUserResponse,
 	reopenAvailabilityRequest,
 	submitAvailabilityResponse,
+	updateReminderSentAt,
 } from "~/services/availability.server";
 import { validateCsrfToken } from "~/services/csrf.server";
-import { isGroupAdmin, requireGroupMember } from "~/services/groups.server";
+import { sendAvailabilityReminderNotification } from "~/services/email.server";
+import { getGroupById, isGroupAdmin, requireGroupMember } from "~/services/groups.server";
+import { checkReminderRateLimit } from "~/services/rate-limit.server";
+import { sendAvailabilityReminderWebhook } from "~/services/webhook.server";
 import type { loader as groupLayoutLoader } from "./groups.$groupId";
 
 type AvailabilityStatus = "available" | "maybe" | "not_available";
@@ -48,8 +63,20 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
 	const userResponse = await getUserResponse(requestId, user.id);
 	const results = admin ? await getAggregatedResults(requestId) : null;
+	const nonRespondentCount =
+		results && results.totalResponded < results.totalMembers
+			? results.totalMembers - results.totalResponded
+			: 0;
 
-	return { availRequest, userResponse, results, isAdmin: admin, user };
+	return {
+		availRequest,
+		userResponse,
+		results,
+		isAdmin: admin,
+		user,
+		nonRespondentCount,
+		reminderSentAt: availRequest.reminderSentAt,
+	};
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -125,11 +152,81 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		return redirect(`/groups/${groupId}/availability`);
 	}
 
+	if (intent === "sendReminder") {
+		const admin = await isGroupAdmin(user.id, groupId);
+		if (!admin) throw new Response("Forbidden", { status: 403 });
+
+		const rateLimit = checkReminderRateLimit(requestId);
+		if (rateLimit.limited) {
+			return {
+				error: `Reminder already sent recently. Try again in ${rateLimit.retryAfter} seconds.`,
+			};
+		}
+
+		const availRequest = await getAvailabilityRequest(requestId);
+		if (!availRequest || availRequest.groupId !== groupId) {
+			throw new Response("Not Found", { status: 404 });
+		}
+
+		if (availRequest.status !== "open") {
+			return { error: "Cannot send reminders for a closed request." };
+		}
+
+		const nonRespondents = await getNonRespondents(requestId, groupId);
+		if (nonRespondents.length === 0) {
+			return { success: true, message: "Everyone has already responded!" };
+		}
+
+		const group = await getGroupById(groupId);
+		const groupName = group?.name ?? "Your group";
+		const appUrl = process.env.APP_URL || "https://mycalltime.app";
+		const requestUrl = `${appUrl}/groups/${groupId}/availability/${requestId}`;
+		const preferencesUrl = `${appUrl}/groups/${groupId}/notifications`;
+		const dateRange = `${formatDateMedium(availRequest.dateRangeStart as unknown as string)} – ${formatDateMedium(availRequest.dateRangeEnd as unknown as string)}`;
+		const expiresAt = availRequest.expiresAt
+			? formatDateMedium(availRequest.expiresAt as unknown as string)
+			: null;
+
+		// Fire-and-forget: send email reminders
+		void sendAvailabilityReminderNotification({
+			requestTitle: availRequest.title,
+			groupName,
+			dateRange,
+			expiresAt,
+			recipients: nonRespondents.map((nr) => ({
+				email: nr.email,
+				name: nr.name,
+				notificationPreferences: nr.notificationPreferences ?? undefined,
+			})),
+			requestUrl,
+			preferencesUrl,
+		});
+
+		// Fire-and-forget: send Discord webhook if configured
+		if (group?.webhookUrl) {
+			sendAvailabilityReminderWebhook(group.webhookUrl, {
+				groupName,
+				title: availRequest.title,
+				nonRespondentNames: nonRespondents.map((nr) => nr.name),
+				requestUrl,
+			});
+		}
+
+		// Track when reminder was sent
+		await updateReminderSentAt(requestId);
+
+		return {
+			success: true,
+			message: `Reminder sent to ${nonRespondents.length} member${nonRespondents.length !== 1 ? "s" : ""}!`,
+		};
+	}
+
 	return { error: "Invalid action." };
 }
 
 export default function AvailabilityRequestDetail() {
-	const { availRequest, userResponse, results, isAdmin, user } = useLoaderData<typeof loader>();
+	const { availRequest, userResponse, results, isAdmin, user, nonRespondentCount, reminderSentAt } =
+		useLoaderData<typeof loader>();
 	const parentData = useRouteLoaderData<typeof groupLayoutLoader>("routes/groups.$groupId");
 	const timezone = parentData?.user?.timezone ?? undefined;
 	const actionData = useActionData<typeof action>();
@@ -139,6 +236,7 @@ export default function AvailabilityRequestDetail() {
 	const batchSuccess = searchParams.get("batchSuccess") === "true";
 	const batchCount = searchParams.get("count");
 	const isSubmitting = navigation.state === "submitting";
+	const isSendingReminder = isSubmitting && navigation.formData?.get("intent") === "sendReminder";
 
 	const dates = availRequest.requestedDates as string[];
 	const [responses, setResponses] = useState<Record<string, AvailabilityStatus>>(
@@ -355,14 +453,28 @@ export default function AvailabilityRequestDetail() {
 								Waiting for {results.totalMembers - results.totalResponded} more{" "}
 								{results.totalMembers - results.totalResponded === 1 ? "response" : "responses"}
 							</p>
-							<button
-								type="button"
-								disabled
-								className="mt-2 rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-700 opacity-50"
-								title="Coming soon"
-							>
-								Send Reminder (coming soon)
-							</button>
+							{!isClosed && (
+								<Form method="post" className="mt-2">
+									<CsrfInput />
+									<input type="hidden" name="intent" value="sendReminder" />
+									<button
+										type="submit"
+										disabled={isSendingReminder}
+										className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-50"
+									>
+										<Bell className="h-3.5 w-3.5" />
+										{isSendingReminder
+											? "Sending..."
+											: `Send Reminder (${nonRespondentCount} haven't responded)`}
+									</button>
+								</Form>
+							)}
+							{reminderSentAt && (
+								<p className="mt-2 text-xs text-amber-600">
+									Last reminder sent{" "}
+									{formatDateMedium(reminderSentAt as unknown as string, timezone)}
+								</p>
+							)}
 						</div>
 					)}
 				</div>
