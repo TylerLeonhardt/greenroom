@@ -9,3 +9,6 @@ build
 e2e/.auth/
 test-results/
 playwright-report/
+
+# Worktree directories (used for parallel branch exploration)
+wt-*/

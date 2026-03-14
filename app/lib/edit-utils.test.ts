@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-	type AvailabilityRequestChanges,
 	detectAvailabilityRequestChanges,
 	detectEventChanges,
 	type EventChanges,
@@ -66,9 +65,9 @@ describe("detectEventChanges", () => {
 			}),
 		);
 		expect(changes.startTime).toBeDefined();
-		expect(changes.startTime!.new).toEqual(new Date("2026-03-16T23:00:00Z"));
+		expect(changes.startTime?.new).toEqual(new Date("2026-03-16T23:00:00Z"));
 		expect(changes.endTime).toBeDefined();
-		expect(changes.endTime!.new).toEqual(new Date("2026-03-17T01:00:00Z"));
+		expect(changes.endTime?.new).toEqual(new Date("2026-03-17T01:00:00Z"));
 	});
 
 	it("detects time change on same day", () => {
