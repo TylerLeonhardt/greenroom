@@ -7,7 +7,7 @@ import {
 	useLoaderData,
 	useNavigation,
 } from "@remix-run/react";
-import { ArrowLeft, Calendar, Check, MapPin } from "lucide-react";
+import { ArrowLeft, Calendar, Check, MapPin, Plus } from "lucide-react";
 import { useState } from "react";
 import { CsrfInput } from "~/components/csrf-input";
 import { InlineTimezoneSelector } from "~/components/timezone-selector";
@@ -31,6 +31,9 @@ import {
 } from "~/services/groups.server";
 import { sendBatchEventsCreatedWebhook } from "~/services/webhook.server";
 import type { NotificationPreferences } from "../../src/db/schema.js";
+
+export const DEFAULT_START_TIME = "19:00";
+export const DEFAULT_END_TIME = "21:00";
 
 export const meta: MetaFunction = () => {
 	return [{ title: "Batch Create Events — My Call Time" }];
@@ -284,11 +287,13 @@ export default function BatchCreateEvents() {
 	const [title, setTitle] = useState(availRequest.title);
 	const [eventType, setEventType] = useState("rehearsal");
 	const [description, setDescription] = useState("");
-	const [startTime, setStartTime] = useState(availRequest.requestedStartTime ?? "");
-	const [endTime, setEndTime] = useState(availRequest.requestedEndTime ?? "");
+	const [startTime, setStartTime] = useState(availRequest.requestedStartTime ?? DEFAULT_START_TIME);
+	const [endTime, setEndTime] = useState(availRequest.requestedEndTime ?? DEFAULT_END_TIME);
 	const [timezone, setTimezone] = useState<string | null>(userTimezone ?? null);
 	const [locations, setLocations] = useState<Record<string, string>>({});
 	const [applyAllLocation, setApplyAllLocation] = useState("");
+	const [showDescription, setShowDescription] = useState(false);
+	const [showLocations, setShowLocations] = useState(false);
 
 	const canReview = title.trim() !== "" && startTime !== "" && endTime !== "" && eventType !== "";
 
@@ -375,6 +380,19 @@ export default function BatchCreateEvents() {
 					canReview={canReview}
 					onNext={() => setStep("review")}
 					typeBadgeClasses={typeBadgeClasses}
+					showDescription={showDescription}
+					onToggleDescription={(show: boolean) => {
+						setShowDescription(show);
+						if (!show) setDescription("");
+					}}
+					showLocations={showLocations}
+					onToggleLocations={(show: boolean) => {
+						setShowLocations(show);
+						if (!show) {
+							setLocations({});
+							setApplyAllLocation("");
+						}
+					}}
 				/>
 			) : (
 				<ReviewStep
@@ -417,6 +435,10 @@ function ConfigureStep({
 	canReview,
 	onNext,
 	typeBadgeClasses,
+	showDescription,
+	onToggleDescription,
+	showLocations,
+	onToggleLocations,
 }: {
 	title: string;
 	onTitleChange: (v: string) => void;
@@ -439,6 +461,10 @@ function ConfigureStep({
 	canReview: boolean;
 	onNext: () => void;
 	typeBadgeClasses: Record<string, string>;
+	showDescription: boolean;
+	onToggleDescription: (show: boolean) => void;
+	showLocations: boolean;
+	onToggleLocations: (show: boolean) => void;
 }) {
 	return (
 		<div className="space-y-6">
@@ -453,7 +479,7 @@ function ConfigureStep({
 					{/* Title */}
 					<div>
 						<label htmlFor="title" className="block text-sm font-medium text-slate-700">
-							Title
+							Title <span className="text-red-500">*</span>
 						</label>
 						<input
 							id="title"
@@ -488,27 +514,47 @@ function ConfigureStep({
 						</div>
 					</div>
 
-					{/* Description */}
-					<div>
-						<label htmlFor="description" className="block text-sm font-medium text-slate-700">
-							Description <span className="text-slate-400">(optional)</span>
-						</label>
-						<textarea
-							id="description"
-							value={description}
-							onChange={(e) => onDescriptionChange(e.target.value)}
-							maxLength={2000}
-							rows={3}
-							className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-							placeholder="Add any notes or details..."
-						/>
-					</div>
+					{/* Description (optional — toggle) */}
+					{!showDescription ? (
+						<button
+							type="button"
+							onClick={() => onToggleDescription(true)}
+							className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 hover:text-emerald-700"
+						>
+							<Plus className="h-3.5 w-3.5" />
+							Add description
+						</button>
+					) : (
+						<div>
+							<div className="flex items-center justify-between">
+								<label htmlFor="description" className="block text-sm font-medium text-slate-700">
+									Description
+								</label>
+								<button
+									type="button"
+									onClick={() => onToggleDescription(false)}
+									className="text-xs text-slate-400 hover:text-slate-600"
+								>
+									Remove
+								</button>
+							</div>
+							<textarea
+								id="description"
+								value={description}
+								onChange={(e) => onDescriptionChange(e.target.value)}
+								maxLength={2000}
+								rows={3}
+								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+								placeholder="Add any notes or details..."
+							/>
+						</div>
+					)}
 
 					{/* Time Inputs */}
 					<div className="grid grid-cols-2 gap-4">
 						<div>
 							<label htmlFor="startTime" className="block text-sm font-medium text-slate-700">
-								Start Time
+								Start Time <span className="text-red-500">*</span>
 							</label>
 							<input
 								id="startTime"
@@ -520,7 +566,7 @@ function ConfigureStep({
 						</div>
 						<div>
 							<label htmlFor="endTime" className="block text-sm font-medium text-slate-700">
-								End Time
+								End Time <span className="text-red-500">*</span>
 							</label>
 							<input
 								id="endTime"
@@ -543,58 +589,76 @@ function ConfigureStep({
 				</div>
 			</div>
 
-			{/* Per-Date Locations Card */}
-			<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-				<h2 className="text-lg font-semibold text-slate-900">
-					<MapPin className="mr-1.5 inline-block h-5 w-5 text-slate-400" />
-					Locations
-				</h2>
-				<p className="mt-1 text-sm text-slate-500">
-					Optionally set a location for each event date.
-				</p>
+			{/* Per-Date Locations (optional — toggle) */}
+			{!showLocations ? (
+				<button
+					type="button"
+					onClick={() => onToggleLocations(true)}
+					className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-4 text-sm font-medium text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-700"
+				>
+					<MapPin className="h-4 w-4" />
+					Add locations per date
+				</button>
+			) : (
+				<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+					<div className="flex items-center justify-between">
+						<h2 className="text-lg font-semibold text-slate-900">
+							<MapPin className="mr-1.5 inline-block h-5 w-5 text-slate-400" />
+							Locations
+						</h2>
+						<button
+							type="button"
+							onClick={() => onToggleLocations(false)}
+							className="text-xs text-slate-400 hover:text-slate-600"
+						>
+							Remove
+						</button>
+					</div>
+					<p className="mt-1 text-sm text-slate-500">Set a location for each event date.</p>
 
-				{/* Apply to All */}
-				<div className="mt-4 flex gap-2">
-					<input
-						type="text"
-						value={applyAllLocation}
-						onChange={(e) => onApplyAllLocationChange(e.target.value)}
-						maxLength={200}
-						className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-						placeholder="Same location for all dates"
-					/>
-					<button
-						type="button"
-						onClick={onApplyAll}
-						className="whitespace-nowrap rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
-					>
-						Apply to All
-					</button>
-				</div>
+					{/* Apply to All */}
+					<div className="mt-4 flex gap-2">
+						<input
+							type="text"
+							value={applyAllLocation}
+							onChange={(e) => onApplyAllLocationChange(e.target.value)}
+							maxLength={200}
+							className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+							placeholder="Same location for all dates"
+						/>
+						<button
+							type="button"
+							onClick={onApplyAll}
+							className="whitespace-nowrap rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
+						>
+							Apply to All
+						</button>
+					</div>
 
-				{/* Per-date inputs */}
-				<div className="mt-4 space-y-3">
-					{selectedDates.map((date) => {
-						const { dayOfWeek, display } = formatDateDisplay(date);
-						return (
-							<div key={date} className="flex items-center gap-3">
-								<div className="w-28 shrink-0">
-									<span className="text-sm font-medium text-slate-700">{dayOfWeek}</span>
-									<span className="ml-1 text-sm text-slate-500">{display}</span>
+					{/* Per-date inputs */}
+					<div className="mt-4 space-y-3">
+						{selectedDates.map((date) => {
+							const { dayOfWeek, display } = formatDateDisplay(date);
+							return (
+								<div key={date} className="flex items-center gap-3">
+									<div className="w-28 shrink-0">
+										<span className="text-sm font-medium text-slate-700">{dayOfWeek}</span>
+										<span className="ml-1 text-sm text-slate-500">{display}</span>
+									</div>
+									<input
+										type="text"
+										value={locations[date] ?? ""}
+										onChange={(e) => onLocationChange(date, e.target.value)}
+										maxLength={200}
+										className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+										placeholder="Location"
+									/>
 								</div>
-								<input
-									type="text"
-									value={locations[date] ?? ""}
-									onChange={(e) => onLocationChange(date, e.target.value)}
-									maxLength={200}
-									className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-									placeholder="Location"
-								/>
-							</div>
-						);
-					})}
+							);
+						})}
+					</div>
 				</div>
-			</div>
+			)}
 
 			{/* Next Button */}
 			<div className="flex justify-end">
@@ -697,14 +761,16 @@ function ReviewStep({
 				<CsrfInput />
 				<input type="hidden" name="title" value={title} />
 				<input type="hidden" name="eventType" value={eventType} />
-				<input type="hidden" name="description" value={description} />
+				{description && <input type="hidden" name="description" value={description} />}
 				<input type="hidden" name="startTime" value={startTime} />
 				<input type="hidden" name="endTime" value={endTime} />
 				<input type="hidden" name="timezone" value={timezone ?? ""} />
 				<input type="hidden" name="dates" value={selectedDates.join(",")} />
-				{selectedDates.map((date) => (
-					<input key={date} type="hidden" name={`location-${date}`} value={locations[date] ?? ""} />
-				))}
+				{selectedDates.map((date) =>
+					locations[date] ? (
+						<input key={date} type="hidden" name={`location-${date}`} value={locations[date]} />
+					) : null,
+				)}
 
 				<div className="flex items-center justify-between">
 					<button

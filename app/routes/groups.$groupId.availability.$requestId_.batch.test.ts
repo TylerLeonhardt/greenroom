@@ -51,7 +51,11 @@ vi.mock("~/services/webhook.server", () => ({
 	sendBatchEventsCreatedWebhook: vi.fn(),
 }));
 
-import { action } from "~/routes/groups.$groupId.availability.$requestId_.batch";
+import {
+	action,
+	DEFAULT_END_TIME,
+	DEFAULT_START_TIME,
+} from "~/routes/groups.$groupId.availability.$requestId_.batch";
 import { getAvailabilityRequest } from "~/services/availability.server";
 import { validateCsrfToken } from "~/services/csrf.server";
 import { createEventsFromAvailability } from "~/services/events.server";
@@ -362,6 +366,100 @@ describe("batch route action", () => {
 		// The long location should be ignored (undefined), not passed through
 		expect(createEventsFromAvailability).toHaveBeenCalledWith(
 			expect.objectContaining({
+				dates: expect.arrayContaining([
+					expect.objectContaining({
+						date: "2026-03-15",
+						location: undefined,
+					}),
+				]),
+			}),
+		);
+	});
+});
+
+describe("default time constants", () => {
+	it("DEFAULT_START_TIME is 19:00 (7 PM)", () => {
+		expect(DEFAULT_START_TIME).toBe("19:00");
+	});
+
+	it("DEFAULT_END_TIME is 21:00 (9 PM)", () => {
+		expect(DEFAULT_END_TIME).toBe("21:00");
+	});
+
+	it("default times are valid HH:MM format", () => {
+		expect(DEFAULT_START_TIME).toMatch(/^\d{2}:\d{2}$/);
+		expect(DEFAULT_END_TIME).toMatch(/^\d{2}:\d{2}$/);
+	});
+
+	it("default end time is after default start time", () => {
+		expect(DEFAULT_END_TIME > DEFAULT_START_TIME).toBe(true);
+	});
+});
+
+describe("batch action with default times (fast path)", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		(getAvailabilityRequest as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: "req-1",
+			groupId: "g1",
+			title: "March Schedule",
+			status: "open",
+			requestedDates: ["2026-03-15", "2026-03-16"],
+		});
+		(createEventsFromAvailability as ReturnType<typeof vi.fn>).mockResolvedValue([
+			{
+				id: "ev-1",
+				groupId: "g1",
+				title: "Rehearsal",
+				eventType: "rehearsal",
+				startTime: new Date("2026-03-15T19:00:00Z"),
+				endTime: new Date("2026-03-15T21:00:00Z"),
+				location: null,
+				description: null,
+			},
+		]);
+	});
+
+	it("succeeds with default time values and title only (fast path)", async () => {
+		const formData = createFormData({
+			title: "Weekly Rehearsal",
+			eventType: "rehearsal",
+			startTime: DEFAULT_START_TIME,
+			endTime: DEFAULT_END_TIME,
+			dates: "2026-03-15,2026-03-16",
+		});
+
+		let response: Response | undefined;
+		try {
+			const result = await action(actionArgs(formData));
+			if (result instanceof Response) response = result;
+		} catch (thrown) {
+			if (thrown instanceof Response) response = thrown;
+		}
+
+		expect(response).toBeInstanceOf(Response);
+		expect(response?.status).toBe(302);
+	});
+
+	it("works without description or locations (minimal form)", async () => {
+		const formData = createFormData({
+			title: "Quick Rehearsal",
+			eventType: "rehearsal",
+			startTime: DEFAULT_START_TIME,
+			endTime: DEFAULT_END_TIME,
+			dates: "2026-03-15",
+		});
+
+		try {
+			await action(actionArgs(formData));
+		} catch {
+			// redirect expected
+		}
+
+		expect(createEventsFromAvailability).toHaveBeenCalledWith(
+			expect.objectContaining({
+				title: "Quick Rehearsal",
+				description: undefined,
 				dates: expect.arrayContaining([
 					expect.objectContaining({
 						date: "2026-03-15",
