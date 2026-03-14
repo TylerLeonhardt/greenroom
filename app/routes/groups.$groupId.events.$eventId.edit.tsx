@@ -461,7 +461,7 @@ export default function EditEvent() {
 								name="callTime"
 								type="time"
 								defaultValue={prefill.callTime}
-								className="mt-1 block w-full max-w-[200px] rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors sm:max-w-[200px] focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
 							/>
 						</div>
 					)}

@@ -610,7 +610,7 @@ function ConfigureStep({
 								type="time"
 								value={callTime}
 								onChange={(e) => onCallTimeChange(e.target.value)}
-								className="mt-1 block w-full max-w-[200px] rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm sm:max-w-[200px] focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
 							/>
 						</div>
 					)}
