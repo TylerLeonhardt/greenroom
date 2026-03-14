@@ -208,13 +208,9 @@ describe("DateSelector", () => {
 
 	describe("empty state", () => {
 		it("shows placeholder when no date range is set", () => {
-			render(
-				<DateSelector startDate="" endDate="" selectedDates={[]} onChange={() => {}} />,
-			);
+			render(<DateSelector startDate="" endDate="" selectedDates={[]} onChange={() => {}} />);
 
-			expect(
-				screen.getByText("Select a date range above to choose specific days"),
-			).toBeDefined();
+			expect(screen.getByText("Select a date range above to choose specific days")).toBeDefined();
 		});
 	});
 

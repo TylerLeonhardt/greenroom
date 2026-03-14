@@ -222,7 +222,7 @@ describe("ResultsHeatmap", () => {
 			const rows = desktop.el.querySelectorAll<HTMLTableRowElement>("tbody tr");
 			const caretButton = rows[0].querySelectorAll("td")[1].querySelector("button");
 			expect(caretButton).not.toBeNull();
-			await user.click(caretButton!);
+			await user.click(caretButton as HTMLElement);
 
 			// Respondents should be visible (expansion happened)
 			expect(desktop.getByText("Alice")).toBeDefined();
@@ -249,7 +249,7 @@ describe("ResultsHeatmap", () => {
 			const rows = desktop.el.querySelectorAll<HTMLTableRowElement>("tbody tr");
 			const caretButton = rows[0].querySelectorAll("td")[1].querySelector("button");
 			expect(caretButton).not.toBeNull();
-			await user.click(caretButton!);
+			await user.click(caretButton as HTMLElement);
 
 			// The date should NOT be selected (no "1 date selected" text)
 			expect(screen.queryByText(/1 date/)).toBeNull();
@@ -275,7 +275,7 @@ describe("ResultsHeatmap", () => {
 			const rows = desktop.el.querySelectorAll<HTMLTableRowElement>("tbody tr");
 			const checkboxButton = rows[0].querySelectorAll("td")[0].querySelector("button");
 			expect(checkboxButton).not.toBeNull();
-			await user.click(checkboxButton!);
+			await user.click(checkboxButton as HTMLElement);
 
 			// Date should be selected but NOT expanded (no respondent names visible)
 			expect(screen.queryByText("Alice")).toBeNull();
