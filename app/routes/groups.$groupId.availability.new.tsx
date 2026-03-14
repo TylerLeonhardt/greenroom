@@ -8,7 +8,8 @@ import {
 	useNavigation,
 	useParams,
 } from "@remix-run/react";
-import { useState } from "react";
+import { Plus } from "lucide-react";
+import { useCallback, useState } from "react";
 import { CsrfInput } from "~/components/csrf-input";
 import { DateSelector } from "~/components/date-selector";
 import { InlineTimezoneSelector } from "~/components/timezone-selector";
@@ -179,6 +180,29 @@ export default function NewAvailabilityRequest() {
 	const [requestedStartTime, setRequestedStartTime] = useState("");
 	const [requestedEndTime, setRequestedEndTime] = useState("");
 
+	const [showDescription, setShowDescription] = useState(false);
+	const [showTimeRange, setShowTimeRange] = useState(false);
+	const [showDeadline, setShowDeadline] = useState(false);
+
+	const toggleDescription = useCallback((show: boolean) => {
+		setShowDescription(show);
+	}, []);
+
+	const toggleTimeRange = useCallback((show: boolean) => {
+		setShowTimeRange(show);
+		if (!show) {
+			setRequestedStartTime("");
+			setRequestedEndTime("");
+		}
+	}, []);
+
+	const toggleDeadline = useCallback((show: boolean) => {
+		setShowDeadline(show);
+		if (!show) {
+			setExpiresAt("");
+		}
+	}, []);
+
 	return (
 		<div className="max-w-3xl">
 			<div className="mb-6">
@@ -219,19 +243,39 @@ export default function NewAvailabilityRequest() {
 								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 							/>
 						</div>
-						<div>
-							<label htmlFor="description" className="block text-sm font-medium text-slate-700">
-								Description
-							</label>
-							<textarea
-								id="description"
-								name="description"
-								rows={2}
-								maxLength={2000}
-								placeholder="Any additional context for the group..."
-								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-							/>
-						</div>
+						{!showDescription ? (
+							<button
+								type="button"
+								onClick={() => toggleDescription(true)}
+								className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 hover:text-emerald-700"
+							>
+								<Plus className="h-3.5 w-3.5" />
+								Add description
+							</button>
+						) : (
+							<div>
+								<div className="flex items-center justify-between">
+									<label htmlFor="description" className="block text-sm font-medium text-slate-700">
+										Description
+									</label>
+									<button
+										type="button"
+										onClick={() => toggleDescription(false)}
+										className="text-xs text-slate-400 hover:text-slate-600"
+									>
+										Remove
+									</button>
+								</div>
+								<textarea
+									id="description"
+									name="description"
+									rows={2}
+									maxLength={2000}
+									placeholder="Any additional context for the group..."
+									className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+								/>
+							</div>
+						)}
 					</div>
 				</div>
 
@@ -288,69 +332,108 @@ export default function NewAvailabilityRequest() {
 					/>
 				</div>
 
-				{/* Expiration */}
-				<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-					<h3 className="mb-4 text-sm font-semibold text-slate-900">
-						Response Deadline (optional)
-					</h3>
-					<div className="max-w-xs">
-						<input
-							name="expiresAt"
-							type="date"
-							value={expiresAt}
-							onChange={(e) => setExpiresAt(e.target.value)}
-							className="block w-full min-w-0 rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-						/>
-						<p className="mt-1 text-xs text-slate-500">
-							Responses will still be accepted after this date
-						</p>
+				{/* Response Deadline (optional — toggle) */}
+				{!showDeadline ? (
+					<button
+						type="button"
+						onClick={() => toggleDeadline(true)}
+						className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 hover:text-emerald-700"
+					>
+						<Plus className="h-3.5 w-3.5" />
+						Add response deadline
+					</button>
+				) : (
+					<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+						<div className="flex items-center justify-between">
+							<h3 className="text-sm font-semibold text-slate-900">Response Deadline</h3>
+							<button
+								type="button"
+								onClick={() => toggleDeadline(false)}
+								className="text-xs text-slate-400 hover:text-slate-600"
+							>
+								Remove
+							</button>
+						</div>
+						<div className="mt-4 max-w-xs">
+							<input
+								name="expiresAt"
+								type="date"
+								value={expiresAt}
+								onChange={(e) => setExpiresAt(e.target.value)}
+								className="block w-full min-w-0 rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+							/>
+							<p className="mt-1 text-xs text-slate-500">
+								Responses will still be accepted after this date
+							</p>
+						</div>
 					</div>
-				</div>
+				)}
 
-				{/* Time Range (optional) */}
-				<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-					<h3 className="mb-1 text-sm font-semibold text-slate-900">Time Range (optional)</h3>
-					<p className="mb-4 text-xs text-slate-500">
-						If your event has a specific time, let members know what hours you&apos;re asking about.
-					</p>
-					<div className="mb-4">
-						<InlineTimezoneSelector timezone={userTimezone} />
-					</div>
-					<div className="grid gap-4 sm:grid-cols-2">
-						<div>
-							<label
-								htmlFor="requestedStartTime"
-								className="block text-sm font-medium text-slate-700"
+				{/* Time Range (optional — toggle) */}
+				{!showTimeRange ? (
+					<button
+						type="button"
+						onClick={() => toggleTimeRange(true)}
+						className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 hover:text-emerald-700"
+					>
+						<Plus className="h-3.5 w-3.5" />
+						Add time range
+					</button>
+				) : (
+					<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+						<div className="flex items-center justify-between">
+							<h3 className="text-sm font-semibold text-slate-900">Time Range</h3>
+							<button
+								type="button"
+								onClick={() => toggleTimeRange(false)}
+								className="text-xs text-slate-400 hover:text-slate-600"
 							>
-								Start Time
-							</label>
-							<input
-								id="requestedStartTime"
-								name="requestedStartTime"
-								type="time"
-								value={requestedStartTime}
-								onChange={(e) => setRequestedStartTime(e.target.value)}
-								className="mt-1 block w-full min-w-0 appearance-none rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-							/>
+								Remove
+							</button>
 						</div>
-						<div>
-							<label
-								htmlFor="requestedEndTime"
-								className="block text-sm font-medium text-slate-700"
-							>
-								End Time
-							</label>
-							<input
-								id="requestedEndTime"
-								name="requestedEndTime"
-								type="time"
-								value={requestedEndTime}
-								onChange={(e) => setRequestedEndTime(e.target.value)}
-								className="mt-1 block w-full min-w-0 appearance-none rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-							/>
+						<p className="mt-1 text-xs text-slate-500">
+							If your event has a specific time, let members know what hours you&apos;re asking
+							about.
+						</p>
+						<div className="mt-4 mb-4">
+							<InlineTimezoneSelector timezone={userTimezone} />
+						</div>
+						<div className="grid gap-4 sm:grid-cols-2">
+							<div>
+								<label
+									htmlFor="requestedStartTime"
+									className="block text-sm font-medium text-slate-700"
+								>
+									Start Time
+								</label>
+								<input
+									id="requestedStartTime"
+									name="requestedStartTime"
+									type="time"
+									value={requestedStartTime}
+									onChange={(e) => setRequestedStartTime(e.target.value)}
+									className="mt-1 block w-full min-w-0 appearance-none rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+								/>
+							</div>
+							<div>
+								<label
+									htmlFor="requestedEndTime"
+									className="block text-sm font-medium text-slate-700"
+								>
+									End Time
+								</label>
+								<input
+									id="requestedEndTime"
+									name="requestedEndTime"
+									type="time"
+									value={requestedEndTime}
+									onChange={(e) => setRequestedEndTime(e.target.value)}
+									className="mt-1 block w-full min-w-0 appearance-none rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+								/>
+							</div>
 						</div>
 					</div>
-				</div>
+				)}
 
 				{/* Preview */}
 				{selectedDates.length > 0 && (

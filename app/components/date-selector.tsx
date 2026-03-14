@@ -88,6 +88,14 @@ export function DateSelector({ startDate, endDate, selectedDates, onChange }: Da
 		onChange(weekdays);
 	}, [allDatesInRange, onChange]);
 
+	const selectWeekends = useCallback(() => {
+		const weekends = allDatesInRange.filter((d) => {
+			const day = new Date(`${d}T00:00:00`).getDay();
+			return day === 0 || day === 6;
+		});
+		onChange(weekends);
+	}, [allDatesInRange, onChange]);
+
 	const clearAll = useCallback(() => {
 		onChange([]);
 	}, [onChange]);
@@ -109,6 +117,13 @@ export function DateSelector({ startDate, endDate, selectedDates, onChange }: Da
 					className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
 				>
 					Weekdays (Mon–Fri)
+				</button>
+				<button
+					type="button"
+					onClick={selectWeekends}
+					className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+				>
+					Weekends (Sat–Sun)
 				</button>
 				<button
 					type="button"
