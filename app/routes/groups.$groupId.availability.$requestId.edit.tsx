@@ -260,7 +260,7 @@ export default function EditAvailabilityRequest() {
 								type="date"
 								value={dateRangeStart}
 								onChange={(e) => setDateRangeStart(e.target.value)}
-								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+								className="mt-1 block w-full min-w-0 rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 							/>
 						</div>
 						<div>
@@ -273,7 +273,7 @@ export default function EditAvailabilityRequest() {
 								value={dateRangeEnd}
 								min={dateRangeStart || undefined}
 								onChange={(e) => setDateRangeEnd(e.target.value)}
-								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+								className="mt-1 block w-full min-w-0 rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 							/>
 						</div>
 					</div>
