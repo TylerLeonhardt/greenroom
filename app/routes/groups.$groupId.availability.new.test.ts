@@ -220,4 +220,122 @@ describe("availability.new action — validation", () => {
 			error: "Please provide both start and end times, or leave both empty for all-day.",
 		});
 	});
+
+	it("returns error when end time is before start time", async () => {
+		const request = makeRequest({
+			...validFields,
+			requestedStartTime: "21:00",
+			requestedEndTime: "19:00",
+		});
+		const result = await action({
+			request,
+			params: { groupId: "g1" },
+			context: {},
+		});
+		expect(result).toEqual({
+			error: "End time must be after start time.",
+		});
+	});
+});
+
+describe("availability.new action — toggle-off scenarios", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		(requireGroupAdminOrPermission as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: "user-1",
+			email: "test@example.com",
+			name: "Test User",
+			profileImage: null,
+			timezone: "America/New_York",
+		});
+	});
+
+	it("succeeds with only required fields (all toggles off)", async () => {
+		// When all optional toggles are off, only required fields are submitted
+		const request = makeRequest({
+			title: "Minimal Request",
+			dateRangeStart: "2099-03-01",
+			dateRangeEnd: "2099-03-31",
+			selectedDates: JSON.stringify(["2099-03-15"]),
+		});
+		const result = await action({
+			request,
+			params: { groupId: "g1" },
+			context: {},
+		});
+		expect(result).toBeInstanceOf(Response);
+		expect((result as Response).status).toBe(302);
+	});
+
+	it("succeeds with description toggle on", async () => {
+		const request = makeRequest({
+			title: "With Description",
+			dateRangeStart: "2099-03-01",
+			dateRangeEnd: "2099-03-31",
+			selectedDates: JSON.stringify(["2099-03-15"]),
+			description: "Some extra context",
+		});
+		const result = await action({
+			request,
+			params: { groupId: "g1" },
+			context: {},
+		});
+		expect(result).toBeInstanceOf(Response);
+		expect((result as Response).status).toBe(302);
+	});
+
+	it("succeeds with deadline toggle on", async () => {
+		const request = makeRequest({
+			title: "With Deadline",
+			dateRangeStart: "2099-03-01",
+			dateRangeEnd: "2099-03-31",
+			selectedDates: JSON.stringify(["2099-03-15"]),
+			expiresAt: "2099-03-28",
+		});
+		const result = await action({
+			request,
+			params: { groupId: "g1" },
+			context: {},
+		});
+		expect(result).toBeInstanceOf(Response);
+		expect((result as Response).status).toBe(302);
+	});
+
+	it("succeeds with time range toggle on", async () => {
+		const request = makeRequest({
+			title: "With Time Range",
+			dateRangeStart: "2099-03-01",
+			dateRangeEnd: "2099-03-31",
+			selectedDates: JSON.stringify(["2099-03-15"]),
+			requestedStartTime: "19:00",
+			requestedEndTime: "21:00",
+		});
+		const result = await action({
+			request,
+			params: { groupId: "g1" },
+			context: {},
+		});
+		expect(result).toBeInstanceOf(Response);
+		expect((result as Response).status).toBe(302);
+	});
+
+	it("succeeds with all optional toggles on", async () => {
+		const request = makeRequest({
+			title: "Full Request",
+			dateRangeStart: "2099-03-01",
+			dateRangeEnd: "2099-03-31",
+			selectedDates: JSON.stringify(["2099-03-15", "2099-03-16"]),
+			description: "Detailed description here",
+			expiresAt: "2099-03-28",
+			requestedStartTime: "19:00",
+			requestedEndTime: "21:00",
+		});
+		const result = await action({
+			request,
+			params: { groupId: "g1" },
+			context: {},
+		});
+		expect(result).toBeInstanceOf(Response);
+		expect((result as Response).status).toBe(302);
+	});
 });
