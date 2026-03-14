@@ -18,12 +18,7 @@ import {
 	localTimeToUTC,
 	utcToLocalParts,
 } from "~/lib/date-utils";
-import {
-	detectEventChanges,
-	formatEventChangeSummary,
-	hasAnyChanges,
-	hasScheduleChanges,
-} from "~/lib/edit-utils";
+import { detectEventChanges, formatEventChangeSummary, hasAnyChanges } from "~/lib/edit-utils";
 import { validateCsrfToken } from "~/services/csrf.server";
 import {
 	sendEventEditedNotification,

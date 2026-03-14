@@ -30,7 +30,7 @@
 		}
 	},
 	"files": {
-		"includes": ["**/*.ts", "**/*.tsx", "**/*.json", "**/*.css", "!drizzle"]
+		"includes": ["**/*.ts", "**/*.tsx", "**/*.json", "**/*.css", "!drizzle", "!wt-*"]
 	},
 	"vcs": {
 		"enabled": true,

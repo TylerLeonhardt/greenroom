@@ -7,7 +7,7 @@ export default defineConfig({
 		environment: "node",
 		globals: true,
 		include: ["**/*.test.{ts,tsx}"],
-		exclude: ["**/*.integration.test.ts", "node_modules/**"],
+		exclude: ["**/*.integration.test.ts", "node_modules/**", "wt-*/**"],
 		env: {
 			SESSION_SECRET: "test-secret-for-vitest",
 		},
