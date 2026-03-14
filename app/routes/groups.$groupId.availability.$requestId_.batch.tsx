@@ -504,7 +504,7 @@ function ConfigureStep({
 							value={title}
 							onChange={(e) => onTitleChange(e.target.value)}
 							maxLength={200}
-							className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+							className="mt-1 block w-full appearance-none rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 							placeholder="e.g. Weekly Rehearsal"
 						/>
 					</div>
@@ -561,7 +561,7 @@ function ConfigureStep({
 								onChange={(e) => onDescriptionChange(e.target.value)}
 								maxLength={2000}
 								rows={3}
-								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+								className="mt-1 block w-full appearance-none rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 								placeholder="Add any notes or details..."
 							/>
 						</div>
@@ -578,7 +578,7 @@ function ConfigureStep({
 								type="time"
 								value={startTime}
 								onChange={(e) => onStartTimeChange(e.target.value)}
-								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+								className="mt-1 block w-full appearance-none rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 							/>
 						</div>
 						<div>
@@ -590,7 +590,7 @@ function ConfigureStep({
 								type="time"
 								value={endTime}
 								onChange={(e) => onEndTimeChange(e.target.value)}
-								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+								className="mt-1 block w-full appearance-none rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 							/>
 						</div>
 					</div>
@@ -610,7 +610,7 @@ function ConfigureStep({
 								type="time"
 								value={callTime}
 								onChange={(e) => onCallTimeChange(e.target.value)}
-								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors sm:max-w-[200px] focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+								className="mt-1 block w-full appearance-none rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors sm:max-w-[200px] focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
 							/>
 						</div>
 					)}
@@ -660,7 +660,7 @@ function ConfigureStep({
 							value={applyAllLocation}
 							onChange={(e) => onApplyAllLocationChange(e.target.value)}
 							maxLength={200}
-							className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+							className="flex-1 appearance-none rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 							placeholder="Same location for all dates"
 						/>
 						<button
@@ -687,7 +687,7 @@ function ConfigureStep({
 										value={locations[date] ?? ""}
 										onChange={(e) => onLocationChange(date, e.target.value)}
 										maxLength={200}
-										className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+										className="flex-1 appearance-none rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
 										placeholder="Location"
 									/>
 								</div>
