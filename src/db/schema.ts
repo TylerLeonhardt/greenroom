@@ -133,6 +133,7 @@ export const availabilityRequests = pgTable(
 		createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
 		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 		expiresAt: timestamp("expires_at", { withTimezone: true }),
+		reminderSentAt: timestamp("reminder_sent_at", { withTimezone: true }),
 	},
 	(table) => [index("availability_requests_group_id_idx").on(table.groupId)],
 );

@@ -214,6 +214,55 @@ ${ctaButton(options.requestUrl, "Submit Your Availability")}
 	}
 }
 
+export async function sendAvailabilityReminderNotification(options: {
+	requestTitle: string;
+	groupName: string;
+	dateRange: string;
+	recipients: Array<{
+		email: string;
+		name: string;
+		notificationPreferences?: NotificationPreferences;
+	}>;
+	requestUrl: string;
+	preferencesUrl?: string;
+	expiresAt?: string | null;
+}): Promise<void> {
+	for (const recipient of options.recipients) {
+		const prefs = mergeWithDefaults(recipient.notificationPreferences);
+		if (!prefs.availabilityRequests.email) continue;
+
+		const expiryLine = options.expiresAt
+			? `<p style="margin:0;font-size:13px;color:#475569;">⏰ Please respond by ${escapeHtml(options.expiresAt)}</p>`
+			: "";
+
+		const html = emailLayout(
+			`
+<h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0f172a;">Availability Reminder</h2>
+<p style="color:#475569;margin:0 0 20px;">Hi ${escapeHtml(recipient.name)}, ${escapeHtml(options.groupName)} is waiting for your availability response.</p>
+${infoCard(
+	[
+		`<p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0f172a;">${escapeHtml(options.requestTitle)}</p>`,
+		`<p style="margin:0 0 4px;font-size:13px;color:#475569;">${escapeHtml(options.groupName)} · ${escapeHtml(options.dateRange)}</p>`,
+		expiryLine,
+	].filter(Boolean),
+)}
+${ctaButton(options.requestUrl, "Submit Your Availability")}
+<p style="color:#64748b;font-size:13px;margin:0;">Please respond so your group can plan around everyone's schedule.</p>`,
+			{ preferencesUrl: options.preferencesUrl },
+		);
+
+		const expiryText = options.expiresAt ? `\nPlease respond by: ${options.expiresAt}\n` : "";
+		const text = `Hi ${recipient.name},\n\n${options.groupName} is waiting for your availability response.\n\nRequest: ${options.requestTitle}\nDates: ${options.dateRange}${expiryText}\n\nSubmit your availability: ${options.requestUrl}`;
+
+		void sendEmail({
+			to: recipient.email,
+			subject: `🔔 Reminder: "${options.requestTitle}" — your availability is needed`,
+			html,
+			text,
+		});
+	}
+}
+
 export async function sendEventCreatedNotification(options: {
 	eventTitle: string;
 	eventType: string;

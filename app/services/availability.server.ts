@@ -5,6 +5,7 @@ import {
 	availabilityResponses,
 	events,
 	groupMemberships,
+	type NotificationPreferences,
 	users,
 } from "../../src/db/schema.js";
 import { trackEvent } from "./telemetry.server.js";
@@ -71,6 +72,7 @@ export async function getGroupAvailabilityRequests(groupId: string): Promise<
 			createdById: availabilityRequests.createdById,
 			createdAt: availabilityRequests.createdAt,
 			expiresAt: availabilityRequests.expiresAt,
+			reminderSentAt: availabilityRequests.reminderSentAt,
 			createdByName: users.name,
 			responseCount: sql<number>`cast((
 				select count(*) from availability_responses
@@ -115,6 +117,7 @@ export async function getAvailabilityRequest(
 			createdById: availabilityRequests.createdById,
 			createdAt: availabilityRequests.createdAt,
 			expiresAt: availabilityRequests.expiresAt,
+			reminderSentAt: availabilityRequests.reminderSentAt,
 			createdByName: users.name,
 		})
 		.from(availabilityRequests)
@@ -327,4 +330,63 @@ export async function deleteAvailabilityRequest(requestId: string): Promise<void
 		// Delete the request (responses cascade automatically)
 		await tx.delete(availabilityRequests).where(eq(availabilityRequests.id, requestId));
 	});
+}
+
+// --- Reminders ---
+
+export async function getNonRespondents(
+	requestId: string,
+	groupId: string,
+): Promise<
+	Array<{
+		userId: string;
+		name: string;
+		email: string;
+		notificationPreferences: NotificationPreferences | null;
+	}>
+> {
+	// Verify the request exists and belongs to this group
+	const [request] = await db
+		.select({ groupId: availabilityRequests.groupId })
+		.from(availabilityRequests)
+		.where(eq(availabilityRequests.id, requestId))
+		.limit(1);
+
+	if (!request || request.groupId !== groupId) return [];
+
+	// Get all group members
+	const allMembers = await db
+		.select({
+			userId: groupMemberships.userId,
+			name: users.name,
+			email: users.email,
+			notificationPreferences: groupMemberships.notificationPreferences,
+		})
+		.from(groupMemberships)
+		.innerJoin(users, eq(groupMemberships.userId, users.id))
+		.where(eq(groupMemberships.groupId, groupId));
+
+	// Get users who have already responded
+	const respondedUsers = await db
+		.select({ userId: availabilityResponses.userId })
+		.from(availabilityResponses)
+		.where(eq(availabilityResponses.requestId, requestId));
+
+	const respondedSet = new Set(respondedUsers.map((r) => r.userId));
+
+	return allMembers
+		.filter((m) => !respondedSet.has(m.userId))
+		.map((m) => ({
+			userId: m.userId,
+			name: m.name,
+			email: m.email,
+			notificationPreferences: m.notificationPreferences as NotificationPreferences | null,
+		}));
+}
+
+export async function updateReminderSentAt(requestId: string): Promise<void> {
+	await db
+		.update(availabilityRequests)
+		.set({ reminderSentAt: new Date() })
+		.where(eq(availabilityRequests.id, requestId));
 }
