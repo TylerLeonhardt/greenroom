@@ -63,7 +63,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 	}
 
 	const userResponse = await getUserResponse(requestId, user.id);
-	const results = admin ? await getAggregatedResults(requestId) : null;
+	const results = await getAggregatedResults(requestId);
 	const nonRespondentCount =
 		results && results.totalResponded < results.totalMembers
 			? results.totalMembers - results.totalResponded
@@ -361,8 +361,8 @@ export default function AvailabilityRequestDetail() {
 				</div>
 			)}
 
-			{/* Tab toggle for admins */}
-			{isAdmin && results && (
+			{/* Tab toggle */}
+			{results && (
 				<div className="mb-6 flex gap-0 border-b border-slate-200">
 					<button
 						type="button"
@@ -428,7 +428,7 @@ export default function AvailabilityRequestDetail() {
 				</div>
 			)}
 
-			{/* Results View (admin only) */}
+			{/* Results View */}
 			{view === "results" && results && (
 				<div className="space-y-6">
 					<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -457,7 +457,7 @@ export default function AvailabilityRequestDetail() {
 								Waiting for {results.totalMembers - results.totalResponded} more{" "}
 								{results.totalMembers - results.totalResponded === 1 ? "response" : "responses"}
 							</p>
-							{!isClosed && (
+							{isAdmin && !isClosed && (
 								<Form method="post" className="mt-2">
 									<CsrfInput />
 									<input type="hidden" name="intent" value="sendReminder" />
@@ -473,7 +473,7 @@ export default function AvailabilityRequestDetail() {
 									</button>
 								</Form>
 							)}
-							{reminderSentAt && (
+							{isAdmin && reminderSentAt && (
 								<p className="mt-2 text-xs text-amber-600">
 									Last reminder sent{" "}
 									{formatDateMedium(reminderSentAt as unknown as string, timezone)}

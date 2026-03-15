@@ -757,4 +757,112 @@ describe("availability request loader", () => {
 		expect(result.results).toEqual(mockResults);
 		expect(result.nonRespondentCount).toBe(2);
 	});
+
+	it("includes aggregated results for regular members", async () => {
+		// isGroupAdmin defaults to false (non-admin)
+		const mockResults = {
+			dates: [
+				{
+					date: "2025-03-15",
+					available: 2,
+					maybe: 1,
+					notAvailable: 0,
+					noResponse: 2,
+					total: 5,
+					score: 5,
+					respondents: [
+						{ name: "Alice", status: "available" },
+						{ name: "Bob", status: "available" },
+						{ name: "Carol", status: "maybe" },
+					],
+				},
+			],
+			totalMembers: 5,
+			totalResponded: 3,
+		};
+		(getAggregatedResults as ReturnType<typeof vi.fn>).mockResolvedValue(mockResults);
+
+		const request = new Request("http://localhost/groups/g1/availability/r1");
+		const result = await loader({
+			request,
+			params: { groupId: "g1", requestId: "r1" },
+			context: {},
+		});
+
+		expect(result.isAdmin).toBe(false);
+		expect(result.results).toEqual(mockResults);
+		expect(getAggregatedResults).toHaveBeenCalledWith("r1");
+		expect(result.nonRespondentCount).toBe(2);
+	});
+
+	it("includes nonRespondentCount for regular members", async () => {
+		const mockResults = {
+			dates: [
+				{
+					date: "2025-03-15",
+					available: 1,
+					maybe: 0,
+					notAvailable: 1,
+					noResponse: 6,
+					total: 8,
+					score: 2,
+					respondents: [
+						{ name: "Alice", status: "available" },
+						{ name: "Bob", status: "not_available" },
+					],
+				},
+			],
+			totalMembers: 8,
+			totalResponded: 2,
+		};
+		(getAggregatedResults as ReturnType<typeof vi.fn>).mockResolvedValue(mockResults);
+
+		const request = new Request("http://localhost/groups/g1/availability/r1");
+		const result = await loader({
+			request,
+			params: { groupId: "g1", requestId: "r1" },
+			context: {},
+		});
+
+		expect(result.isAdmin).toBe(false);
+		expect(result.results).toEqual(mockResults);
+		expect(result.nonRespondentCount).toBe(6);
+	});
+
+	it("regular member results have zero nonRespondentCount when all responded", async () => {
+		const mockResults = {
+			dates: [
+				{
+					date: "2025-03-15",
+					available: 3,
+					maybe: 1,
+					notAvailable: 1,
+					noResponse: 0,
+					total: 5,
+					score: 7,
+					respondents: [
+						{ name: "Alice", status: "available" },
+						{ name: "Bob", status: "available" },
+						{ name: "Carol", status: "available" },
+						{ name: "Dave", status: "maybe" },
+						{ name: "Eve", status: "not_available" },
+					],
+				},
+			],
+			totalMembers: 5,
+			totalResponded: 5,
+		};
+		(getAggregatedResults as ReturnType<typeof vi.fn>).mockResolvedValue(mockResults);
+
+		const request = new Request("http://localhost/groups/g1/availability/r1");
+		const result = await loader({
+			request,
+			params: { groupId: "g1", requestId: "r1" },
+			context: {},
+		});
+
+		expect(result.isAdmin).toBe(false);
+		expect(result.results).toEqual(mockResults);
+		expect(result.nonRespondentCount).toBe(0);
+	});
 });
