@@ -1,15 +1,15 @@
 # My Call Time — User Guide
 
-Welcome to **My Call Time**, a scheduling platform built for groups that need to coordinate rehearsals, shows, and events. Whether you're part of an improv troupe, theater company, band, or any group that needs to find the best times to get together — My Call Time makes it easy.
+Welcome to **My Call Time** — the scheduling platform built for improv groups, theater companies, bands, and any ensemble that needs to coordinate rehearsals, shows, and events.
 
-**The core workflow is simple:**
+**Here's how it works:**
 
-1. An admin sends an availability request — *"When is everyone free?"*
-2. Members respond with their availability for each date
-3. The admin sees a color-coded heatmap of the best dates
-4. The admin creates events from the top dates — members get notified automatically
+1. An admin sends out an availability request — *"When is everyone free?"*
+2. Members tap through each date: ✅ Available, 🤔 Maybe, or ❌ Unavailable
+3. The admin sees a scored heatmap showing the best dates at a glance
+4. The admin creates events from the top-scoring dates — members get notified automatically
 
-No more group texts. No more spreadsheets. Just a clean workflow from *"when are you free?"* to *"see you Thursday."*
+No more group texts. No more spreadsheets. Just a clean path from *"when are you free?"* to *"see you Thursday."*
 
 ---
 
@@ -68,107 +68,122 @@ No more group texts. No more spreadsheets. Just a clean workflow from *"when are
 
 ### Creating an Account
 
-1. Visit the My Call Time homepage and click **"Get Started Free"**.
-2. You can sign up two ways:
-   - **With Google** — Click **"Sign up with Google"** and authorize with your Google account. You'll be taken straight to your dashboard.
-   - **With Email** — Fill in your name, email, and a password (minimum 8 characters). A strength meter below the password field shows how strong your password is. Click **"Create account"**.
-3. If you signed up with email, you'll be taken to a **"Check your email"** page. Open your inbox, find the verification email, and click the verification link. The link expires in 24 hours.
-4. After verifying your email, you'll be redirected to the sign-in page with a confirmation message. Sign in with your credentials to access your dashboard.
+When you first visit My Call Time, you'll see the landing page with the tagline **"Never miss your call time"** and a description of the platform's features: Find Availability, Smart Scheduling, Manage Shows, and Built for Groups.
 
-> **Didn't receive the email?** On the "Check your email" page, click **"Resend Verification Email"** to get a new one. You can resend once per minute.
+Click **"Get Started Free"** to begin. You'll land on the sign-up page titled **"Create your account"**.
+
+You have two options:
+
+- **Sign up with Google** — Click the **"Sign up with Google"** button at the top. You'll authorize with your Google account and be taken straight to your dashboard.
+- **Sign up with email** — Fill in these four fields:
+  - **Name** — Your display name (how others in your groups will see you)
+  - **Email** — Your email address (used for login and notifications)
+  - **Password** — Minimum 8 characters. A color-coded strength meter appears below the field as you type: red for weak, amber for medium, green with "Strong" for 8+ characters
+  - **Confirm password** — Must match exactly
+
+Click **"Create account"** and you'll be taken to a **"Check your email"** page. Open your inbox, find the verification email, and click the link. The link expires after 24 hours.
+
+> **Didn't get the email?** Click **"Resend Verification Email"** on the check-email page. You can resend once per minute.
+
+After verifying, you'll be redirected to the sign-in page with a success message. Sign in to access your dashboard.
+
+At the bottom of the signup page there's a link: *"Already have an account? **Sign in**"*.
 
 ### Signing In
 
-1. Go to the sign-in page and enter your email and password, or click **"Sign in with Google"**.
-2. After signing in, you'll land on your **Dashboard**.
+The sign-in page shows **"Welcome back"** at the top. You have two options:
 
-> **Reactivating a deleted account:** If you previously deleted your account within the last 30 days, signing in will automatically reactivate it.
+- **Sign in with Google** — Click the button to authenticate with your Google account.
+- **Sign in with email** — Enter your **Email** and **Password**, then click **"Sign in"**.
+
+After signing in, you'll land on your **Dashboard**.
+
+> **Reactivating a deleted account:** If you deleted your account within the last 30 days, signing in will automatically reactivate it and restore your data.
 
 ### Your Dashboard
 
-The Dashboard is your home base. It shows you everything that needs your attention at a glance:
+The Dashboard is your home base — it greets you by name (e.g., *"Welcome back, Taylor Swift! 👋"*) and shows everything that needs your attention:
 
-- **Action Required** — A yellow section at the top listing items that need your response:
-  - **Availability requests** waiting for your response, with their date ranges and deadlines
-  - **Events** waiting for you to confirm or decline attendance
-  - If everything is handled, you'll see a friendly *"You're all caught up!"* message with a ✅
-- **Upcoming Events** — A grid of your upcoming events across all groups, showing the event type, date/time, location, and your attendance status.
-- **Your Groups** — Quick links to your groups, showing member counts and your role (Admin or Member). If you're in more than four groups, click **"View all groups"** to see the full list.
+- **Action Required** — A section listing items that need your attention. Each item is a clickable card showing the request title, group name, and date range with a **"Respond →"** link. For example: *📋 "April Rehearsal Schedule" needs your response — The Improvables · Mar 21 – Apr 4, 2026 — Respond →*. Events waiting for confirmation also appear here.
+- **Upcoming Events** — Cards showing your upcoming events across all groups. Each card displays the event type emoji and label (🎯 Rehearsal, 🎭 Show, or 📅 Other), the group name, event title, date/time, and location.
+- **Your Groups** — At the bottom, a list of your groups with member counts and your role. Includes quick-action links: **"Create Group"** and **"Join Group"**.
 
-If you're new and haven't joined any groups yet, the Dashboard will prompt you to **Create a Group** or **Join a Group**.
+The top navigation bar shows links to **Dashboard**, **Groups**, and **Settings**, plus your initials avatar and name with a **"Log out"** button.
 
 ---
 
 ## Groups
 
-Groups are at the heart of My Call Time. Each group has its own availability requests, events, and member list. You can be in multiple groups at the same time.
+Groups are the heart of My Call Time. Each group has its own availability requests, events, and member list. You can belong to multiple groups at once.
 
 ### Creating a Group
 
 1. From your Dashboard or the Groups page, click **"Create Group"**.
-2. Enter a **Group Name** (required, up to 100 characters) — for example, *"The Improvables"*.
-3. Optionally add a **Description** to tell members what the group is about.
-4. Click **"Create Group"**.
+2. You'll see a form titled **"Create a Group"** with the subtitle *"Start a new improv group and invite your ensemble."*
+3. Enter a **Group Name** (e.g., *"The Improvables"*).
+4. Optionally add a **Description** (e.g., *"Chicago's finest improv troupe. Rehearsals Tuesdays, shows Fridays."*).
+5. Click **"Create Group"**.
 
-You'll automatically become the **Admin** of your new group and receive a unique invite code to share with others.
+You'll automatically become the **Admin** and receive a unique 8-character invite code to share with others.
 
 ### Joining a Group
 
-There are two ways to join a group:
+There are two ways to join:
 
 **Using an invite link:**
-- If someone shares a join link with you (like `mycalltime.app/groups/join?code=ABCD1234`), simply click the link. If you're signed in, you'll join the group immediately. If you're not signed in, you'll be prompted to sign in or create an account first.
+If someone shares a join link (like `mycalltime.app/groups/join?code=ABCD1234`), just click it. If you're signed in, you'll join immediately.
 
 **Using an invite code:**
-1. Go to the **Groups** page.
-2. In the **"Have an invite code?"** section, type in the 8-character code.
-3. Click **"Join Group"**.
+1. Go to the **Groups** page. Right at the top, you'll see a text field labeled **"Have an invite code?"** with a placeholder *"Enter invite code"*.
+2. Type in the 8-character code and click **"Join Group"**.
 
-You can also navigate to **Groups → Join a Group** for a dedicated join page with a larger code input.
+There's also a dedicated join page at **Groups → Join Group** in the navigation.
 
 ### Group Overview
 
-Click on any group to see its **Overview** page. This is the main hub for your group and includes:
+Click on any group from the Groups list to open it. The group page shows the group name, description, and a **tab bar** with five tabs:
 
-- **Members list** — Shows every member with their name, email, role badge (Admin or Member), and profile photo.
-- **Quick Stats** — At a glance: total member count, number of upcoming events, and number of open availability requests.
-- **Next Up** — A preview of up to 3 upcoming events. Click **"View all →"** to see the full events list.
-- **Invite Code** (admins only) — Your group's unique invite code and a **"Copy Invite Link"** button to share with prospective members.
-
-Use the **tab bar** at the top of the group page to navigate between:
-- **Overview** — Members, stats, and upcoming events
+- **Overview** — The default view
 - **Availability** — Scheduling polls
 - **Events** — Rehearsals, shows, and other events
-- **Notifications** — Your notification preferences for this group
-- **Settings** — Group settings (admin only)
+- **Notifications** — Your email notification preferences for this group
+- **Settings** — Group administration (visible to admins)
+
+The **Overview** tab has two columns:
+
+**Left column — Members list:** Shows each member with their initials avatar, name, email, and role badge (Admin or Member). Admins see a **"Remove"** button next to each non-admin member.
+
+**Right column — three sections:**
+1. **Quick Stats** — Shows Members count, Upcoming Events count, and Open Availability count.
+2. **Next Up** — A preview of upcoming events as clickable cards, with a **"View all →"** link to the full events list.
+3. **Invite Code** — Displays the code in a monospace font (e.g., `DEMO2026`) with a copy icon button, plus a **"📋 Copy Invite Link"** button to share the full URL.
 
 ### Invite Codes
 
-Every group has an 8-character invite code (like `ABCD1234`) that anyone can use to join. Admins can:
+Every group has an 8-character invite code (like `DEMO2026`) displayed on the group Overview page and in Group Settings. Admins can:
 
-- **Copy the code** to share via text or chat
-- **Copy the full invite link** to share a clickable URL
+- **Copy the code** by clicking the clipboard icon next to it
+- **Copy the full invite link** with the **"📋 Copy Invite Link"** button
 - **Regenerate the code** from Group Settings if the old one needs to be invalidated
 
 > **Note:** Regenerating a code permanently invalidates the old one — any previously shared links or codes will stop working.
 
 ### Managing Members
 
-From the group **Overview** page, admins can:
+From the group **Overview** tab, you can see all members listed with their initials avatar, full name, email address, and role badge (Admin or Member).
 
-- **View all members** with their names, emails, and roles
-- **Remove a member** by clicking the **"Remove"** link next to their name. You'll be asked to confirm before the member is removed.
+As an admin, you'll see a **"Remove"** button next to each non-admin member. Click it and confirm to remove them from the group.
 
-> **Note:** You can't remove yourself from a group.
+> **Note:** You can't remove yourself or other admins from a group.
 
 ### Group Permissions
 
-By default, only admins can create availability requests and events. But admins can enable these permissions for regular members:
+By default, only admins can create availability requests and events. Admins can change this under **Group Settings → Member Permissions**:
 
-- **Allow members to create availability requests** — Members can create scheduling polls, not just admins.
-- **Allow members to create events** — Members can create rehearsals, shows, and other events.
+- **Allow members to create availability requests** — Members can create scheduling polls, not just admins
+- **Allow members to create events** — Members can create rehearsals, shows, and other events
 
-These settings are found under **Group Settings → Member Permissions**.
+Each toggle has a description explaining what it enables. Click **"Save Permissions"** after making changes.
 
 ---
 
@@ -179,453 +194,349 @@ Availability requests are scheduling polls that help you find the best dates for
 ### Creating an Availability Request
 
 1. Navigate to your group and click the **Availability** tab.
-2. Click **"New Request"**.
-3. Fill in the form:
+2. Click the **"New Request"** button (with a ＋ icon) in the top-right corner.
+3. You'll see the form titled **"Create Availability Request"** with the subtitle *"Ask your group when they're free."*
 
-   - **Title** (required) — Give it a descriptive name, like *"March Rehearsal Schedule"*.
-   - **Description** (optional) — Click **"+ Add description"** to expand a text field for extra context. Click **"Remove"** to hide it again.
-   - **Date Range** (required) — Pick a **Start Date** and **End Date** to define the overall range.
-   - **Select Dates** (required) — Choose specific dates within your range using the interactive calendar. Use the **quick-select buttons** for speed:
-     - **Weekdays (Mon–Fri)** — Select all weekdays in the range
-     - **Weekends (Sat–Sun)** — Select all weekend days
-     - **All Days** — Select every day in the range
-     - **Clear All** — Deselect everything and start over
-     - A counter shows how many days you've selected (e.g., *"12 days selected"*)
-   - **Response Deadline** (optional) — Click **"+ Add response deadline"** to set a deadline. Responses are still accepted after this date, but it signals urgency to members.
-   - **Time Range** (optional) — Click **"+ Add time range"** to specify what hours you're asking about (e.g., 7:00 PM – 9:00 PM). This helps members know the expected time slot. Your timezone is shown — you can change it if needed.
+Fill in the form:
 
-4. A **Preview** section shows all your selected dates as tags.
-5. Click **"Create Request"**.
+- **Title** (required) — A descriptive name like *"March Rehearsal Schedule"*. The placeholder text suggests this.
+- **Description** (optional) — Click the **"Add description"** button to expand a text area. Toggling this off clears the description.
+- **Date Range** (required) — Pick a **Start Date** and **End Date** using the date fields under the "Date Range" heading.
+- **Select Days** — After setting the date range, a day picker appears under the "Select Days" heading. Use the quick-select buttons to speed things up:
+  - **Weekdays (Mon–Fri)** — Select all weekdays in the range
+  - **Weekends (Sat–Sun)** — Select all weekend days
+  - **All Days** — Select every day in the range
+  - **Clear All** — Deselect everything
+  - A counter shows how many days are selected (e.g., *"12 days selected"*)
+- **Response deadline** (optional) — Click **"Add response deadline"** to set when you'd like responses by. Responses are still accepted after this date, but it signals urgency.
+- **Time range** (optional) — Click **"Add time range"** to specify the hours you're asking about (e.g., 7:00 PM – 9:00 PM). Your timezone is shown so members know the context.
 
-All group members will be notified by email (and Discord, if configured) that a new availability request is waiting for their response.
+Click **"Create Request"** when you're ready. All group members are notified by email (and Discord, if configured).
 
 ### Responding to an Availability Request
 
-1. Click on an availability request from the list (or from the "Action Required" section on your Dashboard).
-2. On the **My Response** tab, you'll see a grid with every requested date.
+1. Click on a request from the Availability list, or from the **"Action Required"** section on your Dashboard. You'll see the request title, status badge (Open/Closed), description, date range, and time range.
+2. The **"My Response"** tab shows a table with columns: **Date**, **Day**, and **Status**.
 3. For each date, click one of three buttons:
    - ✅ **Available** — You can make it
    - 🤔 **Maybe** — You might be able to make it
    - ❌ **Unavailable** — You can't make it
 
-   **Shortcuts to save time:**
-   - **"All Available"** — Mark every date as available
+   **Shortcuts at the top of the grid:**
+   - **"All Available"** — Mark every date as available in one click
    - **"All Unavailable"** — Mark every date as unavailable
-   - **"Clear"** — Remove all your responses to start over
+   - **"Clear"** — Remove all your selections and start over
 
-4. Click **"Submit Response"** (or **"Update Response"** if you've already responded).
+   If the request includes a time range, you'll see it at the top of the grid: *"⏰ Time: 7:00 PM – 9:00 PM each day"*.
 
-You can update your response anytime while the request is open. If you've already responded, your previous selections will be pre-filled.
+4. Click **"Submit Response"** at the bottom. The button is disabled until you've selected at least one date. After submitting, you'll see a green **"Response saved!"** confirmation banner.
 
-> If the request is **closed**, the grid will be disabled with a message: *"This request is closed. Responses are no longer being accepted."*
+You can update your response anytime while the request is open — just change your selections and click **"Update Response"**.
 
 ### Viewing Results
 
-Click the **Results** tab on any availability request to see the aggregated responses.
+Click the **"Results"** tab on any availability request to see the aggregated view.
 
-**The Heatmap** shows every requested date with:
-- ✅ Count of people who said **Available**
-- 🤔 Count of people who said **Maybe**
-- ❌ Count of people who said **Unavailable**
-- — Count of people who **haven't responded yet**
-- A **Score** for each date, calculated as:
-  - Each "Available" response = **2 points**
-  - Each "Maybe" response = **1 point**
-  - Unavailable and no response = **0 points**
+At the top you'll see how many members have responded (e.g., *"3/3 responded"*).
 
-**Color coding** makes it easy to spot the best dates at a glance:
-- 🟢 **Green** (high score) — Most people are available. Great choice!
-- 🟡 **Amber** (medium score) — Mixed availability. Consider carefully.
-- 🔴 **Red** (low score) — Few people are available. Probably best to skip.
-- ⭐ The **top 3 dates** by score are marked with a star icon.
+**The Results Table** shows every date with these columns:
+- An **expand/collapse** arrow to see individual responses
+- **Date** — The calendar date (e.g., Mar 22)
+- **Day** — Day of the week (e.g., Sun)
+- **✅** — Count of Available responses
+- **🤔** — Count of Maybe responses
+- **❌** — Count of Unavailable responses
+- **—** — Count of people who haven't responded yet
+- **Score** — Calculated as: Available × 2 + Maybe × 1. Higher scores mean more people are free.
+- **Create Event** — A direct link to create an event on that date
 
-**Sorting options:**
+The **top-scoring dates** are highlighted with a ⭐ star icon next to the date.
+
+**Sorting:**
 - **Date** — Chronological order (default)
-- **Best First** — Highest scores at the top, so you can quickly find the best dates
+- **Best First** — Highest scores at the top
 
-**Expanding a date:** Click any row to expand it and see exactly who responded and what they said — for example, *"✅ Sarah — Available"*, *"🤔 Mike — Maybe"*.
+**Expanding a row:** Click the arrow on any row to see who responded and how — e.g., *"Alex Rivera: Available, Jamie Lee: Unavailable, Taylor Swift: Available."*
 
-A **progress bar** at the top shows how many members have responded (e.g., *"8/12 responded"*).
+**Select Dates mode:** Click the **"Select Dates"** button to enter batch selection mode. Check off the dates you want, or use quick-select buttons (**Select Top 5**, **Select All**, **Clear**). Then click **"Create N Events →"** to batch-create events.
 
 ### Sending Reminders
 
-If some members haven't responded yet, admins will see a **"Send Reminder"** button in the results view:
-
-1. Look for the yellow *"Waiting for N more responses"* banner.
-2. Click **"Send Reminder (N haven't responded)"**.
-3. Non-respondents will receive an email (and a Discord notification, if configured) reminding them to respond.
-
-> You can only send one reminder per minute to prevent spamming. The timestamp of the last reminder is displayed so you know when it was last sent.
+If some members haven't responded, admins see a **"Send Reminder"** button. Click it to email non-respondents a reminder. You can only send one reminder per minute.
 
 ### Editing an Availability Request
 
-Admins and the request creator can edit an availability request:
-
-1. On the request detail page, click the **"Edit"** button (pencil icon).
-2. You can modify the **title**, **description**, and **selected dates**. (The time range, if set, cannot be changed after creation.)
-3. Check or uncheck **"Notify members of this change"** (checked by default).
-4. Click **"Save Changes"**.
-
-If notifications are enabled and changes were made, all members will receive an email summarizing what changed.
+Admins and the request creator can click the **"Edit"** button (pencil icon) on the request detail page. You can modify the title, description, and dates. Optionally notify members of changes.
 
 ### Closing and Reopening Requests
 
-Admins can **close** an availability request to stop accepting responses:
-
-- On the request detail page, click **"Close Request"**. The status badge changes to **"Closed"** and members can no longer submit or update responses.
-- To reopen it later, click **"Reopen Request"**.
+Admins can click **"Close Request"** on the request detail page to stop accepting responses. The status badge changes from "Open" to "Closed." Click **"Reopen Request"** to re-enable responses later.
 
 ---
 
 ## Events
 
-Events are the end result of the scheduling process — rehearsals, shows, and other gatherings. Once you know when everyone's free, create events and let your group know.
+Events are the end result of the scheduling process — the rehearsals, shows, and gatherings you've planned.
 
 ### Viewing Events
 
-Go to your group and click the **Events** tab. You can view events two ways:
+Go to your group and click the **Events** tab. You'll see the events page with:
 
-- **List View** (default) — Events organized into **Upcoming Events** and **Past Events** sections. Past events are collapsed by default — click to expand them.
-- **Calendar View** — A monthly calendar with colored dots on dates that have events. Click a date to see the events on that day in a side panel.
+- **View toggle** — Switch between **List** (default) and **Calendar** views using the buttons in the top bar
+- **Type filter** — A dropdown to filter by **All Types**, **🎭 Shows**, **🎯 Rehearsals**, or **📅 Other**
+- **Create Event** button — In the top-right corner
 
-**Filter by event type** using the dropdown: **All Types**, **Shows**, **Rehearsals**, or **Other**.
+**List view** organizes events into **Upcoming** and **Past** sections, each with a count (e.g., *"Upcoming (2)"*). Each event card shows:
+- Event type emoji and label (🎯 Rehearsal, 🎭 Show, or 📅 Other)
+- Event title
+- Date and time
+- Location (if set)
+- Confirmation status (e.g., *"1/2 confirmed"*)
+
+**Calendar view** shows a monthly grid with event dots on dates that have events. Navigate months with arrow buttons. Click a date to see events on that day.
 
 ### Creating an Event
 
 1. From the Events tab, click **"Create Event"**.
-2. Fill in the form:
-   - **Title** (required) — e.g., *"Friday Night Show"*
-   - **Event Type** (required) — Choose **Rehearsal**, **Show**, or **Other**
-   - **Date** (required) — Pick the event date
-   - **Start Time** and **End Time** (required) — Set the time range. Defaults to 7:00 PM – 9:00 PM.
-   - **Call Time** (shows only) — If you chose "Show", an additional field appears for when performers need to arrive (defaults to 6:00 PM). See [Call Time](#call-time-for-shows) for details.
-   - **Timezone** — Shown inline; click to change if needed.
-   - **Location** (optional) — Where the event takes place
-   - **Description** (optional) — Any additional details
-3. For shows, you can also select **cast members** from the group member list. See [Cast Management](#cast-management).
-4. Click **"Create Event"**.
+2. The form has these sections:
 
-All assigned members (and the group via Discord, if configured) will be notified.
+   **Basic Details:**
+   - **Title** (required) — Placeholder: *"e.g., Friday Night Show"*
+   - **Event Type** (required) — Three radio buttons: **🎯 Rehearsal** (selected by default), **🎭 Show**, or **📅 Other**
+
+   **Date & Time:**
+   - Your timezone is shown (e.g., *"New York (EDT)"*) — click it to change
+   - **Date** (required) — A date picker
+   - **Start Time** (required) — Defaults to 19:00
+   - **End Time** (required) — Defaults to 21:00
+   - **Call Time** — Appears only when "Show" is selected. This is when performers need to arrive (before the show starts).
+
+   **Additional Details:**
+   - **Location** (optional) — Placeholder: *"e.g., Studio A, Main Theater"*
+   - **Description** (optional) — Placeholder: *"Any additional details..."*
+
+   **Cast Assignment** (shows only) — A list of group members you can select as performers.
+
+3. Click **"Create Event"** to save, or **"Cancel"** to go back.
 
 ### Creating an Event from Availability Results
 
-When viewing the results heatmap for an availability request, you can create events directly from the best dates:
-
-**For a single date:**
-1. In the results heatmap, find the date you want.
-2. Click the **"Create Event"** link on that row.
-3. You'll be taken to the event creation form with the date pre-filled.
-4. Members who said they were available will be pre-selected in the cast assignment section.
-
-**For multiple dates at once:** See [Batch Event Creation](#batch-event-creation) below.
+In the Results tab of any availability request, each row has a **"Create Event"** link. Clicking it takes you to the event creation form with:
+- The **date** pre-filled from the selected row
+- The **time range** pre-filled from the availability request
+- Members who said **Available** pre-selected as performers (for shows)
 
 ### Batch Event Creation
 
-Batch creation lets you create multiple events at once from your availability results — perfect for scheduling an entire month of rehearsals in one go.
+Create multiple events at once from availability results:
 
-1. In the results heatmap, click **"Select Dates"** to enter selection mode.
-2. Select dates using checkboxes, or use the quick-select buttons:
-   - **Select Top 5** — Automatically picks the 5 dates with the highest availability scores
-   - **Select All** — Selects every date
-   - **Clear** — Deselects all
-3. A summary bar shows how many dates you've selected. Click **"Create N Events →"**.
-4. **Step 1 — Configure:** Set the shared details for all events:
-   - **Title** — Pre-filled with the availability request title
-   - **Event Type** — Rehearsal, Show, or Other
-   - **Start Time** and **End Time** — Pre-filled from the availability request's time range, or defaults to 7:00 PM – 9:00 PM
-   - **Call Time** (shows only) — When performers should arrive
-   - **Description** (optional) — Click **"+ Add description"** to add notes
-   - **Locations** (optional) — Click **"+ Add locations per date"** to set a location for each event. Use **"Apply to All"** to set the same location for every date, or set them individually.
-   - **Timezone** — Select the timezone for all events
-5. Click **"Review Events →"** to proceed.
-6. **Step 2 — Review:** See a preview card for each event showing the title, type, date, time, call time (if applicable), and location. Verify everything looks correct.
-7. Click **"Create N Events"** to create all events at once.
+1. On the Results tab, click **"Select Dates"** to enter selection mode.
+2. Checkboxes appear next to each date. Use them individually or with quick-select buttons:
+   - **Select Top 5** — Picks the 5 highest-scoring dates
+   - **Select All** / **Clear**
+3. A summary bar shows your selection count. Click **"Create N Events →"**.
+4. **Configure** shared details: title, type, times, timezone. Optionally add description and per-date locations.
+5. **Review** the event cards — one per date, showing all details.
+6. Click **"Create N Events"** to create them all.
 
-You'll be redirected to the availability request page with a success message and a link to **"View Events →"**.
-
-**Smart notifications:** Members receive a single consolidated email listing all the batch-created events, personalized based on their availability response:
-- Members who said **"Available"** get a confirmation that they're booked
-- Members who said **"Maybe"** are asked to confirm attendance
-- Members who **didn't respond** are notified about the new events
-- Members who said **"Not Available"** are **not** emailed
+Members receive a single consolidated email listing all events, personalized based on their availability response (Available, Maybe, or no response). Members who said "Not Available" are not emailed.
 
 ### Event Types
 
-My Call Time supports three event types, each with a distinctive badge:
-
 | Type | Badge | Special Features |
 |------|-------|-----------------|
-| 🎯 **Rehearsal** | Green | Standard attendee list |
-| 🎭 **Show** | Purple | Call time field, Performer/Viewer roles, self-registration |
-| 📅 **Other** | Gray | Standard attendee list |
+| 🎯 **Rehearsal** | Default type | Standard attendee tracking |
+| 🎭 **Show** | Selected via radio | Call time field, Performer/Viewer roles, self-registration |
+| 📅 **Other** | For anything else | Standard attendee tracking |
 
 ### Call Time (for Shows)
 
-Shows have an optional **Call Time** — the time performers need to arrive, which is typically earlier than the show start time.
+Shows have a **Call Time** — when performers need to arrive, typically before the show starts.
 
-- When creating or editing a show, a **"Call Time"** field appears below the start/end time fields.
-- Call time must be before the show's start time.
-- Performers see the call time prominently on the event detail page: *"Arrive by 6:00 PM"*.
-- When performers download the iCal file, their calendar entry starts at the **call time**, not the show time. Viewers' calendar entries start at the regular show time.
-- Reminder emails for shows include the call time prominently highlighted.
+On the event detail page, the call time is displayed prominently: *"Call Time: 9:00 PM (performers arrive)"*. Under "Your Status," performers see: *"📍 Arrive by 9:00 PM"*.
+
+When performers download the iCal file via **"Add to Calendar"**, their calendar entry starts at the call time, not the show time. Viewers' calendar entries start at the regular show time.
 
 ### Cast Management
 
-For **shows**, cast management lets you assign performers:
-
-**During event creation:**
-- A **Cast Assignment** section appears when creating a show.
-- If creating from availability results, members are grouped by their response:
-  - ✅ **Available** members are pre-selected
-  - 🤔 **Maybe** members are listed but not pre-selected
-  - ❌ **Not Available** members are shown grayed out (still selectable if needed)
-  - **No Response** members are listed and selectable
-- Click on names to select or deselect them. A counter shows how many performers are selected.
-
-**On the event detail page:**
-- Admins can click **"Add Performers"** to add members after the event is created.
-- If the event was created from an availability request, the add-performers panel groups members by their availability response for easy selection.
-- Admins can **remove** assigned performers by clicking the ✕ button next to their name.
-- Newly added performers receive an email notification.
-
-For **rehearsals** and **other** events, the same system works but members are simply labeled as "cast" rather than "performers."
+For **shows**, the event detail page has a **"Cast"** section showing assigned performers:
+- Each performer is listed with their name, role ("Performer"), and status (Confirmed/Pending/Declined).
+- Admins see an **"Add Performers"** button and a **"Remove"** button (✕ icon) next to each performer.
+- A separate **"Attending"** section shows self-registered viewers.
 
 ### Confirming or Declining Attendance
 
-When you're assigned to an event, you'll see a **"Your Status"** card on the event detail page:
+When you're assigned to an event, a **"Your Status"** card appears on the event detail page showing:
+- Your **Role** (e.g., "Performer")
+- Your **arrival time** (for shows with call time)
+- Your current status with action buttons:
+  - If **Confirmed**: Shows a green checkmark and **"Change to Declined"** button
+  - If **Pending**: Shows **"Confirm"** and **"Decline"** buttons
+  - If **Declined**: Shows **"Change to Confirmed"** button
 
-- **Pending** — You haven't responded yet. Click **"Confirm"** (✓) or **"Decline"** (✕).
-- **Confirmed** — You've confirmed attendance. You can change your mind by clicking **"Change to Declined"**.
-- **Declined** — You've declined. You can change by clicking **"Change to Confirmed"**.
-
-Pending events also appear in your Dashboard under **"Action Required"** for easy access.
+For shows, a **"Show Summary"** box displays: Performers count, Viewers count, Confirmed count, Pending count, and Declined count.
 
 ### Self-Registration
 
-Any group member who isn't already assigned to an event can let their group know whether they'll attend:
-
-**For shows:**
-- On the show's detail page, look for the **"Attending?"** section.
-- Click **"I'll be there"** to register as a **Viewer** (audience member), or **"I won't be there"** to indicate you won't attend.
-- Viewers are separate from the performer cast list — viewers see the regular show start time (not the call time) in their calendar exports.
-
-**For rehearsals and other events:**
-- On the event detail page, look for the **"Attending?"** section.
-- Click **"I'll be there"** to mark your attendance, or decline if you can't make it.
+Group members not assigned to an event can self-register:
+- **For shows:** Click **"I'll be there"** to register as a **Viewer**. Viewers see the regular show time (not the call time).
+- **For rehearsals/other:** Click **"I'll be there"** to mark attendance.
 
 ### Navigating Between Events
 
-On any event detail page, a **horizontal carousel** at the top shows all events in the group. Each card displays the date, day of week, and event type badge. The current event is highlighted in green. Click any card to jump to that event — a quick way to browse through your schedule without going back to the list.
+On any event detail page, a **horizontal date carousel** at the top shows all events in the group. Each card displays the month, day number, day of week, and event type. The current event is highlighted. Click any card to jump to that event — a quick way to browse your schedule.
 
 ### Adding to Your Calendar
 
-On any event detail page, click the **"Add to Calendar"** button (download icon) to download a calendar file that you can import into Google Calendar, Apple Calendar, Outlook, or any other calendar app.
+On any event detail page, click **"Add to Calendar"** (with a download icon) to download an `.ics` file. Import it into Google Calendar, Apple Calendar, Outlook, or any calendar app.
 
-**Smart start times for shows:**
-- If you're a **Performer** and the show has a call time, your calendar event starts at the **call time** (when you need to arrive).
-- For everyone else, the calendar event starts at the **regular show time**.
+**Smart start times for shows:** Performers get the call time as the start; everyone else gets the regular show time.
 
 ### Editing an Event
 
-Admins and the event creator can edit an event:
+Admins can click **"Edit"** (pencil icon) on the event detail page. Modify any details: title, type, date, times, location, description, or call time. Options at the bottom:
+- **Notify members** (checked by default) — Email assigned members about changes
+- **Request re-confirmation** — Reset everyone to "Pending" and ask them to re-confirm
 
-1. On the event detail page, click the **"Edit"** button (pencil icon).
-2. Modify any event details: title, type, date, times, location, description, or call time.
-3. Two optional checkboxes at the bottom:
-   - **"Notify members"** (checked by default) — Send an email and Discord notification about the changes.
-   - **"Request re-confirmation"** — Reset all attendees back to "Pending" status and ask them to re-confirm. Useful when the date or time changes significantly.
-4. Click **"Save Changes"**.
-
-If notifications are enabled, members receive an email listing exactly what changed (e.g., *"Start time changed from 7:00 PM to 7:30 PM"*).
+Click **"Save Changes"** to apply.
 
 ### Deleting an Event
 
-Admins and the event creator can delete an event:
-
-1. On the event detail page (or the edit page), scroll to the **Danger Zone** section.
-2. Click **"Delete Event"**.
-3. Confirm the deletion in the dialog. If the event has confirmed attendees, the confirmation will warn you about this.
-
-> Deleting an event permanently removes it and all attendee assignments. This cannot be undone.
+Scroll to the **"Danger Zone"** section on the event detail page. Click **"Delete Event"** and confirm. This permanently removes the event and all assignments.
 
 ---
 
 ## Notifications
 
-My Call Time keeps your group informed through email notifications and optional Discord webhook notifications.
-
 ### Email Notifications
 
-Here's every email My Call Time sends and when:
+My Call Time sends these emails:
 
 | Notification | When It's Sent | Who Receives It |
 |-------------|----------------|-----------------|
 | **New Availability Request** | Admin creates a new request | All group members (except the creator) |
-| **Availability Reminder** | Admin clicks "Send Reminder" | Members who haven't responded yet |
+| **Availability Reminder** | Admin clicks "Send Reminder" | Members who haven't responded |
 | **Availability Request Updated** | Admin edits a request | All group members |
-| **New Event Created** | An event is created and members are assigned | Assigned members |
-| **Batch Events Created** | Multiple events created from availability results | Members segmented by availability (available, maybe, no response) — *not* sent to those who said "Not Available" |
-| **Added to Event** | A member is manually added to an event | The newly added member |
-| **Event Updated** | An event is edited with "notify members" checked | All assigned members |
-| **Event Re-confirmation** | An event is edited with "request re-confirmation" checked | Previously confirmed/declined attendees (reset to pending) |
-| **Event Reminder (24 hours)** | Automated, 24 hours before event | Confirmed attendees only |
-| **Confirmation Reminder (48 hours)** | Automated, 48 hours before event | Pending (unconfirmed) attendees only |
+| **New Event Created** | An event is created with assigned members | Assigned members |
+| **Batch Events Created** | Multiple events from availability results | Members segmented by availability response |
+| **Added to Event** | Member manually added to an event | The newly added member |
+| **Event Updated** | Event edited with "notify" checked | All assigned members |
+| **Event Re-confirmation** | Event edited with "re-confirm" checked | Previously confirmed/declined attendees |
+| **Event Reminder (24h)** | Automated, 24 hours before | Confirmed attendees only |
+| **Confirmation Reminder (48h)** | Automated, 48 hours before | Pending attendees only |
 
-**Batch event emails are consolidated:** When multiple events are created at once, members receive **one email** listing all the events — not a separate email for each event.
-
-Every email includes a link to **manage your notification preferences** at the bottom.
+Batch event emails are consolidated — one email per member listing all events.
 
 ### Discord Channel Notifications
 
-Groups can optionally receive notifications directly in a Discord channel. When configured, Discord receives notifications for:
-
-- 📋 **New availability requests** — With the request title, date range, and creator name
-- 🔔 **Availability reminders** — Lists who still needs to respond
-- ✏️ **Updated availability requests** — Lists what changed
-- 🎭 **New events** — With event details, date/time, and location
-- 🎭 **Batch events created** — Numbered list of all events with dates and locations
-- ✏️ **Updated events** — Lists what changed
-- ⏰ **Event reminders** — 24 hours before the event
-
-See [Discord Webhook Setup](#discord-webhook-setup) for how to configure this.
+Groups can receive notifications in a Discord channel. See [Discord Webhook Setup](#discord-webhook-setup) for configuration.
 
 ### Managing Your Notification Preferences
 
-Each group has its own notification preferences, so you can customize notifications per group:
+Each group has its own notification settings:
 
 1. Go to your group and click the **Notifications** tab.
-2. Toggle these email notification categories on or off:
-   - **Availability requests** — New requests and reminders
-   - **Event notifications** — Event creation, updates, and assignments
-   - **Event reminders** — Pre-event reminders:
-     - 48 hours before: a confirmation nudge if you haven't confirmed yet
-     - 24 hours before: a reminder for events you've confirmed
-3. Click **"Save Preferences"**.
+2. The page shows **"Email Notifications"** with the subtitle *"Choose which email notifications you receive from this group."*
+3. Toggle these categories on or off:
+   - **Availability requests** — *"Get notified when someone creates a new availability request in this group"*
+   - **Event notifications** — *"Get notified when events are created or you're assigned to an event in this group"*
+   - **Event reminders** — *"Get reminder emails before upcoming events:"*
+     - 48 hours before — a confirmation nudge if you haven't confirmed yet
+     - 24 hours before — a reminder for events you've confirmed
+4. Click **"Save Preferences"**.
 
 All notification types are **enabled by default** when you join a group.
 
 ### Automated Reminders
 
-My Call Time can automatically send reminders before events (when enabled by the app administrator):
+My Call Time automatically sends reminders before events (when enabled):
+- **Confirmation reminder (48h)** — Sent to members who haven't confirmed or declined yet
+- **Event reminder (24h)** — Sent to confirmed attendees as a final heads-up. For shows, prominently displays the call time.
 
-- **Confirmation reminder** — Sent approximately **48 hours** before an event to members who haven't confirmed or declined yet. Asks them to confirm attendance.
-- **Event reminder** — Sent approximately **24 hours** before an event to **confirmed attendees** as a final heads-up. For shows, the reminder prominently displays the call time.
-
-These reminders respect your notification preferences — if you've turned off event reminders for a group, you won't receive them.
+These respect your notification preferences.
 
 ---
 
 ## Account Settings
 
-Access your settings by clicking **"Settings"** in the navigation bar.
+Click **"Settings"** in the top navigation bar to access your account settings.
 
 ### Display Name
 
-Your display name is how other group members see you.
-
-1. Under **Display Name**, edit your name.
-2. Click **"Save"**.
+Under the **"Display Name"** section (with a user icon), you'll see a text field pre-filled with your current name. This is how other group members see you. Edit it and click **"Save"**.
 
 ### Timezone
 
-Your timezone controls how dates and times are displayed throughout the app.
+Under the **"Timezone"** section (with a globe icon), select your timezone from a dropdown of common timezones organized by region. Options include US timezones (New York, Chicago, Denver, Los Angeles, Anchorage, Honolulu, Phoenix), Canadian timezones, Latin American timezones, European timezones, Asian timezones, and UTC.
 
-1. Under **Timezone**, select your timezone from the dropdown (e.g., *"Eastern Time (US & Canada)"*).
-2. Click **"Save"**.
+Click **"Save"** after selecting.
 
-> Your timezone is **auto-detected** from your browser when you first visit the app. You can change it anytime.
+> Your timezone is **auto-detected** from your browser on first visit. You can change it anytime. The timezone is also available inline when creating availability requests or events.
 
-The timezone selector is also available inline when creating availability requests or events, so you can quickly adjust if needed.
+### Account Info
+
+The **"Account"** section shows your email address (read-only).
 
 ### Deleting Your Account
 
-If you need to delete your account:
+Scroll to the **"Danger Zone"** section. Click the **"Delete Account"** link, which takes you to a dedicated page explaining:
+- What will happen to your data
+- Groups where you're the only admin
+- The 30-day recovery window
 
-1. Go to **Settings** and scroll to the **Danger Zone** section.
-2. Click **"Delete Account"**.
-3. You'll see a summary of what will happen:
-   - How many groups you'll be removed from
-   - How many availability requests and events you've created (which will be reassigned)
-   - Your responses and event assignments will be removed
-4. **If you're the only admin in any groups**, you'll need to make a decision for each one:
-   - **Transfer ownership** to another member (select who from a dropdown)
-   - **Delete the group** and all its data permanently
-5. Click **"Continue"** to proceed.
-6. On the confirmation page, type your **email address** to confirm.
-7. Click **"Permanently Delete My Account"**.
-
-> **30-day recovery window:** Your account is deactivated for 30 days before being permanently deleted. If you change your mind, simply sign in again during that window and your account will be reactivated automatically.
+> **30-day recovery:** Your account is deactivated, not immediately deleted. Sign back in within 30 days to reactivate it automatically.
 
 ---
 
 ## For Group Admins
 
-Admins have additional capabilities to manage their group effectively.
-
 ### Admin-Only Features
-
-Here's a summary of what admins can do that regular members cannot (unless permissions are enabled):
 
 | Feature | Admin | Member (default) | Member (with permission) |
 |---------|-------|-------------------|--------------------------|
 | Create availability requests | ✅ | ❌ | ✅ (if enabled) |
 | Create events | ✅ | ❌ | ✅ (if enabled) |
 | Close/reopen availability requests | ✅ | ❌ | ❌ |
-| Send reminders to non-respondents | ✅ | ❌ | ❌ |
-| Select dates for batch event creation | ✅ | ❌ | ❌ |
-| Edit/delete availability requests | ✅ (or creator) | Creator only | Creator only |
-| Edit/delete events | ✅ (or creator) | Creator only | Creator only |
+| Send reminders | ✅ | ❌ | ❌ |
+| Batch event creation | ✅ | ❌ | ❌ |
+| Edit/delete requests & events | ✅ (or creator) | Creator only | Creator only |
 | Add/remove cast members | ✅ | ❌ | ❌ |
 | Remove group members | ✅ | ❌ | ❌ |
-| View invite code & copy invite link | ✅ | ❌ | ❌ |
+| View & copy invite code | ✅ | ❌ | ❌ |
 | Manage group settings | ✅ | ❌ | ❌ |
 | Configure Discord webhook | ✅ | ❌ | ❌ |
 | Delete the group | ✅ | ❌ | ❌ |
 
-Members can always:
-- View all group content (availability requests, results, events, member list)
-- Respond to availability requests
-- Confirm/decline event attendance
-- Self-register as a viewer for shows
-- Download iCal files
-- Manage their own notification preferences
+Members can always: view all content, respond to requests, confirm/decline events, self-register for shows, download iCal files, and manage their notification preferences.
 
 ### Group Settings
 
-Admins can access group settings from the **Settings** tab on the group page:
+The **Settings** tab on the group page has five sections:
 
-- **Group Details** — Update the group name and description.
-- **Invite Code** — View, copy, or regenerate the invite code.
-- **Member Permissions** — Enable or disable member creation permissions:
-  - *"Allow members to create availability requests"*
-  - *"Allow members to create events"*
-- **Discord Webhook** — Connect a Discord channel for group notifications.
-- **Danger Zone** — Delete the group (requires typing the group name to confirm).
+1. **Group Details** — Edit the group name and description. Click **"Save Changes"**.
+2. **Invite Code** — Displays the current code (e.g., `DEMO2026`) with a **"Copy"** button. Click **"Regenerate invite code"** to create a new one (invalidates the old code).
+3. **Member Permissions** — Two toggles:
+   - *"Allow members to create availability requests"* — with description: *"Members can create scheduling polls, not just admins"*
+   - *"Allow members to create events"* — with description: *"Members can create rehearsals, shows, and other events"*
+   - Click **"Save Permissions"** after changes.
+4. **Discord Webhook** — A URL field with the placeholder *"https://discord.com/api/webhooks/..."* and a helper text: *"In Discord: Server Settings → Integrations → Webhooks → New Webhook → Copy Webhook URL."* Paste the URL and click **"Save Webhook"**.
+5. **Danger Zone** — Delete the group. You must type the exact group name to confirm, then click **"Delete this group"** (the button stays disabled until the name matches).
 
 ### Discord Webhook Setup
 
-To receive notifications in a Discord channel:
-
-1. **In Discord:** Go to your server → **Server Settings** → **Integrations** → **Webhooks** → **New Webhook**.
-2. Choose the channel where you want notifications to appear.
-3. Click **"Copy Webhook URL"**.
-4. **In My Call Time:** Go to your group → **Settings** → **Discord Webhook**.
-5. Paste the webhook URL and click **"Save Webhook"**.
-6. Click **"Send Test Message"** to verify it works — you should see a confirmation message in your Discord channel.
-
-Once configured, your Discord channel will automatically receive notifications for new requests, events, reminders, and updates.
-
-To remove the webhook, click **"Remove Webhook"** in the same settings section.
+1. **In Discord:** Server Settings → Integrations → Webhooks → New Webhook → Copy Webhook URL.
+2. **In My Call Time:** Group → Settings → Discord Webhook → Paste URL → **"Save Webhook"**.
+3. Click **"Send Test Message"** to verify.
 
 ### Deleting a Group
 
 > ⚠️ **This is permanent and cannot be undone.**
 
-1. Go to your group → **Settings** → **Danger Zone**.
-2. Type the exact group name to confirm.
+1. Go to Group → Settings → Danger Zone.
+2. Type the exact group name in the confirmation field.
 3. Click **"Delete this group"**.
 
-This permanently removes the group and all of its data: members, availability requests, events, and assignments.
+This permanently removes the group and all its data: members, availability requests, events, and assignments.
 
 ---
 
