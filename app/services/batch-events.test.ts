@@ -72,6 +72,17 @@ const mockEvent = {
 // --- Tests ---
 
 describe("batch events — createEventsFromAvailability per-date features", () => {
+	// Helper: set up a mock select chain returning empty availability responses.
+	// autoAssignFromAvailability calls db.select().from().where() for each date.
+	function mockEmptyAutoAssign(dateCount = 3) {
+		for (let i = 0; i < dateCount; i++) {
+			const chain: Record<string, ReturnType<typeof vi.fn>> = {};
+			chain.where = vi.fn().mockResolvedValue([]);
+			chain.from = vi.fn().mockReturnValue(chain);
+			mockSelect.mockReturnValueOnce(chain);
+		}
+	}
+
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});
@@ -80,6 +91,7 @@ describe("batch events — createEventsFromAvailability per-date features", () =
 		mockReturning
 			.mockResolvedValueOnce([{ ...mockEvent, id: "ev-1", location: "Theater A" }])
 			.mockResolvedValueOnce([{ ...mockEvent, id: "ev-2", location: "Theater B" }]);
+		mockEmptyAutoAssign(2);
 
 		const result = await createEventsFromAvailability({
 			groupId: "group-1",
@@ -101,6 +113,7 @@ describe("batch events — createEventsFromAvailability per-date features", () =
 
 	it("falls back to shared location when per-date location is missing", async () => {
 		mockReturning.mockResolvedValueOnce([{ ...mockEvent, id: "ev-1", location: "Default Venue" }]);
+		mockEmptyAutoAssign(1);
 
 		await createEventsFromAvailability({
 			groupId: "group-1",
@@ -120,6 +133,7 @@ describe("batch events — createEventsFromAvailability per-date features", () =
 		mockReturning
 			.mockResolvedValueOnce([{ ...mockEvent, id: "ev-1", description: "Weekly practice" }])
 			.mockResolvedValueOnce([{ ...mockEvent, id: "ev-2", description: "Weekly practice" }]);
+		mockEmptyAutoAssign(2);
 
 		await createEventsFromAvailability({
 			groupId: "group-1",
@@ -142,6 +156,7 @@ describe("batch events — createEventsFromAvailability per-date features", () =
 
 	it("defaults description to null when not provided", async () => {
 		mockReturning.mockResolvedValueOnce([mockEvent]);
+		mockEmptyAutoAssign(1);
 
 		await createEventsFromAvailability({
 			groupId: "group-1",
@@ -159,6 +174,7 @@ describe("batch events — createEventsFromAvailability per-date features", () =
 		mockReturning
 			.mockResolvedValueOnce([{ ...mockEvent, id: "ev-1", location: "Custom Spot" }])
 			.mockResolvedValueOnce([{ ...mockEvent, id: "ev-2", location: "Shared Venue" }]);
+		mockEmptyAutoAssign(2);
 
 		await createEventsFromAvailability({
 			groupId: "group-1",
@@ -182,6 +198,7 @@ describe("batch events — createEventsFromAvailability per-date features", () =
 
 	it("location is null when neither per-date nor shared location is provided", async () => {
 		mockReturning.mockResolvedValueOnce([{ ...mockEvent, location: null }]);
+		mockEmptyAutoAssign(1);
 
 		await createEventsFromAvailability({
 			groupId: "group-1",
@@ -203,6 +220,7 @@ describe("batch events — createEventsFromAvailability per-date features", () =
 			.mockResolvedValueOnce([
 				{ ...mockEvent, id: "ev-2", callTime: new Date("2026-03-16T18:00:00Z") },
 			]);
+		mockEmptyAutoAssign(2);
 
 		await createEventsFromAvailability({
 			groupId: "group-1",
@@ -229,6 +247,7 @@ describe("batch events — createEventsFromAvailability per-date features", () =
 
 	it("defaults callTime to null when not provided", async () => {
 		mockReturning.mockResolvedValueOnce([mockEvent]);
+		mockEmptyAutoAssign(1);
 
 		await createEventsFromAvailability({
 			groupId: "group-1",

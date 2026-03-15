@@ -28,7 +28,9 @@ vi.mock("~/services/groups.server", () => ({
 vi.mock("~/services/events.server", () => ({
 	createEvent: vi.fn().mockResolvedValue({ id: "event-1" }),
 	bulkAssignToEvent: vi.fn(),
+	autoAssignFromAvailability: vi.fn().mockResolvedValue([]),
 	getAvailabilityForEventDate: vi.fn().mockResolvedValue([]),
+	getAvailabilityRequestGroupId: vi.fn().mockResolvedValue("g1"),
 }));
 
 vi.mock("~/services/availability.server", () => ({
@@ -46,6 +48,10 @@ vi.mock("~/services/csrf.server", () => ({
 }));
 
 import { action } from "~/routes/groups.$groupId.events.new";
+import {
+	autoAssignFromAvailability,
+	getAvailabilityRequestGroupId,
+} from "~/services/events.server";
 
 function makeRequest(fields: Record<string, string | string[]>) {
 	const formData = new FormData();
@@ -171,5 +177,92 @@ describe("events.new validation", () => {
 		});
 		expect(result).toBeInstanceOf(Response);
 		expect((result as Response).status).toBe(302);
+	});
+
+	it("auto-assigns available/maybe members when creating from availability request", async () => {
+		const result = await action({
+			request: makeRequest({
+				...validEvent,
+				fromRequestId: "req-1",
+			}),
+			params: { groupId: "g1" },
+			context: {},
+		});
+		expect(result).toBeInstanceOf(Response);
+		expect((result as Response).status).toBe(302);
+
+		expect(autoAssignFromAvailability).toHaveBeenCalledWith(
+			"event-1",
+			"req-1",
+			"2099-06-15",
+			"user-1", // creator excluded
+		);
+	});
+
+	it("does not auto-assign when not creating from availability request", async () => {
+		const result = await action({
+			request: makeRequest(validEvent),
+			params: { groupId: "g1" },
+			context: {},
+		});
+		expect(result).toBeInstanceOf(Response);
+		expect(autoAssignFromAvailability).not.toHaveBeenCalled();
+	});
+
+	it("auto-assigns for all event types when from availability", async () => {
+		for (const eventType of ["rehearsal", "show", "other"]) {
+			vi.clearAllMocks();
+			vi.mocked(getAvailabilityRequestGroupId).mockResolvedValue("g1");
+			const fields: Record<string, string> = {
+				...validEvent,
+				eventType,
+				fromRequestId: "req-1",
+			};
+			if (eventType === "show") {
+				fields.callTime = "18:00";
+			}
+			const result = await action({
+				request: makeRequest(fields),
+				params: { groupId: "g1" },
+				context: {},
+			});
+			expect(result).toBeInstanceOf(Response);
+			expect(autoAssignFromAvailability).toHaveBeenCalledWith(
+				"event-1",
+				"req-1",
+				"2099-06-15",
+				"user-1",
+			);
+		}
+	});
+
+	it("does not auto-assign when availability request belongs to a different group", async () => {
+		vi.mocked(getAvailabilityRequestGroupId).mockResolvedValue("other-group");
+		const result = await action({
+			request: makeRequest({
+				...validEvent,
+				fromRequestId: "req-from-other-group",
+			}),
+			params: { groupId: "g1" },
+			context: {},
+		});
+		expect(result).toBeInstanceOf(Response);
+		expect((result as Response).status).toBe(302);
+		expect(autoAssignFromAvailability).not.toHaveBeenCalled();
+	});
+
+	it("does not auto-assign when availability request does not exist", async () => {
+		vi.mocked(getAvailabilityRequestGroupId).mockResolvedValue(null);
+		const result = await action({
+			request: makeRequest({
+				...validEvent,
+				fromRequestId: "nonexistent-req",
+			}),
+			params: { groupId: "g1" },
+			context: {},
+		});
+		expect(result).toBeInstanceOf(Response);
+		expect((result as Response).status).toBe(302);
+		expect(autoAssignFromAvailability).not.toHaveBeenCalled();
 	});
 });
