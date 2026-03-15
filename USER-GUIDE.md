@@ -55,6 +55,7 @@ No more group texts. No more spreadsheets. Just a clean path from *"when are you
 - [Account Settings](#account-settings)
   - [Display Name](#display-name)
   - [Timezone](#timezone)
+  - [Account Info](#account-info)
   - [Deleting Your Account](#deleting-your-account)
 - [For Group Admins](#for-group-admins)
   - [Admin-Only Features](#admin-only-features)
