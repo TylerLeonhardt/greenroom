@@ -46,6 +46,7 @@ vi.mock("../lib/date-utils.js", () => ({
 const {
 	createEvent,
 	createEventsFromAvailability,
+	autoAssignFromAvailability,
 	getGroupEvents,
 	getGroupEventSummaries,
 	getEventWithAssignments,
@@ -823,6 +824,14 @@ describe("events.server", () => {
 				.mockResolvedValueOnce([{ ...mockEvent, id: "event-a" }])
 				.mockResolvedValueOnce([{ ...mockEvent, id: "event-b" }]);
 
+			// Auto-assign queries (one per date) — no eligible members
+			for (let i = 0; i < 2; i++) {
+				const respChain = chainMock(null);
+				respChain.where = vi.fn().mockResolvedValue([]);
+				respChain.from = vi.fn().mockReturnValue(respChain);
+				mockSelect.mockReturnValueOnce(respChain);
+			}
+
 			const result = await createEventsFromAvailability({
 				groupId: "group-1",
 				requestId: "req-1",
@@ -844,6 +853,11 @@ describe("events.server", () => {
 		it("passes timezone to localTimeToUTC", async () => {
 			mockReturning.mockResolvedValueOnce([mockEvent]);
 
+			const respChain = chainMock(null);
+			respChain.where = vi.fn().mockResolvedValue([]);
+			respChain.from = vi.fn().mockReturnValue(respChain);
+			mockSelect.mockReturnValueOnce(respChain);
+
 			await createEventsFromAvailability({
 				groupId: "group-1",
 				requestId: "req-1",
@@ -860,6 +874,11 @@ describe("events.server", () => {
 		it("links created events to the availability request", async () => {
 			mockReturning.mockResolvedValueOnce([mockEvent]);
 
+			const respChain = chainMock(null);
+			respChain.where = vi.fn().mockResolvedValue([]);
+			respChain.from = vi.fn().mockReturnValue(respChain);
+			mockSelect.mockReturnValueOnce(respChain);
+
 			await createEventsFromAvailability({
 				groupId: "group-1",
 				requestId: "req-99",
@@ -874,13 +893,17 @@ describe("events.server", () => {
 			);
 		});
 
-		it("auto-assigns available users when autoAssignAvailable is true", async () => {
+		it("auto-assigns available and maybe users for each date", async () => {
 			// createEvent insert
 			mockReturning.mockResolvedValueOnce([{ ...mockEvent, id: "event-new" }]);
 
 			// availability responses query (for auto-assign)
 			const respChain = chainMock(null);
 			respChain.where = vi.fn().mockResolvedValue([
+				{
+					userId: "user-1", // creator — should be excluded
+					responses: { "2026-03-15": "available" },
+				},
 				{
 					userId: "user-2",
 					responses: { "2026-03-15": "available" },
@@ -891,7 +914,7 @@ describe("events.server", () => {
 				},
 				{
 					userId: "user-4",
-					responses: { "2026-03-15": "available" },
+					responses: { "2026-03-15": "not_available" },
 				},
 			]);
 			respChain.from = vi.fn().mockReturnValue(respChain);
@@ -911,17 +934,16 @@ describe("events.server", () => {
 				title: "Rehearsal",
 				eventType: "rehearsal",
 				createdById: "user-1",
-				autoAssignAvailable: true,
 			});
 
-			// Should assign only user-2 and user-4 (available), not user-3 (maybe)
+			// Should assign user-2 (available) and user-3 (maybe), NOT user-1 (creator) or user-4 (not_available)
 			expect(mockValues).toHaveBeenLastCalledWith([
 				expect.objectContaining({ userId: "user-2" }),
-				expect.objectContaining({ userId: "user-4" }),
+				expect.objectContaining({ userId: "user-3" }),
 			]);
 		});
 
-		it("skips auto-assign when no users are available", async () => {
+		it("skips auto-assign when no users are available or maybe", async () => {
 			mockReturning.mockResolvedValueOnce([mockEvent]);
 
 			const respChain = chainMock(null);
@@ -938,28 +960,10 @@ describe("events.server", () => {
 				title: "Rehearsal",
 				eventType: "rehearsal",
 				createdById: "user-1",
-				autoAssignAvailable: true,
 			});
 
 			// insert called once for createEvent, NOT for bulkAssign
 			expect(mockInsert).toHaveBeenCalledTimes(1);
-		});
-
-		it("does not query responses when autoAssignAvailable is false", async () => {
-			mockReturning.mockResolvedValueOnce([mockEvent]);
-
-			await createEventsFromAvailability({
-				groupId: "group-1",
-				requestId: "req-1",
-				dates: [{ date: "2026-03-15", startTime: "19:00", endTime: "21:00" }],
-				title: "Rehearsal",
-				eventType: "rehearsal",
-				createdById: "user-1",
-				autoAssignAvailable: false,
-			});
-
-			// select should not be called (no response lookup)
-			expect(mockSelect).not.toHaveBeenCalled();
 		});
 
 		it("returns empty array for empty dates", async () => {
@@ -974,6 +978,131 @@ describe("events.server", () => {
 
 			expect(result).toEqual([]);
 			expect(mockInsert).not.toHaveBeenCalled();
+		});
+	});
+
+	// ============================================================
+	// autoAssignFromAvailability
+	// ============================================================
+	describe("autoAssignFromAvailability", () => {
+		it("assigns available and maybe members, excludes creator", async () => {
+			const respChain = chainMock(null);
+			respChain.where = vi.fn().mockResolvedValue([
+				{ userId: "creator-1", responses: { "2026-03-15": "available" } },
+				{ userId: "user-2", responses: { "2026-03-15": "available" } },
+				{ userId: "user-3", responses: { "2026-03-15": "maybe" } },
+				{ userId: "user-4", responses: { "2026-03-15": "not_available" } },
+				{ userId: "user-5", responses: { "2026-03-16": "available" } }, // wrong date
+			]);
+			respChain.from = vi.fn().mockReturnValue(respChain);
+			mockSelect.mockReturnValueOnce(respChain);
+
+			const onConflictDoNothing = vi.fn().mockResolvedValue(undefined);
+			mockValues.mockReturnValueOnce({
+				returning: mockReturning,
+				onConflictDoNothing,
+			});
+
+			const result = await autoAssignFromAvailability(
+				"event-1",
+				"req-1",
+				"2026-03-15",
+				"creator-1",
+			);
+
+			expect(result).toEqual(["user-2", "user-3"]);
+			expect(mockValues).toHaveBeenLastCalledWith([
+				expect.objectContaining({ eventId: "event-1", userId: "user-2", status: "pending" }),
+				expect.objectContaining({ eventId: "event-1", userId: "user-3", status: "pending" }),
+			]);
+			expect(onConflictDoNothing).toHaveBeenCalled();
+		});
+
+		it("returns empty array when no eligible members", async () => {
+			const respChain = chainMock(null);
+			respChain.where = vi
+				.fn()
+				.mockResolvedValue([{ userId: "user-2", responses: { "2026-03-15": "not_available" } }]);
+			respChain.from = vi.fn().mockReturnValue(respChain);
+			mockSelect.mockReturnValueOnce(respChain);
+
+			const result = await autoAssignFromAvailability(
+				"event-1",
+				"req-1",
+				"2026-03-15",
+				"creator-1",
+			);
+
+			expect(result).toEqual([]);
+			expect(mockInsert).not.toHaveBeenCalled();
+		});
+
+		it("excludes only the specified creator from assignment", async () => {
+			const respChain = chainMock(null);
+			respChain.where = vi
+				.fn()
+				.mockResolvedValue([{ userId: "the-creator", responses: { "2026-03-15": "available" } }]);
+			respChain.from = vi.fn().mockReturnValue(respChain);
+			mockSelect.mockReturnValueOnce(respChain);
+
+			const result = await autoAssignFromAvailability(
+				"event-1",
+				"req-1",
+				"2026-03-15",
+				"the-creator",
+			);
+
+			expect(result).toEqual([]);
+			expect(mockInsert).not.toHaveBeenCalled();
+		});
+
+		it("handles empty responses gracefully", async () => {
+			const respChain = chainMock(null);
+			respChain.where = vi.fn().mockResolvedValue([]);
+			respChain.from = vi.fn().mockReturnValue(respChain);
+			mockSelect.mockReturnValueOnce(respChain);
+
+			const result = await autoAssignFromAvailability(
+				"event-1",
+				"req-1",
+				"2026-03-15",
+				"creator-1",
+			);
+
+			expect(result).toEqual([]);
+			expect(mockInsert).not.toHaveBeenCalled();
+		});
+
+		it("filters by the correct date", async () => {
+			const respChain = chainMock(null);
+			respChain.where = vi.fn().mockResolvedValue([
+				{
+					userId: "user-2",
+					responses: { "2026-03-15": "available", "2026-03-16": "not_available" },
+				},
+				{
+					userId: "user-3",
+					responses: { "2026-03-15": "not_available", "2026-03-16": "available" },
+				},
+			]);
+			respChain.from = vi.fn().mockReturnValue(respChain);
+			mockSelect.mockReturnValueOnce(respChain);
+
+			const onConflictDoNothing = vi.fn().mockResolvedValue(undefined);
+			mockValues.mockReturnValueOnce({
+				returning: mockReturning,
+				onConflictDoNothing,
+			});
+
+			const result = await autoAssignFromAvailability(
+				"event-1",
+				"req-1",
+				"2026-03-16",
+				"creator-1",
+			);
+
+			// Only user-3 is available on 2026-03-16
+			expect(result).toEqual(["user-3"]);
 		});
 	});
 

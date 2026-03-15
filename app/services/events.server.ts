@@ -59,7 +59,6 @@ export async function createEventsFromAvailability(data: {
 	eventType: "rehearsal" | "show" | "other";
 	location?: string;
 	createdById: string;
-	autoAssignAvailable?: boolean;
 	timezone?: string | null;
 	callTime?: string;
 }): Promise<Event[]> {
@@ -85,31 +84,45 @@ export async function createEventsFromAvailability(data: {
 				: undefined,
 		});
 
-		if (data.autoAssignAvailable) {
-			const responses = await db
-				.select({
-					userId: availabilityResponses.userId,
-					responses: availabilityResponses.responses,
-				})
-				.from(availabilityResponses)
-				.where(eq(availabilityResponses.requestId, data.requestId));
-
-			const availableUserIds = responses
-				.filter((r) => {
-					const resp = r.responses as Record<string, string>;
-					return resp[dateInfo.date] === "available";
-				})
-				.map((r) => r.userId);
-
-			if (availableUserIds.length > 0) {
-				await bulkAssignToEvent(event.id, availableUserIds);
-			}
-		}
+		await autoAssignFromAvailability(event.id, data.requestId, dateInfo.date, data.createdById);
 
 		createdEvents.push(event);
 	}
 
 	return createdEvents;
+}
+
+/**
+ * Auto-assign members who said "available" or "maybe" for a specific date
+ * to an event as pending cast members. Excludes the event creator.
+ */
+export async function autoAssignFromAvailability(
+	eventId: string,
+	requestId: string,
+	date: string,
+	excludeUserId: string,
+): Promise<string[]> {
+	const responses = await db
+		.select({
+			userId: availabilityResponses.userId,
+			responses: availabilityResponses.responses,
+		})
+		.from(availabilityResponses)
+		.where(eq(availabilityResponses.requestId, requestId));
+
+	const eligibleUserIds = responses
+		.filter((r) => {
+			if (r.userId === excludeUserId) return false;
+			const resp = r.responses as Record<string, string>;
+			return resp[date] === "available" || resp[date] === "maybe";
+		})
+		.map((r) => r.userId);
+
+	if (eligibleUserIds.length > 0) {
+		await bulkAssignToEvent(eventId, eligibleUserIds);
+	}
+
+	return eligibleUserIds;
 }
 
 // --- List ---

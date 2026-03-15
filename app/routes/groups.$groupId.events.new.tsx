@@ -20,9 +20,11 @@ import {
 	sendEventFromAvailabilityNotification,
 } from "~/services/email.server";
 import {
+	autoAssignFromAvailability,
 	bulkAssignToEvent,
 	createEvent,
 	getAvailabilityForEventDate,
+	getAvailabilityRequestGroupId,
 } from "~/services/events.server";
 import {
 	getGroupMembersWithPreferences,
@@ -132,7 +134,18 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		timezone,
 	});
 
-	// Assign performers for show events
+	// Auto-assign available/maybe members when creating from an availability request
+	const validFromRequestIdForAssign =
+		typeof fromRequestId === "string" && fromRequestId ? fromRequestId : null;
+	if (validFromRequestIdForAssign && typeof date === "string") {
+		// Validate the availability request belongs to this group (IDOR prevention)
+		const requestGroupId = await getAvailabilityRequestGroupId(validFromRequestIdForAssign);
+		if (requestGroupId === groupId) {
+			await autoAssignFromAvailability(event.id, validFromRequestIdForAssign, date, user.id);
+		}
+	}
+
+	// Assign performers for show events (onConflictDoNothing handles overlap with auto-assign)
 	if (eventType === "show") {
 		const validPerformerIds = performerIds.filter(
 			(id): id is string => typeof id === "string" && id.length > 0,
