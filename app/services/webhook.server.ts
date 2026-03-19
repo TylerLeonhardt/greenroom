@@ -141,6 +141,7 @@ export function sendEventCreatedWebhook(
 		eventType: string;
 		dateTime: string;
 		location?: string;
+		callTime?: string | null;
 		eventUrl: string;
 	},
 ): void {
@@ -150,6 +151,9 @@ export function sendEventCreatedWebhook(
 		{ name: "Type", value: typeLabel, inline: true },
 		{ name: "When", value: params.dateTime },
 	];
+	if (params.callTime) {
+		fields.push({ name: "Call Time", value: params.callTime });
+	}
 	if (params.location) {
 		fields.push({ name: "Where", value: params.location });
 	}
@@ -231,6 +235,7 @@ export function sendEventEditedWebhook(
 		eventType: string;
 		dateTime: string;
 		location?: string | null;
+		callTime?: string | null;
 		changes: string[];
 		eventUrl: string;
 	},
@@ -243,6 +248,9 @@ export function sendEventEditedWebhook(
 		{ name: "Type", value: typeLabel, inline: true },
 		{ name: "When", value: params.dateTime },
 	];
+	if (params.callTime) {
+		fields.push({ name: "Call Time", value: params.callTime });
+	}
 	if (params.location) {
 		fields.push({ name: "Where", value: params.location });
 	}

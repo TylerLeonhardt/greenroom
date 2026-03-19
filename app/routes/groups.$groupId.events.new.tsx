@@ -12,7 +12,12 @@ import { ArrowLeft, Clock, Users } from "lucide-react";
 import { useState } from "react";
 import { CsrfInput } from "~/components/csrf-input";
 import { InlineTimezoneSelector } from "~/components/timezone-selector";
-import { formatEventTime, getTimezoneAbbreviation, localTimeToUTC } from "~/lib/date-utils";
+import {
+	formatEventTime,
+	formatTime,
+	getTimezoneAbbreviation,
+	localTimeToUTC,
+} from "~/lib/date-utils";
 import { getAvailabilityRequest } from "~/services/availability.server";
 import { validateCsrfToken } from "~/services/csrf.server";
 import {
@@ -275,12 +280,18 @@ export async function action({ request, params }: ActionFunctionArgs) {
 			const tz = event.timezone ?? undefined;
 			const webhookDateTime = formatEventTime(event.startTime, event.endTime, tz);
 			const tzAbbrev = getTimezoneAbbreviation(event.startTime, tz);
+			const webhookCallTime = event.callTime ? formatTime(event.callTime, tz) : null;
 			sendEventCreatedWebhook(groupData.group.webhookUrl, {
 				groupName: groupData.group.name,
 				eventTitle: event.title,
 				eventType: event.eventType,
 				dateTime: tzAbbrev ? `${webhookDateTime} (${tzAbbrev})` : webhookDateTime,
 				location: event.location ?? undefined,
+				callTime: webhookCallTime
+					? tzAbbrev
+						? `${webhookCallTime} (${tzAbbrev})`
+						: webhookCallTime
+					: undefined,
 				eventUrl,
 			});
 		}

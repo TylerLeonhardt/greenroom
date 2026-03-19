@@ -14,6 +14,7 @@ import { CsrfInput } from "~/components/csrf-input";
 import { InlineTimezoneSelector } from "~/components/timezone-selector";
 import {
 	formatEventTime,
+	formatTime,
 	getTimezoneAbbreviation,
 	localTimeToUTC,
 	utcToLocalParts,
@@ -281,12 +282,18 @@ export async function action({ request, params }: ActionFunctionArgs) {
 					const tz = timezone ?? oldEvent.timezone;
 					const dateTime = formatEventTime(newStartTime, newEndTime, tz);
 					const tzAbbr = getTimezoneAbbreviation(newStartTime, tz);
+					const webhookCallTime = newCallTime ? formatTime(newCallTime, tz) : null;
 					sendEventEditedWebhook(group.webhookUrl, {
 						groupName: group.name,
 						eventTitle: title.trim(),
 						eventType,
-						dateTime: `${dateTime} ${tzAbbr}`,
+						dateTime: tzAbbr ? `${dateTime} (${tzAbbr})` : dateTime,
 						location: typeof location === "string" ? location.trim() || undefined : undefined,
+						callTime: webhookCallTime
+							? tzAbbr
+								? `${webhookCallTime} (${tzAbbr})`
+								: webhookCallTime
+							: undefined,
 						changes: changeSummary,
 						eventUrl,
 					});
