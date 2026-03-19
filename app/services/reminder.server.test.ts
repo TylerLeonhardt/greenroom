@@ -333,13 +333,14 @@ describe("reminder.server", () => {
 
 			await processReminders();
 
-			// Verify webhook was called with timezone-formatted dateTime
+			// Verify webhook was called with timezone-formatted dateTime and callTime
 			expect(mockSendEventReminderWebhook).toHaveBeenCalledWith(
 				"https://discord.com/api/webhooks/123/abc",
 				expect.objectContaining({
 					groupName: "Comedy Team",
 					eventTitle: "Show Night",
 					dateTime: expect.stringContaining("PST"),
+					callTime: expect.stringContaining("PST"),
 				}),
 			);
 
@@ -354,6 +355,48 @@ describe("reminder.server", () => {
 			expect(getTimezoneAbbreviation).toHaveBeenCalledWith(
 				mockUpcomingEvent.startTime,
 				"America/Los_Angeles",
+			);
+		});
+
+		it("sends Discord webhook with null callTime when event has no call time", async () => {
+			const eventWithoutCallTime = { ...mockUpcomingEvent, callTime: null };
+
+			mockTransaction.mockImplementation(async (fn) => {
+				const eventChain = txChainMock(null);
+				eventChain.where = vi.fn().mockResolvedValue([eventWithoutCallTime]);
+				eventChain.innerJoin = vi.fn().mockReturnValue(eventChain);
+				eventChain.from = vi.fn().mockReturnValue(eventChain);
+
+				const attendeeChain = txChainMock(null);
+				attendeeChain.where = vi.fn().mockResolvedValue(mockAttendees);
+				attendeeChain.innerJoin = vi.fn().mockReturnValue(attendeeChain);
+				attendeeChain.from = vi.fn().mockReturnValue(attendeeChain);
+
+				let selectCallCount = 0;
+				const tx = {
+					execute: vi.fn().mockResolvedValue({
+						rows: [{ pg_try_advisory_xact_lock: true }],
+					}),
+					select: vi.fn().mockImplementation(() => {
+						selectCallCount++;
+						return selectCallCount === 1 ? eventChain : attendeeChain;
+					}),
+					update: vi.fn().mockReturnValue({
+						set: vi.fn().mockReturnValue({
+							where: vi.fn().mockResolvedValue(undefined),
+						}),
+					}),
+				};
+				return fn(tx);
+			});
+
+			await processReminders();
+
+			expect(mockSendEventReminderWebhook).toHaveBeenCalledWith(
+				"https://discord.com/api/webhooks/123/abc",
+				expect.objectContaining({
+					callTime: null,
+				}),
 			);
 		});
 	});

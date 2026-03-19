@@ -165,11 +165,17 @@ export async function processReminders(): Promise<void> {
 				const webhookTz = event.timezone ?? undefined;
 				const webhookDateTime = formatEventTime(event.startTime, event.endTime, webhookTz);
 				const tzAbbrev = getTimezoneAbbreviation(event.startTime, webhookTz);
+				const webhookCallTime = event.callTime ? formatTime(event.callTime, webhookTz) : null;
 				sendEventReminderWebhook(event.webhookUrl, {
 					groupName: event.groupName,
 					eventTitle: event.title,
 					dateTime: tzAbbrev ? `${webhookDateTime} (${tzAbbrev})` : webhookDateTime,
 					location: event.location,
+					callTime: webhookCallTime
+						? tzAbbrev
+							? `${webhookCallTime} (${tzAbbrev})`
+							: webhookCallTime
+						: null,
 					eventUrl,
 				});
 			}
