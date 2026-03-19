@@ -11,6 +11,7 @@ import {
 } from "@remix-run/react";
 import {
 	ArrowLeft,
+	ArrowUpDown,
 	Calendar,
 	CalendarDays,
 	Check,
@@ -29,7 +30,10 @@ import { CsrfInput } from "~/components/csrf-input";
 import { EventDateCarousel } from "~/components/event-date-carousel";
 import { formatDateLong, formatEventTime, formatTime, utcToLocalParts } from "~/lib/date-utils";
 import { validateCsrfToken } from "~/services/csrf.server";
-import { sendEventAssignmentNotification } from "~/services/email.server";
+import {
+	sendEventAssignmentNotification,
+	sendRoleChangeNotification,
+} from "~/services/email.server";
 import {
 	assignToEvent,
 	bulkAssignToEvent,
@@ -39,6 +43,7 @@ import {
 	getEventWithAssignments,
 	getGroupEventSummaries,
 	removeAssignment,
+	updateAssignmentRole,
 	updateAssignmentStatus,
 } from "~/services/events.server";
 import {
@@ -213,6 +218,59 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		return { success: true };
 	}
 
+	if (intent === "change-role") {
+		const targetUserId = formData.get("userId");
+		const newRole = formData.get("newRole");
+		const sendNotification = formData.get("sendNotification") === "on";
+		if (typeof targetUserId !== "string" || typeof newRole !== "string") {
+			return { error: "Invalid parameters." };
+		}
+		if (newRole !== "Performer" && newRole !== "Viewer") {
+			return { error: "Invalid role." };
+		}
+		// Verify the target user is actually assigned to this event
+		const existingAssignment = eventData.assignments.find((a) => a.userId === targetUserId);
+		if (!existingAssignment) {
+			return { error: "User is not assigned to this event." };
+		}
+		await updateAssignmentRole(eventId, targetUserId, newRole);
+
+		if (sendNotification) {
+			void (async () => {
+				const membersWithPrefs = await getGroupMembersWithPreferences(groupId);
+				const member = membersWithPrefs.find((m) => m.id === targetUserId);
+				if (!member) return;
+				const appUrl = process.env.APP_URL ?? "http://localhost:5173";
+				const eventUrl = `${appUrl}/groups/${groupId}/events/${eventId}`;
+				const preferencesUrl = `${appUrl}/groups/${groupId}/notifications`;
+				const event = eventData.event;
+				const groupData = await getGroupWithMembers(groupId);
+				const groupName = groupData?.group.name ?? "";
+				const tz = member.timezone ?? undefined;
+				const dateTime = formatEventTime(
+					event.startTime as unknown as string,
+					event.endTime as unknown as string,
+					tz,
+				);
+				void sendRoleChangeNotification({
+					eventTitle: event.title,
+					eventType: event.eventType,
+					dateTime,
+					groupName,
+					newRole: newRole as "Performer" | "Viewer",
+					recipient: {
+						email: member.email,
+						name: member.name,
+						notificationPreferences: member.notificationPreferences,
+					},
+					eventUrl,
+					preferencesUrl,
+				});
+			})();
+		}
+		return { success: true };
+	}
+
 	if (intent === "remove-assignment") {
 		const userId = formData.get("userId");
 		if (typeof userId === "string") {
@@ -249,6 +307,7 @@ export default function EventDetail() {
 	const [showAddMembers, setShowAddMembers] = useState(false);
 	const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
 	const [assignRole, setAssignRole] = useState("");
+	const [notifyOnRoleChange, setNotifyOnRoleChange] = useState(true);
 
 	const typeConfig = EVENT_TYPE_CONFIG[event.eventType] ?? EVENT_TYPE_CONFIG.other;
 	const myAssignment = assignments.find((a) => a.userId === userId);
@@ -449,6 +508,25 @@ export default function EventDetail() {
 														{statusCfg.label}
 													</span>
 													{isAdmin && (
+														<Form method="post" className="flex items-center">
+															<CsrfInput />
+															<input type="hidden" name="intent" value="change-role" />
+															<input type="hidden" name="userId" value={a.userId} />
+															<input type="hidden" name="newRole" value="Viewer" />
+															{notifyOnRoleChange && (
+																<input type="hidden" name="sendNotification" value="on" />
+															)}
+															<button
+																type="submit"
+																disabled={isSubmitting}
+																className="text-slate-400 transition-colors hover:text-amber-500 disabled:opacity-50"
+																title="Move to watching"
+															>
+																<ArrowUpDown className="h-4 w-4" />
+															</button>
+														</Form>
+													)}
+													{isAdmin && (
 														<Form method="post">
 															<CsrfInput />
 															<input type="hidden" name="intent" value="remove-assignment" />
@@ -617,6 +695,19 @@ export default function EventDetail() {
 						</div>
 					)}
 
+					{/* Notify on role change toggle (admin only, shows only) */}
+					{isShow && isAdmin && (performers.length > 0 || viewers.length > 0) && (
+						<label className="flex items-center gap-2 text-xs text-slate-500">
+							<input
+								type="checkbox"
+								checked={notifyOnRoleChange}
+								onChange={(e) => setNotifyOnRoleChange(e.target.checked)}
+								className="h-3.5 w-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/20"
+							/>
+							Notify members via email when changing roles
+						</label>
+					)}
+
 					{/* Show: Attending (Viewers) */}
 					{isShow && (
 						<div className="rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -645,6 +736,25 @@ export default function EventDetail() {
 															>
 																{statusCfg.label}
 															</span>
+															{isAdmin && (
+																<Form method="post" className="flex items-center">
+																	<CsrfInput />
+																	<input type="hidden" name="intent" value="change-role" />
+																	<input type="hidden" name="userId" value={a.userId} />
+																	<input type="hidden" name="newRole" value="Performer" />
+																	{notifyOnRoleChange && (
+																		<input type="hidden" name="sendNotification" value="on" />
+																	)}
+																	<button
+																		type="submit"
+																		disabled={isSubmitting}
+																		className="text-slate-400 transition-colors hover:text-purple-500 disabled:opacity-50"
+																		title="Move to cast"
+																	>
+																		<ArrowUpDown className="h-4 w-4" />
+																	</button>
+																</Form>
+															)}
 															{isAdmin && (
 																<Form method="post">
 																	<CsrfInput />

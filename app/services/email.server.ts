@@ -358,6 +358,58 @@ ${ctaButton(options.eventUrl, "Confirm Attendance")}
 	});
 }
 
+export async function sendRoleChangeNotification(options: {
+	eventTitle: string;
+	eventType: string;
+	dateTime: string;
+	groupName: string;
+	newRole: "Performer" | "Viewer";
+	recipient: { email: string; name: string; notificationPreferences?: NotificationPreferences };
+	eventUrl: string;
+	preferencesUrl?: string;
+}): Promise<void> {
+	const prefs = mergeWithDefaults(options.recipient.notificationPreferences);
+	if (!prefs.eventNotifications.email) return;
+
+	const typeEmoji =
+		options.eventType === "show" ? "🎭" : options.eventType === "rehearsal" ? "🎯" : "📅";
+
+	const isPromotedToCast = options.newRole === "Performer";
+	const heading = isPromotedToCast
+		? "You've Been Added to the Cast"
+		: "You've Been Moved to Watching";
+	const message = isPromotedToCast
+		? `you've been added to the cast for an upcoming event.`
+		: `you've been moved to watching for an upcoming event.`;
+	const subject = isPromotedToCast
+		? `${typeEmoji} You're in the cast for "${escapeHtml(options.eventTitle)}"`
+		: `${typeEmoji} You've been moved to watching for "${escapeHtml(options.eventTitle)}"`;
+
+	const html = emailLayout(
+		`
+<h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0f172a;">${heading}</h2>
+<p style="color:#475569;margin:0 0 20px;">Hi ${escapeHtml(options.recipient.name)}, ${message}</p>
+${infoCard([
+	`<p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0f172a;">${typeEmoji} ${escapeHtml(options.eventTitle)}</p>`,
+	`<p style="margin:0;font-size:13px;color:#475569;">${escapeHtml(options.groupName)} · ${escapeHtml(options.dateTime)}</p>`,
+])}
+${ctaButton(options.eventUrl, "View Event Details")}`,
+		{ preferencesUrl: options.preferencesUrl },
+	);
+
+	const textMessage = isPromotedToCast
+		? `you've been added to the cast`
+		: `you've been moved to watching`;
+	const text = `Hi ${options.recipient.name},\n\n${textMessage} for an event.\n\nEvent: ${options.eventTitle}\nGroup: ${options.groupName}\nWhen: ${options.dateTime}\n\nView event: ${options.eventUrl}`;
+
+	void sendEmail({
+		to: options.recipient.email,
+		subject,
+		html,
+		text,
+	});
+}
+
 export async function sendEventFromAvailabilityNotification(options: {
 	eventTitle: string;
 	eventType: string;

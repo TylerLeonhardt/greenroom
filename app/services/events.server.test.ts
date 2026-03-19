@@ -55,6 +55,7 @@ const {
 	assignToEvent,
 	removeAssignment,
 	updateAssignmentStatus,
+	updateAssignmentRole,
 	bulkAssignToEvent,
 	getUserUpcomingEvents,
 	getAvailabilityRequestGroupId,
@@ -690,6 +691,32 @@ describe("events.server", () => {
 			await updateAssignmentStatus("event-1", "user-1", "declined");
 
 			expect(mockSet).toHaveBeenCalledWith({ status: "declined" });
+		});
+	});
+
+	// ============================================================
+	// updateAssignmentRole
+	// ============================================================
+	describe("updateAssignmentRole", () => {
+		it("updates role to Performer", async () => {
+			const chain = chainMock(null);
+			chain.where = vi.fn().mockResolvedValue(undefined);
+			mockSet.mockReturnValueOnce(chain);
+
+			await updateAssignmentRole("event-1", "user-1", "Performer");
+
+			expect(mockUpdate).toHaveBeenCalled();
+			expect(mockSet).toHaveBeenCalledWith({ role: "Performer" });
+		});
+
+		it("updates role to Viewer", async () => {
+			const chain = chainMock(null);
+			chain.where = vi.fn().mockResolvedValue(undefined);
+			mockSet.mockReturnValueOnce(chain);
+
+			await updateAssignmentRole("event-1", "user-1", "Viewer");
+
+			expect(mockSet).toHaveBeenCalledWith({ role: "Viewer" });
 		});
 	});
 
