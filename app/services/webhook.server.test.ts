@@ -239,6 +239,70 @@ describe("webhook.server", () => {
 			expect(embed.title).toBe("⏰ Reminder: Saturday Show");
 			expect(embed.description).toContain("less than 24 hours");
 		});
+
+		it("includes call time field when callTime is provided", async () => {
+			vi.mocked(globalThis.fetch).mockResolvedValue(new Response(null, { status: 200 }));
+
+			sendEventReminderWebhook("https://discord.com/api/webhooks/123/abc", {
+				groupName: "Troupe",
+				eventTitle: "Saturday Show",
+				dateTime: "Sat, Mar 8 · 8:00 PM – 10:00 PM",
+				callTime: "7:00 PM (PST)",
+				location: "Theater",
+				eventUrl: "https://mycalltime.app/groups/g1/events/e1",
+			});
+
+			await vi.waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
+
+			const body = JSON.parse(vi.mocked(globalThis.fetch).mock.calls[0]?.[1]?.body as string);
+			const embed = body.embeds[0];
+			const fieldNames = embed.fields.map((f: { name: string }) => f.name);
+
+			expect(fieldNames).toContain("Call Time");
+			const callTimeField = embed.fields.find((f: { name: string }) => f.name === "Call Time");
+			expect(callTimeField.value).toBe("7:00 PM (PST)");
+		});
+
+		it("omits call time field when callTime is not provided", async () => {
+			vi.mocked(globalThis.fetch).mockResolvedValue(new Response(null, { status: 200 }));
+
+			sendEventReminderWebhook("https://discord.com/api/webhooks/123/abc", {
+				groupName: "Troupe",
+				eventTitle: "Rehearsal",
+				dateTime: "Sat, Mar 8 · 8:00 PM – 10:00 PM",
+				location: "Studio",
+				eventUrl: "https://mycalltime.app/groups/g1/events/e1",
+			});
+
+			await vi.waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
+
+			const body = JSON.parse(vi.mocked(globalThis.fetch).mock.calls[0]?.[1]?.body as string);
+			const embed = body.embeds[0];
+			const fieldNames = embed.fields.map((f: { name: string }) => f.name);
+
+			expect(fieldNames).not.toContain("Call Time");
+		});
+
+		it("omits call time field when callTime is null", async () => {
+			vi.mocked(globalThis.fetch).mockResolvedValue(new Response(null, { status: 200 }));
+
+			sendEventReminderWebhook("https://discord.com/api/webhooks/123/abc", {
+				groupName: "Troupe",
+				eventTitle: "Rehearsal",
+				dateTime: "Sat, Mar 8 · 8:00 PM – 10:00 PM",
+				callTime: null,
+				location: "Studio",
+				eventUrl: "https://mycalltime.app/groups/g1/events/e1",
+			});
+
+			await vi.waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
+
+			const body = JSON.parse(vi.mocked(globalThis.fetch).mock.calls[0]?.[1]?.body as string);
+			const embed = body.embeds[0];
+			const fieldNames = embed.fields.map((f: { name: string }) => f.name);
+
+			expect(fieldNames).not.toContain("Call Time");
+		});
 	});
 
 	describe("sendTestWebhook", () => {

@@ -173,6 +173,7 @@ export function sendEventReminderWebhook(
 		eventTitle: string;
 		dateTime: string;
 		location?: string | null;
+		callTime?: string | null;
 		eventUrl: string;
 	},
 ): void {
@@ -180,6 +181,9 @@ export function sendEventReminderWebhook(
 		{ name: "Group", value: params.groupName, inline: true },
 		{ name: "When", value: params.dateTime },
 	];
+	if (params.callTime) {
+		fields.push({ name: "Call Time", value: params.callTime });
+	}
 	if (params.location) {
 		fields.push({ name: "Where", value: params.location });
 	}
