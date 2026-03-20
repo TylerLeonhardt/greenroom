@@ -339,6 +339,17 @@ export async function removeAssignment(eventId: string, userId: string): Promise
 		.where(and(eq(eventAssignments.eventId, eventId), eq(eventAssignments.userId, userId)));
 }
 
+export async function updateAssignmentRole(
+	eventId: string,
+	userId: string,
+	role: string,
+): Promise<void> {
+	await db
+		.update(eventAssignments)
+		.set({ role })
+		.where(and(eq(eventAssignments.eventId, eventId), eq(eventAssignments.userId, userId)));
+}
+
 export async function updateAssignmentStatus(
 	eventId: string,
 	userId: string,

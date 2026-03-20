@@ -32,6 +32,7 @@ vi.mock("~/services/events.server", () => ({
 	getGroupEventSummaries: vi.fn().mockResolvedValue([]),
 	assignToEvent: vi.fn(),
 	updateAssignmentStatus: vi.fn(),
+	updateAssignmentRole: vi.fn(),
 	removeAssignment: vi.fn(),
 	bulkAssignToEvent: vi.fn(),
 	deleteEvent: vi.fn(),
@@ -47,14 +48,19 @@ vi.mock("~/services/csrf.server", () => ({
 // Mock email service
 vi.mock("~/services/email.server", () => ({
 	sendEventAssignmentNotification: vi.fn().mockResolvedValue(undefined),
+	sendRoleChangeNotification: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { sendEventAssignmentNotification } from "~/services/email.server";
+import {
+	sendEventAssignmentNotification,
+	sendRoleChangeNotification,
+} from "~/services/email.server";
 import {
 	assignToEvent,
 	bulkAssignToEvent,
 	deleteEvent,
 	getEventWithAssignments,
+	updateAssignmentRole,
 	updateAssignmentStatus,
 } from "~/services/events.server";
 import {
@@ -478,5 +484,224 @@ describe("event detail action — assignment notifications", () => {
 		expect(bulkAssignToEvent).toHaveBeenCalled();
 		// Should NOT send email because user-2 was already assigned
 		expect(sendEventAssignmentNotification).not.toHaveBeenCalled();
+	});
+});
+
+describe("event detail action — change role", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		(requireGroupMember as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: "user-1",
+			email: "test@example.com",
+			name: "Test User",
+			profileImage: null,
+		});
+		(isGroupAdmin as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+	});
+
+	const mockShowEvent = {
+		id: "event-1",
+		groupId: "g1",
+		title: "Friday Show",
+		eventType: "show",
+		startTime: "2026-03-15T19:00:00.000Z",
+		endTime: "2026-03-15T21:00:00.000Z",
+	};
+
+	function makeChangeRoleRequest(fields: Record<string, string>) {
+		const formData = new FormData();
+		formData.set("intent", "change-role");
+		for (const [key, value] of Object.entries(fields)) {
+			formData.set(key, value);
+		}
+		return new Request("http://localhost/groups/g1/events/event-1", {
+			method: "POST",
+			body: formData,
+		});
+	}
+
+	it("changes a performer to a viewer", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: mockShowEvent,
+			assignments: [
+				{ userId: "user-2", userName: "Performer User", role: "Performer", status: "confirmed" },
+			],
+		});
+
+		const result = await action({
+			request: makeChangeRoleRequest({ userId: "user-2", newRole: "Viewer" }),
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ success: true });
+		expect(updateAssignmentRole).toHaveBeenCalledWith("event-1", "user-2", "Viewer");
+	});
+
+	it("changes a viewer to a performer", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: mockShowEvent,
+			assignments: [
+				{ userId: "user-2", userName: "Viewer User", role: "Viewer", status: "confirmed" },
+			],
+		});
+
+		const result = await action({
+			request: makeChangeRoleRequest({ userId: "user-2", newRole: "Performer" }),
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ success: true });
+		expect(updateAssignmentRole).toHaveBeenCalledWith("event-1", "user-2", "Performer");
+	});
+
+	it("sends email notification when sendNotification is on", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: mockShowEvent,
+			assignments: [
+				{ userId: "user-2", userName: "Performer User", role: "Performer", status: "confirmed" },
+			],
+		});
+		(getGroupMembersWithPreferences as ReturnType<typeof vi.fn>).mockResolvedValue([
+			{
+				id: "user-2",
+				name: "Performer User",
+				email: "performer@example.com",
+				timezone: "UTC",
+				notificationPreferences: {},
+			},
+		]);
+		(getGroupWithMembers as ReturnType<typeof vi.fn>).mockResolvedValue({
+			group: { id: "g1", name: "Test Group" },
+			members: [],
+		});
+
+		const result = await action({
+			request: makeChangeRoleRequest({
+				userId: "user-2",
+				newRole: "Viewer",
+				sendNotification: "on",
+			}),
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ success: true });
+		expect(updateAssignmentRole).toHaveBeenCalledWith("event-1", "user-2", "Viewer");
+
+		await vi.waitFor(() => {
+			expect(sendRoleChangeNotification).toHaveBeenCalledWith(
+				expect.objectContaining({
+					eventTitle: "Friday Show",
+					eventType: "show",
+					newRole: "Viewer",
+					recipient: expect.objectContaining({
+						email: "performer@example.com",
+						name: "Performer User",
+					}),
+				}),
+			);
+		});
+	});
+
+	it("does not send email notification when sendNotification is omitted", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: mockShowEvent,
+			assignments: [
+				{ userId: "user-2", userName: "Viewer User", role: "Viewer", status: "confirmed" },
+			],
+		});
+
+		const result = await action({
+			request: makeChangeRoleRequest({ userId: "user-2", newRole: "Performer" }),
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ success: true });
+		expect(updateAssignmentRole).toHaveBeenCalled();
+		expect(sendRoleChangeNotification).not.toHaveBeenCalled();
+	});
+
+	it("rejects non-admin users with 403", async () => {
+		(isGroupAdmin as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: mockShowEvent,
+			assignments: [
+				{ userId: "user-2", userName: "Performer User", role: "Performer", status: "confirmed" },
+			],
+		});
+
+		try {
+			await action({
+				request: makeChangeRoleRequest({ userId: "user-2", newRole: "Viewer" }),
+				params: { groupId: "g1", eventId: "event-1" },
+				context: {},
+			});
+			expect.fail("Should have thrown 403");
+		} catch (response) {
+			expect(response).toBeInstanceOf(Response);
+			expect((response as Response).status).toBe(403);
+		}
+
+		expect(updateAssignmentRole).not.toHaveBeenCalled();
+	});
+
+	it("prevents role change on event from another group (IDOR)", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: { ...mockShowEvent, groupId: "other-group" },
+			assignments: [
+				{ userId: "user-2", userName: "Performer User", role: "Performer", status: "confirmed" },
+			],
+		});
+
+		try {
+			await action({
+				request: makeChangeRoleRequest({ userId: "user-2", newRole: "Viewer" }),
+				params: { groupId: "g1", eventId: "event-1" },
+				context: {},
+			});
+			expect.fail("Should have thrown 404");
+		} catch (response) {
+			expect(response).toBeInstanceOf(Response);
+			expect((response as Response).status).toBe(404);
+		}
+
+		expect(updateAssignmentRole).not.toHaveBeenCalled();
+	});
+
+	it("returns error when user is not assigned to the event", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: mockShowEvent,
+			assignments: [],
+		});
+
+		const result = await action({
+			request: makeChangeRoleRequest({ userId: "user-2", newRole: "Performer" }),
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ error: "User is not assigned to this event." });
+		expect(updateAssignmentRole).not.toHaveBeenCalled();
+	});
+
+	it("returns error for invalid role", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: mockShowEvent,
+			assignments: [
+				{ userId: "user-2", userName: "Some User", role: "Performer", status: "confirmed" },
+			],
+		});
+
+		const result = await action({
+			request: makeChangeRoleRequest({ userId: "user-2", newRole: "InvalidRole" }),
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ error: "Invalid role." });
+		expect(updateAssignmentRole).not.toHaveBeenCalled();
 	});
 });
