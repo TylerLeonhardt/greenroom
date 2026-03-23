@@ -1,0 +1,16 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Component Explorer (Chrome)",
+			"type": "chrome",
+			"request": "launch",
+			"url": "http://localhost:5337/___explorer",
+			"preLaunchTask": "Component Explorer Daemon",
+			"presentation": {
+				"group": "1_component_explorer",
+				"order": 4
+			}
+		}
+	]
+}

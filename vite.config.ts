@@ -1,6 +1,7 @@
 import path from "node:path";
 import { vitePlugin as remix } from "@remix-run/dev";
 import tailwindcss from "@tailwindcss/vite";
+import { componentExplorer } from "@vscode/component-explorer-vite-plugin";
 import { defineConfig } from "vite";
 
 declare module "@remix-run/node" {
@@ -18,7 +19,7 @@ export default defineConfig({
 	plugins: [
 		tailwindcss(),
 		remix({
-			ignoredRouteFiles: ["**/*.test.{ts,tsx}"],
+			ignoredRouteFiles: ["**/*.test.{ts,tsx}", "**/*.fixture.{ts,tsx}"],
 			future: {
 				v3_fetcherPersist: true,
 				v3_relativeSplatPath: true,
@@ -27,5 +28,6 @@ export default defineConfig({
 				v3_lazyRouteDiscovery: true,
 			},
 		}),
+		componentExplorer(),
 	],
 });
