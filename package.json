@@ -62,6 +62,7 @@
 		"@types/react-dom": "^18.3.7",
 		"@vitejs/plugin-react": "^5.1.4",
 		"@vscode/component-explorer": "^0.2.0",
+		"@vscode/component-explorer-cli": "^0.2.0",
 		"@vscode/component-explorer-vite-plugin": "^0.2.0",
 		"drizzle-kit": "^0.31.9",
 		"jsdom": "^28.1.0",

@@ -1,0 +1,18 @@
+{
+	"servers": {
+		"component-explorer": {
+			"type": "stdio",
+			"command": "./node_modules/.bin/component-explorer",
+			"cwd": "${workspaceFolder}",
+			"args": [
+				"component-explorer",
+				"mcp",
+				"-c",
+				"./component-explorer.json",
+				"--no-daemon-autostart",
+				"--no-daemon-hint",
+				"Start the daemon by running the 'Component Explorer Daemon' VS Code task (use the run_task tool). When you start the task, try up to 2 times to give the daemon enough time to start."
+			]
+		}
+	}
+}

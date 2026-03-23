@@ -10,5 +10,8 @@ e2e/.auth/
 test-results/
 playwright-report/
 
+# Component Explorer screenshots (keep .screenshots/baseline/ committed)
+.screenshots/current/
+
 # Worktree directories (used for parallel branch exploration)
 wt-*/

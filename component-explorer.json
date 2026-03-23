@@ -1,0 +1,6 @@
+{
+	"$schema": "./node_modules/@vscode/component-explorer-cli/dist/component-explorer-config.schema.json",
+	"screenshotDir": ".screenshots",
+	"viteConfig": "./vite.config.ts",
+	"redirection": { "port": 5337 }
+}
