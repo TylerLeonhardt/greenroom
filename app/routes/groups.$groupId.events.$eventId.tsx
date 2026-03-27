@@ -1302,13 +1302,14 @@ export default function EventDetail() {
 								className="flex items-start gap-3 border-l-2 border-slate-200 py-2 pl-4"
 							>
 								<div className="min-w-0 flex-1 text-sm text-slate-600">
+									<span className="text-xs text-slate-400">
+										{formatDateTime(entry.changedAt, timezone)}
+									</span>
+									<span className="mx-1.5">·</span>
 									<span className="font-medium text-slate-900">{entry.userName}</span>{" "}
 									{entry.previousStatus
 										? `changed from ${formatStatusLabel(entry.previousStatus)} → ${formatStatusLabel(entry.newStatus)}`
 										: `confirmed ${formatStatusLabel(entry.newStatus)}`}
-									<span className="ml-2 text-xs text-slate-400">
-										{formatDateTime(entry.changedAt, timezone)}
-									</span>
 								</div>
 							</div>
 						))}
