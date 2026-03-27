@@ -8,15 +8,17 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "../../../src/db/index.js";
-import { eventAssignments, events } from "../../../src/db/schema.js";
+import { eventAssignments, events, rsvpChanges } from "../../../src/db/schema.js";
 import {
 	assignToEvent,
 	bulkAssignToEvent,
 	createEvent,
 	deleteEvent,
+	getEventActivityFeed,
 	getEventWithAssignments,
 	getGroupEvents,
 	getUserUpcomingEvents,
+	recordRsvpChange,
 	removeAssignment,
 	updateAssignmentStatus,
 	updateEvent,
@@ -26,6 +28,7 @@ import {
 	createTestAssignment,
 	createTestEvent,
 	createTestGroup,
+	createTestRsvpChange,
 	createTestUser,
 } from "./seed.js";
 import { cleanDatabase } from "./setup.js";
@@ -604,6 +607,134 @@ describe("events.server integration", () => {
 
 			const results = await getUserUpcomingEvents(user.id, 3);
 			expect(results).toHaveLength(3);
+		});
+	});
+
+	// ============================================================
+	// RSVP Change Feed
+	// ============================================================
+	describe("recordRsvpChange + getEventActivityFeed", () => {
+		it("records and retrieves a first RSVP (null previousStatus)", async () => {
+			const user = await createTestUser({ name: "Tyler" });
+			const group = await createTestGroup(user.id);
+			const event = await createTestEvent(group.id, user.id);
+
+			await recordRsvpChange(event.id, user.id, null, "confirmed");
+
+			const feed = await getEventActivityFeed(event.id);
+			expect(feed).toHaveLength(1);
+			expect(feed[0].userName).toBe("Tyler");
+			expect(feed[0].previousStatus).toBeNull();
+			expect(feed[0].newStatus).toBe("confirmed");
+			expect(feed[0].changedAt).toBeInstanceOf(Date);
+		});
+
+		it("records a status change with previousStatus", async () => {
+			const user = await createTestUser({ name: "Sarah" });
+			const group = await createTestGroup(user.id);
+			const event = await createTestEvent(group.id, user.id);
+
+			await recordRsvpChange(event.id, user.id, null, "confirmed");
+			await recordRsvpChange(event.id, user.id, "confirmed", "declined");
+
+			const feed = await getEventActivityFeed(event.id);
+			expect(feed).toHaveLength(2);
+			// Most recent first
+			expect(feed[0].newStatus).toBe("declined");
+			expect(feed[0].previousStatus).toBe("confirmed");
+			expect(feed[1].newStatus).toBe("confirmed");
+			expect(feed[1].previousStatus).toBeNull();
+		});
+
+		it("returns feed entries from multiple users in chronological order", async () => {
+			const admin = await createTestUser({ name: "Admin" });
+			const member1 = await createTestUser({ name: "Alice" });
+			const member2 = await createTestUser({ name: "Bob" });
+			const group = await createTestGroup(admin.id);
+			await addGroupMember(group.id, member1.id);
+			await addGroupMember(group.id, member2.id);
+			const event = await createTestEvent(group.id, admin.id);
+
+			// Create changes with specific timestamps to ensure ordering
+			await createTestRsvpChange(event.id, member1.id, "confirmed", {
+				changedAt: new Date("2026-03-23T20:00:00Z"),
+			});
+			await createTestRsvpChange(event.id, member2.id, "confirmed", {
+				changedAt: new Date("2026-03-24T10:30:00Z"),
+			});
+			await createTestRsvpChange(event.id, member1.id, "declined", {
+				previousStatus: "confirmed",
+				changedAt: new Date("2026-03-25T15:00:00Z"),
+			});
+
+			const feed = await getEventActivityFeed(event.id);
+			expect(feed).toHaveLength(3);
+			expect(feed[0].userName).toBe("Alice");
+			expect(feed[0].newStatus).toBe("declined");
+			expect(feed[1].userName).toBe("Bob");
+			expect(feed[1].newStatus).toBe("confirmed");
+			expect(feed[2].userName).toBe("Alice");
+			expect(feed[2].newStatus).toBe("confirmed");
+		});
+
+		it("returns empty array for event with no changes", async () => {
+			const user = await createTestUser();
+			const group = await createTestGroup(user.id);
+			const event = await createTestEvent(group.id, user.id);
+
+			const feed = await getEventActivityFeed(event.id);
+			expect(feed).toEqual([]);
+		});
+
+		it("respects the limit parameter", async () => {
+			const user = await createTestUser({ name: "Tyler" });
+			const group = await createTestGroup(user.id);
+			const event = await createTestEvent(group.id, user.id);
+
+			// Create more changes than the limit
+			for (let i = 0; i < 5; i++) {
+				await createTestRsvpChange(event.id, user.id, i % 2 === 0 ? "confirmed" : "declined", {
+					previousStatus: i === 0 ? null : i % 2 === 0 ? "declined" : "confirmed",
+					changedAt: new Date(`2026-03-${20 + i}T12:00:00Z`),
+				});
+			}
+
+			const feed = await getEventActivityFeed(event.id, 3);
+			expect(feed).toHaveLength(3);
+		});
+
+		it("cascades delete when event is deleted", async () => {
+			const user = await createTestUser({ name: "Tyler" });
+			const group = await createTestGroup(user.id);
+			const event = await createTestEvent(group.id, user.id);
+
+			await recordRsvpChange(event.id, user.id, null, "confirmed");
+			const feedBefore = await getEventActivityFeed(event.id);
+			expect(feedBefore).toHaveLength(1);
+
+			await deleteEvent(event.id);
+
+			// rsvp_changes rows should be cascade-deleted
+			const rows = await db.select().from(rsvpChanges).where(eq(rsvpChanges.eventId, event.id));
+			expect(rows).toHaveLength(0);
+		});
+
+		it("only returns changes for the specified event", async () => {
+			const user = await createTestUser({ name: "Tyler" });
+			const group = await createTestGroup(user.id);
+			const event1 = await createTestEvent(group.id, user.id, { title: "Event 1" });
+			const event2 = await createTestEvent(group.id, user.id, { title: "Event 2" });
+
+			await recordRsvpChange(event1.id, user.id, null, "confirmed");
+			await recordRsvpChange(event2.id, user.id, null, "declined");
+
+			const feed1 = await getEventActivityFeed(event1.id);
+			expect(feed1).toHaveLength(1);
+			expect(feed1[0].newStatus).toBe("confirmed");
+
+			const feed2 = await getEventActivityFeed(event2.id);
+			expect(feed2).toHaveLength(1);
+			expect(feed2[0].newStatus).toBe("declined");
 		});
 	});
 });

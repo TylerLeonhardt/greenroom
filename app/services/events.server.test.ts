@@ -60,6 +60,8 @@ const {
 	getUserUpcomingEvents,
 	getAvailabilityRequestGroupId,
 	getAvailabilityForEventDate,
+	recordRsvpChange,
+	getEventActivityFeed,
 } = await import("~/services/events.server");
 
 const { localTimeToUTC } = await import("../lib/date-utils.js");
@@ -1223,6 +1225,110 @@ describe("events.server", () => {
 			const result = await getAvailabilityForEventDate("req-1", "2026-03-15");
 
 			expect(result).toEqual([]);
+		});
+	});
+
+	// ============================================================
+	// recordRsvpChange
+	// ============================================================
+	describe("recordRsvpChange", () => {
+		it("inserts a change record with all fields", async () => {
+			mockReturning.mockResolvedValueOnce([]);
+
+			await recordRsvpChange("event-1", "user-1", "pending", "confirmed");
+
+			expect(mockInsert).toHaveBeenCalled();
+			expect(mockValues).toHaveBeenCalledWith({
+				eventId: "event-1",
+				userId: "user-1",
+				previousStatus: "pending",
+				newStatus: "confirmed",
+			});
+		});
+
+		it("inserts with null previousStatus for first RSVP", async () => {
+			mockReturning.mockResolvedValueOnce([]);
+
+			await recordRsvpChange("event-1", "user-1", null, "confirmed");
+
+			expect(mockValues).toHaveBeenCalledWith({
+				eventId: "event-1",
+				userId: "user-1",
+				previousStatus: null,
+				newStatus: "confirmed",
+			});
+		});
+	});
+
+	// ============================================================
+	// getEventActivityFeed
+	// ============================================================
+	describe("getEventActivityFeed", () => {
+		it("returns feed entries ordered by changedAt desc", async () => {
+			const feedData = [
+				{
+					id: "change-2",
+					userId: "user-1",
+					userName: "Tyler",
+					previousStatus: "confirmed",
+					newStatus: "declined",
+					changedAt: new Date("2026-03-25T15:00:00Z"),
+				},
+				{
+					id: "change-1",
+					userId: "user-2",
+					userName: "Sarah",
+					previousStatus: null,
+					newStatus: "confirmed",
+					changedAt: new Date("2026-03-24T10:30:00Z"),
+				},
+			];
+
+			const chain = chainMock(null);
+			chain.limit = vi.fn().mockResolvedValue(feedData);
+			chain.orderBy = vi.fn().mockReturnValue(chain);
+			chain.where = vi.fn().mockReturnValue(chain);
+			chain.innerJoin = vi.fn().mockReturnValue(chain);
+			chain.from = vi.fn().mockReturnValue(chain);
+			mockSelect.mockReturnValueOnce(chain);
+
+			const result = await getEventActivityFeed("event-1");
+
+			expect(result).toHaveLength(2);
+			expect(result[0].userName).toBe("Tyler");
+			expect(result[0].previousStatus).toBe("confirmed");
+			expect(result[0].newStatus).toBe("declined");
+			expect(result[1].userName).toBe("Sarah");
+			expect(result[1].previousStatus).toBeNull();
+			expect(result[1].newStatus).toBe("confirmed");
+		});
+
+		it("returns empty array when no changes exist", async () => {
+			const chain = chainMock(null);
+			chain.limit = vi.fn().mockResolvedValue([]);
+			chain.orderBy = vi.fn().mockReturnValue(chain);
+			chain.where = vi.fn().mockReturnValue(chain);
+			chain.innerJoin = vi.fn().mockReturnValue(chain);
+			chain.from = vi.fn().mockReturnValue(chain);
+			mockSelect.mockReturnValueOnce(chain);
+
+			const result = await getEventActivityFeed("event-1");
+
+			expect(result).toEqual([]);
+		});
+
+		it("respects custom limit parameter", async () => {
+			const chain = chainMock(null);
+			chain.limit = vi.fn().mockResolvedValue([]);
+			chain.orderBy = vi.fn().mockReturnValue(chain);
+			chain.where = vi.fn().mockReturnValue(chain);
+			chain.innerJoin = vi.fn().mockReturnValue(chain);
+			chain.from = vi.fn().mockReturnValue(chain);
+			mockSelect.mockReturnValueOnce(chain);
+
+			await getEventActivityFeed("event-1", 10);
+
+			expect(chain.limit).toHaveBeenCalledWith(10);
 		});
 	});
 });

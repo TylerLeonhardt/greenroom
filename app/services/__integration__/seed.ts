@@ -13,6 +13,7 @@ import {
 	events,
 	groupMemberships,
 	groups,
+	rsvpChanges,
 	users,
 } from "../../../src/db/schema.js";
 
@@ -20,6 +21,7 @@ type User = typeof users.$inferSelect;
 type Group = typeof groups.$inferSelect;
 type Event = typeof events.$inferSelect;
 type AvailabilityRequest = typeof availabilityRequests.$inferSelect;
+type RsvpChange = typeof rsvpChanges.$inferSelect;
 
 let counter = 0;
 function nextId(): string {
@@ -166,4 +168,29 @@ export async function createTestAssignment(
 		role: overrides?.role ?? null,
 		status: overrides?.status ?? "pending",
 	});
+}
+
+// --- RSVP Changes ---
+
+export async function createTestRsvpChange(
+	eventId: string,
+	userId: string,
+	newStatus: "pending" | "confirmed" | "declined",
+	overrides?: {
+		previousStatus?: "pending" | "confirmed" | "declined" | null;
+		changedAt?: Date;
+	},
+): Promise<RsvpChange> {
+	const [change] = await db
+		.insert(rsvpChanges)
+		.values({
+			eventId,
+			userId,
+			previousStatus: overrides?.previousStatus ?? null,
+			newStatus,
+			...(overrides?.changedAt ? { changedAt: overrides.changedAt } : {}),
+		})
+		.returning();
+	// biome-ignore lint/style/noNonNullAssertion: Factory always returns a row
+	return change!;
 }

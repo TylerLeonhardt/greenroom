@@ -18,6 +18,7 @@ import {
 	Clock,
 	Download,
 	Eye,
+	History,
 	MapPin,
 	Pencil,
 	Trash2,
@@ -28,7 +29,13 @@ import {
 import { useState } from "react";
 import { CsrfInput } from "~/components/csrf-input";
 import { EventDateCarousel } from "~/components/event-date-carousel";
-import { formatDateLong, formatEventTime, formatTime, utcToLocalParts } from "~/lib/date-utils";
+import {
+	formatDateLong,
+	formatDateTime,
+	formatEventTime,
+	formatTime,
+	utcToLocalParts,
+} from "~/lib/date-utils";
 import { validateCsrfToken } from "~/services/csrf.server";
 import {
 	sendEventAssignmentNotification,
@@ -40,8 +47,10 @@ import {
 	deleteEvent,
 	getAvailabilityForEventDate,
 	getAvailabilityRequestGroupId,
+	getEventActivityFeed,
 	getEventWithAssignments,
 	getGroupEventSummaries,
+	recordRsvpChange,
 	removeAssignment,
 	updateAssignmentRole,
 	updateAssignmentStatus,
@@ -96,6 +105,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 		}
 	}
 
+	const activityFeed = await getEventActivityFeed(eventId);
+
 	return {
 		event: data.event,
 		assignments: data.assignments,
@@ -104,6 +115,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 		members,
 		availabilityData,
 		siblingEvents,
+		activityFeed,
 	};
 }
 
@@ -123,21 +135,37 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	const intent = formData.get("intent");
 
 	if (intent === "confirm" || intent === "decline") {
-		await updateAssignmentStatus(eventId, user.id, intent === "confirm" ? "confirmed" : "declined");
+		const newStatus = intent === "confirm" ? "confirmed" : "declined";
+		const currentAssignment = eventData.assignments.find((a) => a.userId === user.id);
+		const previousStatus = currentAssignment?.status ?? null;
+		if (previousStatus !== newStatus) {
+			await updateAssignmentStatus(eventId, user.id, newStatus);
+			await recordRsvpChange(eventId, user.id, previousStatus, newStatus);
+		}
 		return { success: true };
 	}
 
 	if (intent === "attend") {
 		// Self-register as viewer
+		const existingAssignment = eventData.assignments.find((a) => a.userId === user.id);
+		const previousStatus = existingAssignment?.status ?? null;
 		await assignToEvent(eventId, user.id, "Viewer");
 		await updateAssignmentStatus(eventId, user.id, "confirmed");
+		if (previousStatus !== "confirmed") {
+			await recordRsvpChange(eventId, user.id, previousStatus, "confirmed");
+		}
 		return { success: true };
 	}
 
 	if (intent === "decline-attendance") {
 		// Self-register as viewer with declined status
+		const existingAssignment = eventData.assignments.find((a) => a.userId === user.id);
+		const previousStatus = existingAssignment?.status ?? null;
 		await assignToEvent(eventId, user.id, "Viewer");
 		await updateAssignmentStatus(eventId, user.id, "declined");
+		if (previousStatus !== "declined") {
+			await recordRsvpChange(eventId, user.id, previousStatus, "declined");
+		}
 		return { success: true };
 	}
 
@@ -294,9 +322,27 @@ const STATUS_CONFIG: Record<string, { label: string; badgeClass: string }> = {
 	pending: { label: "Pending", badgeClass: "bg-amber-100 text-amber-700" },
 };
 
+const STATUS_LABELS: Record<string, string> = {
+	confirmed: "Going",
+	declined: "Not Going",
+	pending: "Pending",
+};
+
+function formatStatusLabel(status: string): string {
+	return STATUS_LABELS[status] ?? status;
+}
+
 export default function EventDetail() {
-	const { event, assignments, isAdmin, userId, members, availabilityData, siblingEvents } =
-		useLoaderData<typeof loader>();
+	const {
+		event,
+		assignments,
+		isAdmin,
+		userId,
+		members,
+		availabilityData,
+		siblingEvents,
+		activityFeed,
+	} = useLoaderData<typeof loader>();
 	const { groupId } = useParams();
 	const parentData = useRouteLoaderData<typeof groupLayoutLoader>("routes/groups.$groupId");
 	const timezone = parentData?.user?.timezone ?? undefined;
@@ -1241,6 +1287,34 @@ export default function EventDetail() {
 					</div>
 				</div>
 			</div>
+
+			{/* Activity Feed */}
+			{activityFeed.length > 0 && (
+				<div className="mt-8">
+					<h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+						<History className="h-4 w-4 text-slate-500" />
+						Activity
+					</h3>
+					<div className="mt-3 space-y-0">
+						{activityFeed.map((entry) => (
+							<div
+								key={entry.id}
+								className="flex items-start gap-3 border-l-2 border-slate-200 py-2 pl-4"
+							>
+								<div className="min-w-0 flex-1 text-sm text-slate-600">
+									<span className="font-medium text-slate-900">{entry.userName}</span>{" "}
+									{entry.previousStatus
+										? `changed from ${formatStatusLabel(entry.previousStatus)} → ${formatStatusLabel(entry.newStatus)}`
+										: `confirmed ${formatStatusLabel(entry.newStatus)}`}
+									<span className="ml-2 text-xs text-slate-400">
+										{formatDateTime(entry.changedAt, timezone)}
+									</span>
+								</div>
+							</div>
+						))}
+					</div>
+				</div>
+			)}
 
 			{/* Danger Zone — visible to admin or event creator */}
 			{canDelete && (

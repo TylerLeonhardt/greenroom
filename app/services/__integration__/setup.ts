@@ -9,6 +9,7 @@ import { sql } from "drizzle-orm";
 import { db } from "../../../src/db/index.js";
 
 const TABLES = [
+	"rsvp_changes",
 	"event_assignments",
 	"events",
 	"availability_responses",
