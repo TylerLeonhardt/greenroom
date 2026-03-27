@@ -149,11 +149,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		// Self-register as viewer
 		const existingAssignment = eventData.assignments.find((a) => a.userId === user.id);
 		const previousStatus = existingAssignment?.status ?? null;
+		if (previousStatus === "confirmed") {
+			return { success: true };
+		}
 		await assignToEvent(eventId, user.id, "Viewer");
 		await updateAssignmentStatus(eventId, user.id, "confirmed");
-		if (previousStatus !== "confirmed") {
-			await recordRsvpChange(eventId, user.id, previousStatus, "confirmed");
-		}
+		await recordRsvpChange(eventId, user.id, previousStatus, "confirmed");
 		return { success: true };
 	}
 
@@ -161,11 +162,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		// Self-register as viewer with declined status
 		const existingAssignment = eventData.assignments.find((a) => a.userId === user.id);
 		const previousStatus = existingAssignment?.status ?? null;
+		if (previousStatus === "declined") {
+			return { success: true };
+		}
 		await assignToEvent(eventId, user.id, "Viewer");
 		await updateAssignmentStatus(eventId, user.id, "declined");
-		if (previousStatus !== "declined") {
-			await recordRsvpChange(eventId, user.id, previousStatus, "declined");
-		}
+		await recordRsvpChange(eventId, user.id, previousStatus, "declined");
 		return { success: true };
 	}
 
