@@ -28,6 +28,6 @@ export default defineConfig({
 				v3_lazyRouteDiscovery: true,
 			},
 		}),
-		componentExplorer(),
+		componentExplorer({ include: "./app/**/*.fixture.{ts,tsx}" }),
 	],
 });
