@@ -1,6 +1,8 @@
 {
 	"$schema": "./node_modules/@vscode/component-explorer-cli/dist/component-explorer-config.schema.json",
 	"screenshotDir": ".screenshots",
-	"viteConfig": "./vite.config.ts",
+	"sessions": [{ "name": "current" }],
+	"worktree": { "setup": "pnpm", "maxSlots": 2 },
+	"viteConfig": "./vite.explorer.config.ts",
 	"redirection": { "port": 5337 }
 }
