@@ -8,10 +8,12 @@ import {
 	useNavigation,
 	useParams,
 } from "@remix-run/react";
-import { ArrowLeft, Clock, Trash2 } from "lucide-react";
+import { ArrowLeft, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { CsrfInput } from "~/components/csrf-input";
-import { InlineTimezoneSelector } from "~/components/timezone-selector";
+import { DangerZone } from "~/components/danger-zone";
+import { EventDateTimeInputs } from "~/components/event-date-time-inputs";
+import { EventTypeSelector } from "~/components/event-type-selector";
 import {
 	formatEventTime,
 	formatTime,
@@ -357,117 +359,24 @@ export default function EditEvent() {
 							<span className="block text-sm font-medium text-slate-700">
 								Event Type <span className="text-red-500">*</span>
 							</span>
-							<div className="mt-2 flex flex-wrap gap-3">
-								{[
-									{
-										value: "rehearsal",
-										label: "🎯 Rehearsal",
-										color:
-											"peer-checked:bg-emerald-100 peer-checked:border-emerald-300 peer-checked:text-emerald-800",
-									},
-									{
-										value: "show",
-										label: "🎭 Show",
-										color:
-											"peer-checked:bg-purple-100 peer-checked:border-purple-300 peer-checked:text-purple-800",
-									},
-									{
-										value: "other",
-										label: "📅 Other",
-										color:
-											"peer-checked:bg-slate-200 peer-checked:border-slate-400 peer-checked:text-slate-800",
-									},
-								].map((type) => (
-									<label key={type.value} className="cursor-pointer">
-										<input
-											type="radio"
-											name="eventType"
-											value={type.value}
-											defaultChecked={event.eventType === type.value}
-											onChange={() => setEventType(type.value as "rehearsal" | "show" | "other")}
-											className="peer sr-only"
-										/>
-										<span
-											className={`inline-block rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 ${type.color}`}
-										>
-											{type.label}
-										</span>
-									</label>
-								))}
-							</div>
+							<EventTypeSelector
+								defaultValue={event.eventType}
+								onChange={(value) => setEventType(value as "rehearsal" | "show" | "other")}
+							/>
 						</div>
 					</div>
 				</div>
 
 				{/* Date & Time */}
-				<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-					<h3 className="mb-4 text-sm font-semibold text-slate-900">Date & Time</h3>
-					<div className="mb-4">
-						<InlineTimezoneSelector timezone={timezone} onChange={setTimezone} />
-						<input type="hidden" name="timezone" value={timezone} />
-					</div>
-					<div className="grid gap-4 sm:grid-cols-3">
-						<div>
-							<label htmlFor="date" className="block text-sm font-medium text-slate-700">
-								Date <span className="text-red-500">*</span>
-							</label>
-							<input
-								id="date"
-								name="date"
-								type="date"
-								required
-								defaultValue={prefill.date}
-								className="mt-1 block w-full min-w-0 rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-							/>
-						</div>
-						<div>
-							<label htmlFor="startTime" className="block text-sm font-medium text-slate-700">
-								Start Time <span className="text-red-500">*</span>
-							</label>
-							<input
-								id="startTime"
-								name="startTime"
-								type="time"
-								required
-								defaultValue={prefill.startTime}
-								className="mt-1 block w-full min-w-0 appearance-none rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-							/>
-						</div>
-						<div>
-							<label htmlFor="endTime" className="block text-sm font-medium text-slate-700">
-								End Time <span className="text-red-500">*</span>
-							</label>
-							<input
-								id="endTime"
-								name="endTime"
-								type="time"
-								required
-								defaultValue={prefill.endTime}
-								className="mt-1 block w-full min-w-0 appearance-none rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-							/>
-						</div>
-					</div>
-
-					{/* Call Time — show only */}
-					{isShow && (
-						<div className="mt-4">
-							<label htmlFor="callTime" className="block text-sm font-medium text-slate-700">
-								<Clock className="mr-1 inline h-4 w-4 text-purple-500" />
-								Call Time
-								<span className="ml-1 text-xs font-normal text-slate-500">
-									(when performers need to arrive)
-								</span>
-							</label>
-							<input
-								id="callTime"
-								name="callTime"
-								type="time"
-								defaultValue={prefill.callTime}
-								className="mt-1 block w-full min-w-0 appearance-none rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors sm:max-w-[200px] focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
-							/>
-						</div>
-					)}
-				</div>
+				<EventDateTimeInputs
+					defaultDate={prefill.date}
+					defaultStartTime={prefill.startTime}
+					defaultEndTime={prefill.endTime}
+					defaultCallTime={prefill.callTime}
+					timezone={timezone}
+					onTimezoneChange={setTimezone}
+					isShow={isShow}
+				/>
 
 				{/* Location & Description */}
 				<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -560,26 +469,24 @@ export default function EditEvent() {
 			</Form>
 
 			{/* Danger Zone */}
-			<div className="mt-8 rounded-xl border border-red-200 bg-red-50 p-6">
-				<h3 className="text-sm font-semibold text-red-900">Danger Zone</h3>
-				<p className="mt-1 text-xs text-red-700">
-					Deleting this event will remove all assignments and cannot be undone.
-				</p>
-				<Form method="post" className="mt-4">
-					<CsrfInput />
-					<input type="hidden" name="intent" value="delete" />
-					<button
-						type="submit"
-						onClick={(e) => {
-							if (!confirm("Are you sure you want to delete this event?")) {
-								e.preventDefault();
-							}
-						}}
-						className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100"
-					>
-						<Trash2 className="h-4 w-4" /> Delete Event
-					</button>
-				</Form>
+			<div className="mt-8">
+				<DangerZone description="Deleting this event will remove all assignments and cannot be undone.">
+					<Form method="post">
+						<CsrfInput />
+						<input type="hidden" name="intent" value="delete" />
+						<button
+							type="submit"
+							onClick={(e) => {
+								if (!confirm("Are you sure you want to delete this event?")) {
+									e.preventDefault();
+								}
+							}}
+							className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100"
+						>
+							<Trash2 className="h-4 w-4" /> Delete Event
+						</button>
+					</Form>
+				</DangerZone>
 			</div>
 		</div>
 	);

@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { Link, useLoaderData, useRouteLoaderData } from "@remix-run/react";
 import { Calendar, Users } from "lucide-react";
+import { EmptyState } from "~/components/empty-state";
 import { formatDateRange, formatTimeRange } from "~/lib/date-utils";
 import { getGroupAvailabilityRequests } from "~/services/availability.server";
 import { requireGroupMember } from "~/services/groups.server";
@@ -45,14 +46,16 @@ export default function Availability() {
 			</div>
 
 			{requests.length === 0 ? (
-				<div className="mt-8 rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
-					<Calendar className="mx-auto h-12 w-12 text-slate-300" />
-					<h3 className="mt-4 text-sm font-medium text-slate-900">No availability requests yet</h3>
-					<p className="mt-1 text-sm text-slate-500">
-						{canCreateRequests
-							? "Create one to find out when your group is free."
-							: "Your group admin hasn't created any yet."}
-					</p>
+				<div className="mt-8">
+					<EmptyState
+						icon={<Calendar className="mx-auto h-12 w-12 text-slate-300" />}
+						title="No availability requests yet"
+						description={
+							canCreateRequests
+								? "Create one to find out when your group is free."
+								: "Your group admin hasn't created any yet."
+						}
+					/>
 				</div>
 			) : (
 				<div className="mt-6 space-y-3">
