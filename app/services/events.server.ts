@@ -211,6 +211,13 @@ export async function getGroupEventSummaries(
 
 // --- Get Single with Assignments ---
 
+/** Sort priority for assignment statuses: confirmed first, then pending, then declined. */
+export const ASSIGNMENT_STATUS_ORDER = {
+	confirmed: 0,
+	pending: 1,
+	declined: 2,
+} as const satisfies Record<"confirmed" | "pending" | "declined", number>;
+
 export async function getEventWithAssignments(eventId: string): Promise<{
 	event: Event & { createdByName: string };
 	assignments: Array<{
@@ -261,6 +268,14 @@ export async function getEventWithAssignments(eventId: string): Promise<{
 		.innerJoin(users, eq(eventAssignments.userId, users.id))
 		.where(eq(eventAssignments.eventId, eventId))
 		.orderBy(users.name);
+
+	// Sort by status priority (confirmed → pending → declined), then alphabetically by name
+	assignments.sort((a, b) => {
+		const statusA = ASSIGNMENT_STATUS_ORDER[a.status] ?? 99;
+		const statusB = ASSIGNMENT_STATUS_ORDER[b.status] ?? 99;
+		if (statusA !== statusB) return statusA - statusB;
+		return a.userName.localeCompare(b.userName);
+	});
 
 	return {
 		event: { ...eventRow, createdByName },

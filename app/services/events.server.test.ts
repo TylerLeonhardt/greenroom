@@ -62,6 +62,7 @@ const {
 	getAvailabilityForEventDate,
 	recordRsvpChange,
 	getEventActivityFeed,
+	ASSIGNMENT_STATUS_ORDER,
 } = await import("~/services/events.server");
 
 const { localTimeToUTC } = await import("../lib/date-utils.js");
@@ -472,6 +473,124 @@ describe("events.server", () => {
 			expect(result).not.toBeNull();
 			// biome-ignore lint/style/noNonNullAssertion: guarded by assertion above
 			expect(result!.assignments).toEqual([]);
+		});
+
+		it("sorts assignments by status priority then alphabetically", async () => {
+			const eventRow = { ...mockEvent, createdByName: "Alice" };
+			const unsortedAssignments = [
+				{ userId: "u1", userName: "Alice", role: "Performer", status: "pending", assignedAt: now },
+				{ userId: "u2", userName: "Bob", role: "Performer", status: "declined", assignedAt: now },
+				{ userId: "u3", userName: "Charlie", role: "Viewer", status: "confirmed", assignedAt: now },
+				{ userId: "u4", userName: "Dave", role: "Performer", status: "confirmed", assignedAt: now },
+				{ userId: "u5", userName: "Eve", role: "Viewer", status: "pending", assignedAt: now },
+			];
+
+			const eventChain = chainMock(null);
+			eventChain.limit = vi.fn().mockResolvedValue([eventRow]);
+			eventChain.where = vi.fn().mockReturnValue(eventChain);
+			eventChain.leftJoin = vi.fn().mockReturnValue(eventChain);
+			eventChain.from = vi.fn().mockReturnValue(eventChain);
+
+			const assignChain = chainMock(null);
+			assignChain.orderBy = vi.fn().mockResolvedValue(unsortedAssignments);
+			assignChain.where = vi.fn().mockReturnValue(assignChain);
+			assignChain.innerJoin = vi.fn().mockReturnValue(assignChain);
+			assignChain.from = vi.fn().mockReturnValue(assignChain);
+
+			mockSelect.mockReturnValueOnce(eventChain).mockReturnValueOnce(assignChain);
+
+			const result = await getEventWithAssignments("event-1");
+
+			expect(result).not.toBeNull();
+			// biome-ignore lint/style/noNonNullAssertion: guarded by assertion above
+			const names = result!.assignments.map((a) => `${a.userName}:${a.status}`);
+			expect(names).toEqual([
+				"Charlie:confirmed", // confirmed, alphabetically first
+				"Dave:confirmed", // confirmed, alphabetically second
+				"Alice:pending", // pending, alphabetically first
+				"Eve:pending", // pending, alphabetically second
+				"Bob:declined", // declined
+			]);
+		});
+
+		it("sorts alphabetically when all assignments share the same status", async () => {
+			const eventRow = { ...mockEvent, createdByName: "Admin" };
+			const allConfirmed = [
+				{ userId: "u1", userName: "Zara", role: "Performer", status: "confirmed", assignedAt: now },
+				{
+					userId: "u2",
+					userName: "Alice",
+					role: "Performer",
+					status: "confirmed",
+					assignedAt: now,
+				},
+				{ userId: "u3", userName: "Mia", role: "Performer", status: "confirmed", assignedAt: now },
+			];
+
+			const eventChain = chainMock(null);
+			eventChain.limit = vi.fn().mockResolvedValue([eventRow]);
+			eventChain.where = vi.fn().mockReturnValue(eventChain);
+			eventChain.leftJoin = vi.fn().mockReturnValue(eventChain);
+			eventChain.from = vi.fn().mockReturnValue(eventChain);
+
+			const assignChain = chainMock(null);
+			assignChain.orderBy = vi.fn().mockResolvedValue(allConfirmed);
+			assignChain.where = vi.fn().mockReturnValue(assignChain);
+			assignChain.innerJoin = vi.fn().mockReturnValue(assignChain);
+			assignChain.from = vi.fn().mockReturnValue(assignChain);
+
+			mockSelect.mockReturnValueOnce(eventChain).mockReturnValueOnce(assignChain);
+
+			const result = await getEventWithAssignments("event-1");
+
+			expect(result).not.toBeNull();
+			// biome-ignore lint/style/noNonNullAssertion: guarded by assertion above
+			expect(result!.assignments.map((a) => a.userName)).toEqual(["Alice", "Mia", "Zara"]);
+		});
+
+		it("pushes unknown status values after known statuses", async () => {
+			const eventRow = { ...mockEvent, createdByName: "Admin" };
+			const withUnknown = [
+				{ userId: "u1", userName: "Alice", role: "Performer", status: "mystery", assignedAt: now },
+				{ userId: "u2", userName: "Bob", role: "Performer", status: "confirmed", assignedAt: now },
+				{
+					userId: "u3",
+					userName: "Charlie",
+					role: "Performer",
+					status: "mystery",
+					assignedAt: now,
+				},
+			];
+
+			const eventChain = chainMock(null);
+			eventChain.limit = vi.fn().mockResolvedValue([eventRow]);
+			eventChain.where = vi.fn().mockReturnValue(eventChain);
+			eventChain.leftJoin = vi.fn().mockReturnValue(eventChain);
+			eventChain.from = vi.fn().mockReturnValue(eventChain);
+
+			const assignChain = chainMock(null);
+			assignChain.orderBy = vi.fn().mockResolvedValue(withUnknown);
+			assignChain.where = vi.fn().mockReturnValue(assignChain);
+			assignChain.innerJoin = vi.fn().mockReturnValue(assignChain);
+			assignChain.from = vi.fn().mockReturnValue(assignChain);
+
+			mockSelect.mockReturnValueOnce(eventChain).mockReturnValueOnce(assignChain);
+
+			const result = await getEventWithAssignments("event-1");
+
+			expect(result).not.toBeNull();
+			// biome-ignore lint/style/noNonNullAssertion: guarded by assertion above
+			expect(result!.assignments.map((a) => `${a.userName}:${a.status}`)).toEqual([
+				"Bob:confirmed", // known status comes first
+				"Alice:mystery", // unknown statuses sort to end, alphabetically
+				"Charlie:mystery",
+			]);
+		});
+
+		it("exports ASSIGNMENT_STATUS_ORDER with correct priorities", () => {
+			expect(ASSIGNMENT_STATUS_ORDER.confirmed).toBe(0);
+			expect(ASSIGNMENT_STATUS_ORDER.pending).toBe(1);
+			expect(ASSIGNMENT_STATUS_ORDER.declined).toBe(2);
 		});
 	});
 
