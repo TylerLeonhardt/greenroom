@@ -8,10 +8,12 @@ import {
 	useNavigation,
 	useParams,
 } from "@remix-run/react";
-import { ArrowLeft, Clock, Users } from "lucide-react";
+import { ArrowLeft, Users } from "lucide-react";
 import { useState } from "react";
 import { CsrfInput } from "~/components/csrf-input";
-import { InlineTimezoneSelector } from "~/components/timezone-selector";
+import { EventDateTimeInputs } from "~/components/event-date-time-inputs";
+import { EventTypeSelector } from "~/components/event-type-selector";
+import { UserChipSelector } from "~/components/user-chip-selector";
 import {
 	formatEventTime,
 	formatTime,
@@ -396,117 +398,18 @@ export default function NewEvent() {
 							<span className="block text-sm font-medium text-slate-700">
 								Event Type <span className="text-red-500">*</span>
 							</span>
-							<div className="mt-2 flex flex-wrap gap-3">
-								{[
-									{
-										value: "rehearsal",
-										label: "🎯 Rehearsal",
-										color:
-											"peer-checked:bg-emerald-100 peer-checked:border-emerald-300 peer-checked:text-emerald-800",
-									},
-									{
-										value: "show",
-										label: "🎭 Show",
-										color:
-											"peer-checked:bg-purple-100 peer-checked:border-purple-300 peer-checked:text-purple-800",
-									},
-									{
-										value: "other",
-										label: "📅 Other",
-										color:
-											"peer-checked:bg-slate-200 peer-checked:border-slate-400 peer-checked:text-slate-800",
-									},
-								].map((type) => (
-									<label key={type.value} className="cursor-pointer">
-										<input
-											type="radio"
-											name="eventType"
-											value={type.value}
-											defaultChecked={type.value === "rehearsal"}
-											onChange={() => setEventType(type.value)}
-											className="peer sr-only"
-										/>
-										<span
-											className={`inline-block rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 ${type.color}`}
-										>
-											{type.label}
-										</span>
-									</label>
-								))}
-							</div>
+							<EventTypeSelector onChange={(value) => setEventType(value)} />
 						</div>
 					</div>
 				</div>
 
 				{/* Date & Time */}
-				<div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-					<h3 className="mb-4 text-sm font-semibold text-slate-900">Date & Time</h3>
-					<div className="mb-4">
-						<InlineTimezoneSelector timezone={timezone} onChange={setTimezone} />
-						<input type="hidden" name="timezone" value={timezone} />
-					</div>
-					<div className="grid gap-4 sm:grid-cols-3">
-						<div>
-							<label htmlFor="date" className="block text-sm font-medium text-slate-700">
-								Date <span className="text-red-500">*</span>
-							</label>
-							<input
-								id="date"
-								name="date"
-								type="date"
-								required
-								defaultValue={prefillDate ?? ""}
-								className="mt-1 block w-full min-w-0 rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-							/>
-						</div>
-						<div>
-							<label htmlFor="startTime" className="block text-sm font-medium text-slate-700">
-								Start Time <span className="text-red-500">*</span>
-							</label>
-							<input
-								id="startTime"
-								name="startTime"
-								type="time"
-								required
-								defaultValue="19:00"
-								className="mt-1 block w-full min-w-0 appearance-none rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-							/>
-						</div>
-						<div>
-							<label htmlFor="endTime" className="block text-sm font-medium text-slate-700">
-								End Time <span className="text-red-500">*</span>
-							</label>
-							<input
-								id="endTime"
-								name="endTime"
-								type="time"
-								required
-								defaultValue="21:00"
-								className="mt-1 block w-full min-w-0 appearance-none rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-							/>
-						</div>
-					</div>
-
-					{/* Call Time — show only */}
-					{isShow && (
-						<div className="mt-4">
-							<label htmlFor="callTime" className="block text-sm font-medium text-slate-700">
-								<Clock className="mr-1 inline h-4 w-4 text-purple-500" />
-								Call Time
-								<span className="ml-1 text-xs font-normal text-slate-500">
-									(when performers need to arrive)
-								</span>
-							</label>
-							<input
-								id="callTime"
-								name="callTime"
-								type="time"
-								defaultValue="18:00"
-								className="mt-1 block w-full min-w-0 appearance-none rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm transition-colors sm:max-w-[200px] focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
-							/>
-						</div>
-					)}
-				</div>
+				<EventDateTimeInputs
+					defaultDate={prefillDate ?? ""}
+					timezone={timezone}
+					onTimezoneChange={setTimezone}
+					isShow={isShow}
+				/>
 
 				{/* Cast Assignment — show only */}
 				{isShow && members.length > 0 && (
@@ -524,51 +427,23 @@ export default function NewEvent() {
 								{availableMembers.length > 0 && (
 									<div>
 										<h4 className="mb-1.5 text-xs font-semibold text-emerald-700">✅ Available</h4>
-										<div className="flex flex-wrap gap-2">
-											{availableMembers.map((u) => (
-												<label
-													key={u.userId}
-													className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-														selectedPerformers.has(u.userId)
-															? "border-emerald-400 bg-emerald-100 text-emerald-800"
-															: "border-slate-200 bg-white text-slate-700 hover:bg-emerald-50"
-													}`}
-												>
-													<input
-														type="checkbox"
-														className="sr-only"
-														checked={selectedPerformers.has(u.userId)}
-														onChange={() => togglePerformer(u.userId)}
-													/>
-													{u.userName}
-												</label>
-											))}
-										</div>
+										<UserChipSelector
+											users={availableMembers.map((u) => ({ id: u.userId, name: u.userName }))}
+											selectedIds={selectedPerformers}
+											onToggle={togglePerformer}
+											colorScheme="emerald"
+										/>
 									</div>
 								)}
 								{maybeMembers.length > 0 && (
 									<div>
 										<h4 className="mb-1.5 text-xs font-semibold text-amber-700">🤔 Maybe</h4>
-										<div className="flex flex-wrap gap-2">
-											{maybeMembers.map((u) => (
-												<label
-													key={u.userId}
-													className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-														selectedPerformers.has(u.userId)
-															? "border-amber-400 bg-amber-100 text-amber-800"
-															: "border-slate-200 bg-white text-slate-700 hover:bg-amber-50"
-													}`}
-												>
-													<input
-														type="checkbox"
-														className="sr-only"
-														checked={selectedPerformers.has(u.userId)}
-														onChange={() => togglePerformer(u.userId)}
-													/>
-													{u.userName}
-												</label>
-											))}
-										</div>
+										<UserChipSelector
+											users={maybeMembers.map((u) => ({ id: u.userId, name: u.userName }))}
+											selectedIds={selectedPerformers}
+											onToggle={togglePerformer}
+											colorScheme="amber"
+										/>
 									</div>
 								)}
 								{unavailableMembers.length > 0 && (
@@ -576,75 +451,34 @@ export default function NewEvent() {
 										<h4 className="mb-1.5 text-xs font-semibold text-slate-500">
 											❌ Not Available
 										</h4>
-										<div className="flex flex-wrap gap-2">
-											{unavailableMembers.map((u) => (
-												<label
-													key={u.userId}
-													className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium opacity-60 transition-colors ${
-														selectedPerformers.has(u.userId)
-															? "border-red-400 bg-red-100 text-red-800"
-															: "border-slate-200 bg-white text-slate-500 hover:bg-slate-100"
-													}`}
-												>
-													<input
-														type="checkbox"
-														className="sr-only"
-														checked={selectedPerformers.has(u.userId)}
-														onChange={() => togglePerformer(u.userId)}
-													/>
-													{u.userName}
-												</label>
-											))}
-										</div>
+										<UserChipSelector
+											users={unavailableMembers.map((u) => ({ id: u.userId, name: u.userName }))}
+											selectedIds={selectedPerformers}
+											onToggle={togglePerformer}
+											colorScheme="red"
+											dimmed
+										/>
 									</div>
 								)}
 								{noResponseMembers.length > 0 && (
 									<div>
 										<h4 className="mb-1.5 text-xs font-semibold text-slate-400">— No Response</h4>
-										<div className="flex flex-wrap gap-2">
-											{noResponseMembers.map((m) => (
-												<label
-													key={m.id}
-													className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-														selectedPerformers.has(m.id)
-															? "border-slate-400 bg-slate-200 text-slate-800"
-															: "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
-													}`}
-												>
-													<input
-														type="checkbox"
-														className="sr-only"
-														checked={selectedPerformers.has(m.id)}
-														onChange={() => togglePerformer(m.id)}
-													/>
-													{m.name}
-												</label>
-											))}
-										</div>
+										<UserChipSelector
+											users={noResponseMembers.map((m) => ({ id: m.id, name: m.name }))}
+											selectedIds={selectedPerformers}
+											onToggle={togglePerformer}
+											colorScheme="slate"
+										/>
 									</div>
 								)}
 							</div>
 						) : (
-							<div className="flex flex-wrap gap-2">
-								{members.map((m) => (
-									<label
-										key={m.id}
-										className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-											selectedPerformers.has(m.id)
-												? "border-purple-400 bg-purple-100 text-purple-800"
-												: "border-slate-200 bg-white text-slate-700 hover:bg-purple-50"
-										}`}
-									>
-										<input
-											type="checkbox"
-											className="sr-only"
-											checked={selectedPerformers.has(m.id)}
-											onChange={() => togglePerformer(m.id)}
-										/>
-										{m.name}
-									</label>
-								))}
-							</div>
+							<UserChipSelector
+								users={members.map((m) => ({ id: m.id, name: m.name }))}
+								selectedIds={selectedPerformers}
+								onToggle={togglePerformer}
+								colorScheme="purple"
+							/>
 						)}
 
 						{selectedPerformers.size > 0 && (

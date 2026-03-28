@@ -28,7 +28,9 @@ import {
 import { useState } from "react";
 import { ActivityFeed } from "~/components/activity-feed";
 import { CsrfInput } from "~/components/csrf-input";
+import { DangerZone } from "~/components/danger-zone";
 import { EventDateCarousel } from "~/components/event-date-carousel";
+import { UserChipSelector } from "~/components/user-chip-selector";
 import { formatDateLong, formatEventTime, formatTime, utcToLocalParts } from "~/lib/date-utils";
 import { validateCsrfToken } from "~/services/csrf.server";
 import {
@@ -604,26 +606,15 @@ export default function EventDetail() {
 														<h4 className="mb-1.5 text-xs font-semibold text-emerald-700">
 															✅ Available
 														</h4>
-														<div className="flex flex-wrap gap-2">
-															{availableUsers.map((u) => (
-																<label
-																	key={u.userId}
-																	className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-																		selectedUserIds.has(u.userId)
-																			? "border-emerald-400 bg-emerald-100 text-emerald-800"
-																			: "border-slate-200 bg-white text-slate-700 hover:bg-emerald-50"
-																	}`}
-																>
-																	<input
-																		type="checkbox"
-																		className="sr-only"
-																		checked={selectedUserIds.has(u.userId)}
-																		onChange={() => toggleUser(u.userId)}
-																	/>
-																	{u.userName}
-																</label>
-															))}
-														</div>
+														<UserChipSelector
+															users={availableUsers.map((u) => ({
+																id: u.userId,
+																name: u.userName,
+															}))}
+															selectedIds={selectedUserIds}
+															onToggle={toggleUser}
+															colorScheme="emerald"
+														/>
 													</div>
 												)}
 												{maybeUsers.length > 0 && (
@@ -631,26 +622,12 @@ export default function EventDetail() {
 														<h4 className="mb-1.5 text-xs font-semibold text-amber-700">
 															🤔 Maybe
 														</h4>
-														<div className="flex flex-wrap gap-2">
-															{maybeUsers.map((u) => (
-																<label
-																	key={u.userId}
-																	className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-																		selectedUserIds.has(u.userId)
-																			? "border-amber-400 bg-amber-100 text-amber-800"
-																			: "border-slate-200 bg-white text-slate-700 hover:bg-amber-50"
-																	}`}
-																>
-																	<input
-																		type="checkbox"
-																		className="sr-only"
-																		checked={selectedUserIds.has(u.userId)}
-																		onChange={() => toggleUser(u.userId)}
-																	/>
-																	{u.userName}
-																</label>
-															))}
-														</div>
+														<UserChipSelector
+															users={maybeUsers.map((u) => ({ id: u.userId, name: u.userName }))}
+															selectedIds={selectedUserIds}
+															onToggle={toggleUser}
+															colorScheme="amber"
+														/>
 													</div>
 												)}
 												{unavailableUsers.length > 0 && (
@@ -658,26 +635,16 @@ export default function EventDetail() {
 														<h4 className="mb-1.5 text-xs font-semibold text-slate-500">
 															❌ Not Available
 														</h4>
-														<div className="flex flex-wrap gap-2">
-															{unavailableUsers.map((u) => (
-																<label
-																	key={u.userId}
-																	className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium opacity-60 transition-colors ${
-																		selectedUserIds.has(u.userId)
-																			? "border-red-400 bg-red-100 text-red-800"
-																			: "border-slate-200 bg-white text-slate-500 hover:bg-slate-100"
-																	}`}
-																>
-																	<input
-																		type="checkbox"
-																		className="sr-only"
-																		checked={selectedUserIds.has(u.userId)}
-																		onChange={() => toggleUser(u.userId)}
-																	/>
-																	{u.userName}
-																</label>
-															))}
-														</div>
+														<UserChipSelector
+															users={unavailableUsers.map((u) => ({
+																id: u.userId,
+																name: u.userName,
+															}))}
+															selectedIds={selectedUserIds}
+															onToggle={toggleUser}
+															colorScheme="red"
+															dimmed
+														/>
 													</div>
 												)}
 											</div>
@@ -689,26 +656,12 @@ export default function EventDetail() {
 												<h4 className="mb-2 text-xs font-semibold text-slate-700">
 													Select Performers
 												</h4>
-												<div className="flex flex-wrap gap-2">
-													{unassignedMembers.map((m) => (
-														<label
-															key={m.id}
-															className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-																selectedUserIds.has(m.id)
-																	? "border-purple-400 bg-purple-100 text-purple-800"
-																	: "border-slate-200 bg-white text-slate-700 hover:bg-purple-50"
-															}`}
-														>
-															<input
-																type="checkbox"
-																className="sr-only"
-																checked={selectedUserIds.has(m.id)}
-																onChange={() => toggleUser(m.id)}
-															/>
-															{m.name}
-														</label>
-													))}
-												</div>
+												<UserChipSelector
+													users={unassignedMembers.map((m) => ({ id: m.id, name: m.name }))}
+													selectedIds={selectedUserIds}
+													onToggle={toggleUser}
+													colorScheme="purple"
+												/>
 											</div>
 										)}
 
@@ -933,26 +886,15 @@ export default function EventDetail() {
 														<h4 className="mb-1.5 text-xs font-semibold text-emerald-700">
 															✅ Available
 														</h4>
-														<div className="flex flex-wrap gap-2">
-															{availableUsers.map((u) => (
-																<label
-																	key={u.userId}
-																	className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-																		selectedUserIds.has(u.userId)
-																			? "border-emerald-400 bg-emerald-100 text-emerald-800"
-																			: "border-slate-200 bg-white text-slate-700 hover:bg-emerald-50"
-																	}`}
-																>
-																	<input
-																		type="checkbox"
-																		className="sr-only"
-																		checked={selectedUserIds.has(u.userId)}
-																		onChange={() => toggleUser(u.userId)}
-																	/>
-																	{u.userName}
-																</label>
-															))}
-														</div>
+														<UserChipSelector
+															users={availableUsers.map((u) => ({
+																id: u.userId,
+																name: u.userName,
+															}))}
+															selectedIds={selectedUserIds}
+															onToggle={toggleUser}
+															colorScheme="emerald"
+														/>
 													</div>
 												)}
 												{maybeUsers.length > 0 && (
@@ -960,26 +902,12 @@ export default function EventDetail() {
 														<h4 className="mb-1.5 text-xs font-semibold text-amber-700">
 															🤔 Maybe
 														</h4>
-														<div className="flex flex-wrap gap-2">
-															{maybeUsers.map((u) => (
-																<label
-																	key={u.userId}
-																	className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-																		selectedUserIds.has(u.userId)
-																			? "border-amber-400 bg-amber-100 text-amber-800"
-																			: "border-slate-200 bg-white text-slate-700 hover:bg-amber-50"
-																	}`}
-																>
-																	<input
-																		type="checkbox"
-																		className="sr-only"
-																		checked={selectedUserIds.has(u.userId)}
-																		onChange={() => toggleUser(u.userId)}
-																	/>
-																	{u.userName}
-																</label>
-															))}
-														</div>
+														<UserChipSelector
+															users={maybeUsers.map((u) => ({ id: u.userId, name: u.userName }))}
+															selectedIds={selectedUserIds}
+															onToggle={toggleUser}
+															colorScheme="amber"
+														/>
 													</div>
 												)}
 												{unavailableUsers.length > 0 && (
@@ -987,26 +915,16 @@ export default function EventDetail() {
 														<h4 className="mb-1.5 text-xs font-semibold text-slate-500">
 															❌ Not Available
 														</h4>
-														<div className="flex flex-wrap gap-2">
-															{unavailableUsers.map((u) => (
-																<label
-																	key={u.userId}
-																	className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium opacity-60 transition-colors ${
-																		selectedUserIds.has(u.userId)
-																			? "border-red-400 bg-red-100 text-red-800"
-																			: "border-slate-200 bg-white text-slate-500 hover:bg-slate-100"
-																	}`}
-																>
-																	<input
-																		type="checkbox"
-																		className="sr-only"
-																		checked={selectedUserIds.has(u.userId)}
-																		onChange={() => toggleUser(u.userId)}
-																	/>
-																	{u.userName}
-																</label>
-															))}
-														</div>
+														<UserChipSelector
+															users={unavailableUsers.map((u) => ({
+																id: u.userId,
+																name: u.userName,
+															}))}
+															selectedIds={selectedUserIds}
+															onToggle={toggleUser}
+															colorScheme="red"
+															dimmed
+														/>
 													</div>
 												)}
 											</div>
@@ -1018,26 +936,12 @@ export default function EventDetail() {
 												<h4 className="mb-2 text-xs font-semibold text-slate-700">
 													Select Members
 												</h4>
-												<div className="flex flex-wrap gap-2">
-													{unassignedMembers.map((m) => (
-														<label
-															key={m.id}
-															className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-																selectedUserIds.has(m.id)
-																	? "border-emerald-400 bg-emerald-100 text-emerald-800"
-																	: "border-slate-200 bg-white text-slate-700 hover:bg-emerald-50"
-															}`}
-														>
-															<input
-																type="checkbox"
-																className="sr-only"
-																checked={selectedUserIds.has(m.id)}
-																onChange={() => toggleUser(m.id)}
-															/>
-															{m.name}
-														</label>
-													))}
-												</div>
+												<UserChipSelector
+													users={unassignedMembers.map((m) => ({ id: m.id, name: m.name }))}
+													selectedIds={selectedUserIds}
+													onToggle={toggleUser}
+													colorScheme="emerald"
+												/>
 											</div>
 										)}
 
@@ -1279,30 +1183,28 @@ export default function EventDetail() {
 
 			{/* Danger Zone — visible to admin or event creator */}
 			{canDelete && (
-				<div className="mt-8 rounded-xl border border-red-200 bg-red-50 p-6">
-					<h3 className="text-sm font-semibold text-red-900">Danger Zone</h3>
-					<p className="mt-1 text-xs text-red-700">
-						Deleting this event will remove all assignments and cannot be undone.
-					</p>
-					<Form method="post" className="mt-4">
-						<CsrfInput />
-						<input type="hidden" name="intent" value="delete" />
-						<button
-							type="submit"
-							onClick={(e) => {
-								const message =
-									confirmedCount > 0
-										? `This event has ${confirmedCount} confirmed attendee${confirmedCount === 1 ? "" : "s"} who will lose their confirmation. Are you sure you want to delete this event?`
-										: "Are you sure you want to delete this event?";
-								if (!confirm(message)) {
-									e.preventDefault();
-								}
-							}}
-							className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100"
-						>
-							<Trash2 className="h-4 w-4" /> Delete Event
-						</button>
-					</Form>
+				<div className="mt-8">
+					<DangerZone description="Deleting this event will remove all assignments and cannot be undone.">
+						<Form method="post">
+							<CsrfInput />
+							<input type="hidden" name="intent" value="delete" />
+							<button
+								type="submit"
+								onClick={(e) => {
+									const message =
+										confirmedCount > 0
+											? `This event has ${confirmedCount} confirmed attendee${confirmedCount === 1 ? "" : "s"} who will lose their confirmation. Are you sure you want to delete this event?`
+											: "Are you sure you want to delete this event?";
+									if (!confirm(message)) {
+										e.preventDefault();
+									}
+								}}
+								className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100"
+							>
+								<Trash2 className="h-4 w-4" /> Delete Event
+							</button>
+						</Form>
+					</DangerZone>
 				</div>
 			)}
 		</div>

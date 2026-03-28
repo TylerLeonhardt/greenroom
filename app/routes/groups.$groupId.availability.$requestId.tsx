@@ -24,6 +24,7 @@ import {
 import { useState } from "react";
 import { AvailabilityGrid } from "~/components/availability-grid";
 import { CsrfInput } from "~/components/csrf-input";
+import { DangerZone } from "~/components/danger-zone";
 import { ResultsHeatmap } from "~/components/results-heatmap";
 import { formatDateMedium, formatTimeRange } from "~/lib/date-utils";
 import {
@@ -486,26 +487,24 @@ export default function AvailabilityRequestDetail() {
 
 			{/* Danger Zone — visible to admin or creator */}
 			{canDelete && (
-				<div className="mt-8 rounded-xl border border-red-200 bg-red-50 p-6">
-					<h3 className="text-sm font-semibold text-red-900">Danger Zone</h3>
-					<p className="mt-1 text-xs text-red-700">
-						Deleting this request will remove all responses and cannot be undone.
-					</p>
-					<Form method="post" className="mt-4">
-						<CsrfInput />
-						<input type="hidden" name="intent" value="delete" />
-						<button
-							type="submit"
-							onClick={(e) => {
-								if (!confirm("Are you sure you want to delete this availability request?")) {
-									e.preventDefault();
-								}
-							}}
-							className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100"
-						>
-							<Trash2 className="h-4 w-4" /> Delete Request
-						</button>
-					</Form>
+				<div className="mt-8">
+					<DangerZone description="Deleting this request will remove all responses and cannot be undone.">
+						<Form method="post">
+							<CsrfInput />
+							<input type="hidden" name="intent" value="delete" />
+							<button
+								type="submit"
+								onClick={(e) => {
+									if (!confirm("Are you sure you want to delete this availability request?")) {
+										e.preventDefault();
+									}
+								}}
+								className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100"
+							>
+								<Trash2 className="h-4 w-4" /> Delete Request
+							</button>
+						</Form>
+					</DangerZone>
 				</div>
 			)}
 		</div>

@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { Link, useLoaderData, useRouteLoaderData, useSearchParams } from "@remix-run/react";
 import { CalendarDays, List, Plus } from "lucide-react";
 import { useState } from "react";
+import { EmptyState } from "~/components/empty-state";
 import { EventCalendar } from "~/components/event-calendar";
 import { EventCard } from "~/components/event-card";
 import { formatDateLong } from "~/lib/date-utils";
@@ -108,23 +109,25 @@ export default function Events() {
 			{view === "list" && (
 				<div className="space-y-6">
 					{upcoming.length === 0 && past.length === 0 ? (
-						<div className="flex flex-col items-center rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">
-							<CalendarDays className="h-10 w-10 text-slate-300" />
-							<h3 className="mt-3 text-base font-semibold text-slate-900">No events yet</h3>
-							<p className="mt-1 max-w-sm text-sm text-slate-500">
-								{canCreateEvents
+						<EmptyState
+							icon={<CalendarDays className="h-10 w-10 text-slate-300" />}
+							title="No events yet"
+							description={
+								canCreateEvents
 									? "Create your first event or use availability results to schedule one."
-									: "Events created by admins will appear here."}
-							</p>
-							{canCreateEvents && (
-								<Link
-									to={`/groups/${groupId}/events/new`}
-									className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
-								>
-									<Plus className="h-4 w-4" /> Create Event
-								</Link>
-							)}
-						</div>
+									: "Events created by admins will appear here."
+							}
+							actions={
+								canCreateEvents ? (
+									<Link
+										to={`/groups/${groupId}/events/new`}
+										className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+									>
+										<Plus className="h-4 w-4" /> Create Event
+									</Link>
+								) : undefined
+							}
+						/>
 					) : (
 						<>
 							{/* Upcoming */}
@@ -231,9 +234,7 @@ export default function Events() {
 								)}
 							</div>
 						) : (
-							<div className="rounded-xl border border-dashed border-slate-200 bg-white p-6 text-center">
-								<p className="text-sm text-slate-500">Click a date with events to see details</p>
-							</div>
+							<EmptyState description="Click a date with events to see details" />
 						)}
 					</div>
 				</div>

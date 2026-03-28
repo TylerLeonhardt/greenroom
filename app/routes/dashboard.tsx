@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { Link, useLoaderData } from "@remix-run/react";
 import { AlertCircle, CalendarDays, Clock, Plus, Users } from "lucide-react";
+import { EmptyState } from "~/components/empty-state";
 import { EventCard } from "~/components/event-card";
 import { formatDateShort } from "~/lib/date-utils";
 import { requireUser } from "~/services/auth.server";
@@ -100,14 +101,12 @@ export default function Dashboard() {
 					</div>
 				</div>
 			) : (
-				<div className="mt-8 rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">
-					<div className="text-3xl">✅</div>
-					<h3 className="mt-3 text-base font-semibold text-slate-900">
-						You&apos;re all caught up!
-					</h3>
-					<p className="mt-1 text-sm text-slate-500">
-						No pending availability requests or event confirmations.
-					</p>
+				<div className="mt-8">
+					<EmptyState
+						icon="✅"
+						title="You're all caught up!"
+						description="No pending availability requests or event confirmations."
+					/>
 				</div>
 			)}
 
@@ -119,10 +118,8 @@ export default function Dashboard() {
 					</h2>
 				</div>
 				{upcomingEvents.length === 0 ? (
-					<div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">
-						<p className="text-sm text-slate-500">
-							No upcoming events. Events will appear here when they&apos;re scheduled.
-						</p>
+					<div className="mt-4">
+						<EmptyState description="No upcoming events. Events will appear here when they're scheduled." />
 					</div>
 				) : (
 					<div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -171,26 +168,28 @@ export default function Dashboard() {
 				</div>
 
 				{groups.length === 0 ? (
-					<div className="mt-4 flex flex-col items-center rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">
-						<div className="text-3xl">🎭</div>
-						<h3 className="mt-3 text-base font-semibold text-slate-900">Create your first group</h3>
-						<p className="mt-1 max-w-sm text-sm text-slate-500">
-							Get your ensemble together by creating a group or joining one with an invite code.
-						</p>
-						<div className="mt-4 flex gap-3">
-							<Link
-								to="/groups/new"
-								className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
-							>
-								Create Group
-							</Link>
-							<Link
-								to="/groups/join"
-								className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-							>
-								Join Group
-							</Link>
-						</div>
+					<div className="mt-4">
+						<EmptyState
+							icon="🎭"
+							title="Create your first group"
+							description="Get your ensemble together by creating a group or joining one with an invite code."
+							actions={
+								<>
+									<Link
+										to="/groups/new"
+										className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+									>
+										Create Group
+									</Link>
+									<Link
+										to="/groups/join"
+										className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+									>
+										Join Group
+									</Link>
+								</>
+							}
+						/>
 					</div>
 				) : (
 					<div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

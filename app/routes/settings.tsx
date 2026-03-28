@@ -2,6 +2,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remi
 import { Form, Link, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
 import { AlertTriangle, Globe, Save, User } from "lucide-react";
 import { CsrfInput } from "~/components/csrf-input";
+import { DangerZone } from "~/components/danger-zone";
 import { COMMON_TIMEZONES, getTimezoneLabel } from "~/components/timezone-selector";
 import { isValidTimezone } from "~/lib/date-utils";
 import { requireUser, updateUserName, updateUserTimezone } from "~/services/auth.server";
@@ -172,26 +173,20 @@ export default function Settings() {
 			</div>
 
 			{/* Danger Zone */}
-			<div className="mt-6 rounded-xl border border-red-300 bg-white shadow-sm">
-				<div className="border-b border-red-200 px-6 py-4">
-					<h2 className="flex items-center gap-2 text-lg font-semibold text-red-600">
-						<AlertTriangle className="h-5 w-5" />
-						Danger Zone
-					</h2>
-				</div>
-				<div className="p-6">
-					<h3 className="text-sm font-semibold text-slate-900">Delete your account</h3>
-					<p className="mt-2 text-sm text-slate-600">
-						Permanently delete your account and all associated data. You will have 30 days to
-						reactivate your account by logging back in.
-					</p>
+			<div className="mt-6">
+				<DangerZone
+					variant="card"
+					icon={<AlertTriangle className="h-5 w-5" />}
+					subtitle="Delete your account"
+					description="Permanently delete your account and all associated data. You will have 30 days to reactivate your account by logging back in."
+				>
 					<Link
 						to="/settings/delete-account"
-						className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-700"
+						className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-700"
 					>
 						Delete Account
 					</Link>
-				</div>
+				</DangerZone>
 			</div>
 		</div>
 	);

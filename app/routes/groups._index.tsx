@@ -2,6 +2,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remi
 import { redirect } from "@remix-run/node";
 import { Form, Link, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
 import { CsrfInput } from "~/components/csrf-input";
+import { EmptyState } from "~/components/empty-state";
 import { requireUser } from "~/services/auth.server";
 import { validateCsrfToken } from "~/services/csrf.server";
 import { createGroup, getUserGroups, joinGroup } from "~/services/groups.server";
@@ -127,19 +128,20 @@ export default function Groups() {
 
 			{/* Groups Grid */}
 			{groups.length === 0 ? (
-				<div className="mt-8 flex flex-col items-center rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
-					<div className="text-4xl">🎭</div>
-					<h3 className="mt-4 text-lg font-semibold text-slate-900">No groups yet</h3>
-					<p className="mt-2 max-w-sm text-sm text-slate-500">
-						You&apos;re not in any groups yet. Create one or join with an invite code to get
-						started.
-					</p>
-					<Link
-						to="/groups/new"
-						className="mt-6 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
-					>
-						Create Your First Group
-					</Link>
+				<div className="mt-8">
+					<EmptyState
+						icon="🎭"
+						title="No groups yet"
+						description="You're not in any groups yet. Create one or join with an invite code to get started."
+						actions={
+							<Link
+								to="/groups/new"
+								className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+							>
+								Create Your First Group
+							</Link>
+						}
+					/>
 				</div>
 			) : (
 				<div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
