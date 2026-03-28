@@ -25,7 +25,7 @@ export function EventTypeSelector({
 	onChange?: (value: string) => void;
 }) {
 	return (
-		<div className="flex flex-wrap gap-3">
+		<div className="mt-2 flex flex-wrap gap-3">
 			{EVENT_TYPES.map((type) => (
 				<label key={type.value} className="cursor-pointer">
 					<input
