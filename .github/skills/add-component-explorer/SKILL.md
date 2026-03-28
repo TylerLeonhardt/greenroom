@@ -60,10 +60,34 @@ Create a configuration file at the project root:
 {
   "$schema": "./node_modules/@vscode/component-explorer-cli/dist/component-explorer-config.schema.json",
   "screenshotDir": ".screenshots",
+  "sessions": [{ "name": "current" }],
   "viteConfig": "./vite.config.ts",
   "redirection": { "port": 5337 }
 }
 ```
+
+**Important: `sessions` is required.** The daemon will crash on startup without at least one session entry. `{ "name": "current" }` uses the current working tree.
+
+### Remix Projects — Separate Vite Config
+
+If the project uses the Remix Vite plugin, the explorer daemon **must** use a separate Vite config that excludes the Remix plugin. The Remix plugin injects a preamble that fails when fixtures are rendered outside Remix routes, causing a silent "can't detect preamble" error.
+
+Create `vite.explorer.config.ts` with everything except the Remix plugin:
+
+```typescript
+import { componentExplorer } from '@vscode/component-explorer-vite-plugin';
+// ... other plugins (tailwind, etc.)
+
+export default defineConfig({
+  // Same resolve/alias config as main vite.config.ts
+  plugins: [
+    // All plugins EXCEPT the Remix plugin
+    componentExplorer({ include: './app/**/*.fixture.{ts,tsx}' }),
+  ],
+});
+```
+
+Then set `"viteConfig": "./vite.explorer.config.ts"` in component-explorer.json.
 
 ## Step 4: Configure VS Code — MCP Server
 
