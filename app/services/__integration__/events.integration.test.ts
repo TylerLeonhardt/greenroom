@@ -284,7 +284,7 @@ describe("events.server integration", () => {
 			expect(result?.assignments).toEqual([]);
 		});
 
-		it("sorts assignments by user name", async () => {
+		it("sorts assignments by user name within same status", async () => {
 			const admin = await createTestUser({ name: "Admin" });
 			const zara = await createTestUser({ name: "Zara" });
 			const alice = await createTestUser({ name: "Alice" });
@@ -299,6 +299,52 @@ describe("events.server integration", () => {
 			const result = await getEventWithAssignments(event.id);
 			expect(result?.assignments[0].userName).toBe("Alice");
 			expect(result?.assignments[1].userName).toBe("Zara");
+		});
+
+		it("sorts assignments by status priority: confirmed, pending, declined", async () => {
+			const admin = await createTestUser({ name: "Admin" });
+			const alice = await createTestUser({ name: "Alice" });
+			const bob = await createTestUser({ name: "Bob" });
+			const charlie = await createTestUser({ name: "Charlie" });
+			const group = await createTestGroup(admin.id);
+			await addGroupMember(group.id, alice.id);
+			await addGroupMember(group.id, bob.id);
+			await addGroupMember(group.id, charlie.id);
+
+			const event = await createTestEvent(group.id, admin.id);
+			await createTestAssignment(event.id, alice.id, { status: "declined" });
+			await createTestAssignment(event.id, bob.id, { status: "confirmed" });
+			await createTestAssignment(event.id, charlie.id, { status: "pending" });
+
+			const result = await getEventWithAssignments(event.id);
+			expect(result?.assignments.map((a) => a.userName)).toEqual([
+				"Bob", // confirmed
+				"Charlie", // pending
+				"Alice", // declined
+			]);
+		});
+
+		it("sorts alphabetically within each status group", async () => {
+			const admin = await createTestUser({ name: "Admin" });
+			const zara = await createTestUser({ name: "Zara" });
+			const alice = await createTestUser({ name: "Alice" });
+			const bob = await createTestUser({ name: "Bob" });
+			const group = await createTestGroup(admin.id);
+			await addGroupMember(group.id, zara.id);
+			await addGroupMember(group.id, alice.id);
+			await addGroupMember(group.id, bob.id);
+
+			const event = await createTestEvent(group.id, admin.id);
+			await createTestAssignment(event.id, zara.id, { status: "confirmed" });
+			await createTestAssignment(event.id, alice.id, { status: "confirmed" });
+			await createTestAssignment(event.id, bob.id, { status: "pending" });
+
+			const result = await getEventWithAssignments(event.id);
+			expect(result?.assignments.map((a) => `${a.userName}:${a.status}`)).toEqual([
+				"Alice:confirmed",
+				"Zara:confirmed",
+				"Bob:pending",
+			]);
 		});
 	});
 
