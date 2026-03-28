@@ -188,6 +188,27 @@ export const events = pgTable(
 	(table) => [index("events_group_start_time_idx").on(table.groupId, table.startTime)],
 );
 
+// RSVP Changes (activity feed for events)
+export const rsvpChanges = pgTable(
+	"rsvp_changes",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		eventId: uuid("event_id")
+			.notNull()
+			.references(() => events.id, { onDelete: "cascade" }),
+		userId: uuid("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		previousStatus: assignmentStatusEnum("previous_status"),
+		newStatus: assignmentStatusEnum("new_status").notNull(),
+		changedAt: timestamp("changed_at", { withTimezone: true }).defaultNow().notNull(),
+	},
+	(table) => [
+		index("rsvp_changes_event_id_idx").on(table.eventId),
+		index("rsvp_changes_event_changed_at_idx").on(table.eventId, table.changedAt),
+	],
+);
+
 // Event Assignments
 export const eventAssignments = pgTable(
 	"event_assignments",

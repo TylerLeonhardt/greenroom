@@ -30,6 +30,7 @@ vi.mock("~/services/groups.server", () => ({
 vi.mock("~/services/events.server", () => ({
 	getEventWithAssignments: vi.fn(),
 	getGroupEventSummaries: vi.fn().mockResolvedValue([]),
+	getEventActivityFeed: vi.fn().mockResolvedValue([]),
 	assignToEvent: vi.fn(),
 	updateAssignmentStatus: vi.fn(),
 	updateAssignmentRole: vi.fn(),
@@ -38,6 +39,7 @@ vi.mock("~/services/events.server", () => ({
 	deleteEvent: vi.fn(),
 	getAvailabilityRequestGroupId: vi.fn(),
 	getAvailabilityForEventDate: vi.fn(),
+	recordRsvpChange: vi.fn(),
 }));
 
 // Mock CSRF validation — allow all by default

@@ -1,4 +1,4 @@
-import { and, eq, gte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, or, sql } from "drizzle-orm";
 import { db } from "../../src/db/index.js";
 import {
 	availabilityRequests,
@@ -7,6 +7,7 @@ import {
 	events,
 	groupMemberships,
 	groups,
+	rsvpChanges,
 	users,
 } from "../../src/db/schema.js";
 import { localTimeToUTC } from "../lib/date-utils.js";
@@ -468,4 +469,60 @@ export async function getAvailabilityForEventDate(
 			status: resp[date] ?? "no_response",
 		};
 	});
+}
+
+// --- RSVP Change Feed ---
+
+/** Record an RSVP status change for the activity feed. */
+export async function recordRsvpChange(
+	eventId: string,
+	userId: string,
+	previousStatus: "pending" | "confirmed" | "declined" | null,
+	newStatus: "pending" | "confirmed" | "declined",
+): Promise<void> {
+	await db.insert(rsvpChanges).values({
+		eventId,
+		userId,
+		previousStatus,
+		newStatus,
+	});
+}
+
+/** Fetch the RSVP activity feed for an event, most recent first. */
+export async function getEventActivityFeed(
+	eventId: string,
+	limit = 50,
+): Promise<
+	Array<{
+		id: string;
+		userId: string;
+		userName: string;
+		previousStatus: "pending" | "confirmed" | "declined" | null;
+		newStatus: "pending" | "confirmed" | "declined";
+		changedAt: Date;
+	}>
+> {
+	const rows = await db
+		.select({
+			id: rsvpChanges.id,
+			userId: rsvpChanges.userId,
+			userName: users.name,
+			previousStatus: rsvpChanges.previousStatus,
+			newStatus: rsvpChanges.newStatus,
+			changedAt: rsvpChanges.changedAt,
+		})
+		.from(rsvpChanges)
+		.innerJoin(users, eq(rsvpChanges.userId, users.id))
+		.where(eq(rsvpChanges.eventId, eventId))
+		.orderBy(desc(rsvpChanges.changedAt))
+		.limit(limit);
+
+	return rows as Array<{
+		id: string;
+		userId: string;
+		userName: string;
+		previousStatus: "pending" | "confirmed" | "declined" | null;
+		newStatus: "pending" | "confirmed" | "declined";
+		changedAt: Date;
+	}>;
 }

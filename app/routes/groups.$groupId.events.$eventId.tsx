@@ -26,6 +26,7 @@ import {
 	X,
 } from "lucide-react";
 import { useState } from "react";
+import { ActivityFeed } from "~/components/activity-feed";
 import { CsrfInput } from "~/components/csrf-input";
 import { EventDateCarousel } from "~/components/event-date-carousel";
 import { formatDateLong, formatEventTime, formatTime, utcToLocalParts } from "~/lib/date-utils";
@@ -40,8 +41,10 @@ import {
 	deleteEvent,
 	getAvailabilityForEventDate,
 	getAvailabilityRequestGroupId,
+	getEventActivityFeed,
 	getEventWithAssignments,
 	getGroupEventSummaries,
+	recordRsvpChange,
 	removeAssignment,
 	updateAssignmentRole,
 	updateAssignmentStatus,
@@ -96,6 +99,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 		}
 	}
 
+	const activityFeed = await getEventActivityFeed(eventId);
+
 	return {
 		event: data.event,
 		assignments: data.assignments,
@@ -104,6 +109,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 		members,
 		availabilityData,
 		siblingEvents,
+		activityFeed,
 	};
 }
 
@@ -123,21 +129,39 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	const intent = formData.get("intent");
 
 	if (intent === "confirm" || intent === "decline") {
-		await updateAssignmentStatus(eventId, user.id, intent === "confirm" ? "confirmed" : "declined");
+		const newStatus = intent === "confirm" ? "confirmed" : "declined";
+		const currentAssignment = eventData.assignments.find((a) => a.userId === user.id);
+		const previousStatus = currentAssignment?.status ?? null;
+		if (previousStatus !== newStatus) {
+			await updateAssignmentStatus(eventId, user.id, newStatus);
+			await recordRsvpChange(eventId, user.id, previousStatus, newStatus);
+		}
 		return { success: true };
 	}
 
 	if (intent === "attend") {
 		// Self-register as viewer
+		const existingAssignment = eventData.assignments.find((a) => a.userId === user.id);
+		const previousStatus = existingAssignment?.status ?? null;
+		if (previousStatus === "confirmed") {
+			return { success: true };
+		}
 		await assignToEvent(eventId, user.id, "Viewer");
 		await updateAssignmentStatus(eventId, user.id, "confirmed");
+		await recordRsvpChange(eventId, user.id, previousStatus, "confirmed");
 		return { success: true };
 	}
 
 	if (intent === "decline-attendance") {
 		// Self-register as viewer with declined status
+		const existingAssignment = eventData.assignments.find((a) => a.userId === user.id);
+		const previousStatus = existingAssignment?.status ?? null;
+		if (previousStatus === "declined") {
+			return { success: true };
+		}
 		await assignToEvent(eventId, user.id, "Viewer");
 		await updateAssignmentStatus(eventId, user.id, "declined");
+		await recordRsvpChange(eventId, user.id, previousStatus, "declined");
 		return { success: true };
 	}
 
@@ -295,8 +319,16 @@ const STATUS_CONFIG: Record<string, { label: string; badgeClass: string }> = {
 };
 
 export default function EventDetail() {
-	const { event, assignments, isAdmin, userId, members, availabilityData, siblingEvents } =
-		useLoaderData<typeof loader>();
+	const {
+		event,
+		assignments,
+		isAdmin,
+		userId,
+		members,
+		availabilityData,
+		siblingEvents,
+		activityFeed,
+	} = useLoaderData<typeof loader>();
 	const { groupId } = useParams();
 	const parentData = useRouteLoaderData<typeof groupLayoutLoader>("routes/groups.$groupId");
 	const timezone = parentData?.user?.timezone ?? undefined;
@@ -1241,6 +1273,9 @@ export default function EventDetail() {
 					</div>
 				</div>
 			</div>
+
+			{/* Activity Feed */}
+			<ActivityFeed entries={activityFeed} timezone={timezone} />
 
 			{/* Danger Zone — visible to admin or event creator */}
 			{canDelete && (
