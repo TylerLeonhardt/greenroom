@@ -187,7 +187,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		const appUrl = process.env.APP_URL || "https://mycalltime.app";
 		const requestUrl = `${appUrl}/groups/${groupId}/availability/${requestId}`;
 		const preferencesUrl = `${appUrl}/groups/${groupId}/notifications`;
-		const dateRange = `${formatDateMedium(availRequest.dateRangeStart as unknown as string)} – ${formatDateMedium(availRequest.dateRangeEnd as unknown as string)}`;
+		const startFormatted = formatDateMedium(availRequest.dateRangeStart as unknown as string);
+		const endFormatted = formatDateMedium(availRequest.dateRangeEnd as unknown as string);
+		const dateRange =
+			startFormatted === endFormatted ? startFormatted : `${startFormatted} – ${endFormatted}`;
 		const expiresAt = availRequest.expiresAt
 			? formatDateMedium(availRequest.expiresAt as unknown as string)
 			: null;
@@ -284,8 +287,17 @@ export default function AvailabilityRequestDetail() {
 						)}
 						<div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-slate-500">
 							<span>
-								{formatDateMedium(availRequest.dateRangeStart as unknown as string, timezone)} –{" "}
-								{formatDateMedium(availRequest.dateRangeEnd as unknown as string, timezone)}
+								{(() => {
+									const start = formatDateMedium(
+										availRequest.dateRangeStart as unknown as string,
+										timezone,
+									);
+									const end = formatDateMedium(
+										availRequest.dateRangeEnd as unknown as string,
+										timezone,
+									);
+									return start === end ? start : `${start} – ${end}`;
+								})()}
 							</span>
 							{(availRequest.requestedStartTime || availRequest.requestedEndTime) && (
 								<span className="inline-flex items-center gap-1">

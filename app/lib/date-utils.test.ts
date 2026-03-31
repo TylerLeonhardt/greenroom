@@ -117,12 +117,39 @@ describe("date-utils", () => {
 			const result = formatDateLong(testDate, "UTC");
 			expect(result).toBe("Wednesday, March 4, 2026");
 		});
+
+		it("formats event start times correctly in the user's timezone", () => {
+			// Event at 8 PM LA (April 12) = 3 AM UTC (April 13)
+			// formatDateLong must show the correct LOCAL date, not the UTC date
+			const eveningLA = new Date("2026-04-13T03:00:00.000Z");
+			expect(formatDateLong(eveningLA, "America/Los_Angeles")).toBe("Sunday, April 12, 2026");
+		});
 	});
 
 	describe("formatDateMedium", () => {
 		it("formats with full month, day, and year", () => {
 			const result = formatDateMedium(testDate, "UTC");
 			expect(result).toBe("March 4, 2026");
+		});
+
+		it("does not shift date for midnight-UTC timestamps in western timezones", () => {
+			// Core bug fix: midnight UTC formatted in America/Los_Angeles would show previous day
+			const midnightUTC = new Date("2026-04-12T00:00:00.000Z");
+			expect(formatDateMedium(midnightUTC, "America/Los_Angeles")).toBe("April 12, 2026");
+			expect(formatDateMedium(midnightUTC, "America/New_York")).toBe("April 12, 2026");
+		});
+
+		it("does not shift date for midnight-UTC timestamps in eastern timezones", () => {
+			// Asia/Tokyo is UTC+9 — noon UTC is 9 PM same day, so no shift
+			const midnightUTC = new Date("2026-04-12T00:00:00.000Z");
+			expect(formatDateMedium(midnightUTC, "Asia/Tokyo")).toBe("April 12, 2026");
+			expect(formatDateMedium(midnightUTC, "Europe/London")).toBe("April 12, 2026");
+		});
+
+		it("handles string input with midnight-UTC timestamp", () => {
+			expect(formatDateMedium("2026-04-12T00:00:00.000Z", "America/Los_Angeles")).toBe(
+				"April 12, 2026",
+			);
 		});
 	});
 
