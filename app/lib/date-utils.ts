@@ -175,8 +175,22 @@ export function formatDateDisplay(
 }
 
 /**
+ * Anchor a Date to noon UTC on the same calendar day.
+ * Prevents timezone-induced date shifts when formatting date-only values
+ * stored as midnight-UTC timestamps (e.g., "2026-04-12T00:00:00.000Z").
+ * With noon UTC, even the furthest-behind timezone (UTC-12) stays on the same day.
+ */
+function anchorToNoonUTC(date: Date): Date {
+	return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 12, 0, 0));
+}
+
+/**
  * Format a date with full details for display:
  * "Wednesday, March 4, 2026"
+ *
+ * NOTE: This does NOT apply noon-UTC anchoring because it's used for real
+ * datetime values (e.g., event.startTime) where timezone-correct display matters.
+ * For date-only values (midnight-UTC timestamps), use formatDateMedium instead.
  */
 export function formatDateLong(date: string | Date, timezone?: string): string {
 	const tz = sanitizeTimezone(timezone);
@@ -197,7 +211,8 @@ export function formatDateLong(date: string | Date, timezone?: string): string {
 export function formatDateMedium(date: string | Date, timezone?: string): string {
 	const tz = sanitizeTimezone(timezone);
 	const d = typeof date === "string" ? new Date(date) : date;
-	return d.toLocaleDateString("en-US", {
+	const anchored = anchorToNoonUTC(d);
+	return anchored.toLocaleDateString("en-US", {
 		month: "long",
 		day: "numeric",
 		year: "numeric",
