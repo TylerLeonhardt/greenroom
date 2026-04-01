@@ -56,6 +56,22 @@ const statusLabel: Record<string, string> = {
 	not_available: "Unavailable",
 };
 
+const statusSortOrder: Record<string, number> = {
+	available: 0,
+	maybe: 1,
+	not_available: 2,
+};
+
+function sortRespondentsByResponse(
+	respondents: Array<{ name: string; status: string }>,
+): Array<{ name: string; status: string }> {
+	return [...respondents].sort((a, b) => {
+		const statusDiff = (statusSortOrder[a.status] ?? 3) - (statusSortOrder[b.status] ?? 3);
+		if (statusDiff !== 0) return statusDiff;
+		return a.name.localeCompare(b.name);
+	});
+}
+
 export function ResultsHeatmap({
 	dates,
 	totalMembers,
@@ -352,7 +368,7 @@ export function ResultsHeatmap({
 												<td colSpan={batchSelecting ? 10 : 9} className="bg-slate-50 px-8 py-4">
 													<div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
 														{row.respondents.length > 0 ? (
-															row.respondents.map((r) => (
+															sortRespondentsByResponse(row.respondents).map((r) => (
 																<div key={r.name} className="flex items-center gap-2 text-sm">
 																	{statusIcon[r.status]}
 																	<span className="text-slate-700">{r.name}</span>
@@ -477,7 +493,7 @@ export function ResultsHeatmap({
 								<div className="border-t border-slate-200 bg-white p-4">
 									<div className="space-y-2">
 										{row.respondents.length > 0 ? (
-											row.respondents.map((r) => (
+											sortRespondentsByResponse(row.respondents).map((r) => (
 												<div key={r.name} className="flex items-center gap-2 text-sm">
 													{statusIcon[r.status]}
 													<span className="text-slate-700">{r.name}</span>

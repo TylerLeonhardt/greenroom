@@ -481,4 +481,74 @@ describe("ResultsHeatmap", () => {
 			]);
 		});
 	});
+
+	describe("respondent sorting", () => {
+		function makeRespondentTestDate(): DateResult {
+			return makeDateResult({
+				date: "2025-03-15",
+				score: 7,
+				available: 2,
+				maybe: 2,
+				notAvailable: 1,
+				respondents: [
+					{ name: "Alice", status: "maybe" },
+					{ name: "Bob", status: "available" },
+					{ name: "Carol", status: "not_available" },
+					{ name: "Dave", status: "available" },
+					{ name: "Eve", status: "maybe" },
+				],
+			});
+		}
+
+		it("always sorts respondents by response status (yes → maybe → no)", async () => {
+			const user = userEvent.setup();
+			const dates = [makeRespondentTestDate()];
+			const { container } = render(<ResultsHeatmap dates={dates} {...defaultProps} />);
+			const desktop = getDesktopTable(container);
+
+			// Expand the date row
+			const caretCells =
+				desktop.el.querySelectorAll<HTMLTableCellElement>("tbody tr td:first-child");
+			await user.click(caretCells[0]);
+
+			// Expected order: available (Bob, Dave), maybe (Alice, Eve), not_available (Carol)
+			const names = desktop.el.querySelectorAll<HTMLElement>(".bg-slate-50 .text-slate-700");
+			const nameTexts = Array.from(names).map((el) => el.textContent);
+			expect(nameTexts).toEqual(["Bob", "Dave", "Alice", "Eve", "Carol"]);
+		});
+
+		it("maintains alphabetical order within each status group", async () => {
+			const user = userEvent.setup();
+			const dates = [
+				makeDateResult({
+					date: "2025-03-15",
+					score: 7,
+					respondents: [
+						{ name: "Zara", status: "available" },
+						{ name: "Anna", status: "available" },
+						{ name: "Mike", status: "maybe" },
+						{ name: "Beth", status: "maybe" },
+					],
+				}),
+			];
+			const { container } = render(<ResultsHeatmap dates={dates} {...defaultProps} />);
+			const desktop = getDesktopTable(container);
+
+			const caretCells =
+				desktop.el.querySelectorAll<HTMLTableCellElement>("tbody tr td:first-child");
+			await user.click(caretCells[0]);
+
+			const names = desktop.el.querySelectorAll<HTMLElement>(".bg-slate-50 .text-slate-700");
+			const nameTexts = Array.from(names).map((el) => el.textContent);
+			// Available: Anna, Zara (alpha) then Maybe: Beth, Mike (alpha)
+			expect(nameTexts).toEqual(["Anna", "Zara", "Beth", "Mike"]);
+		});
+
+		it("does not render a respondent sort toggle", () => {
+			const dates = [makeRespondentTestDate()];
+			render(<ResultsHeatmap dates={dates} {...defaultProps} />);
+			expect(screen.queryByText("Respondents:")).toBeNull();
+			expect(screen.queryByText("Response")).toBeNull();
+		});
+	});
 });
