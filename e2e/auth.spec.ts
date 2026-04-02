@@ -107,9 +107,12 @@ test.describe("Landing Page", () => {
 test.describe("Landing Page (authenticated)", () => {
 	test.use({ storageState: ADMIN_STATE });
 
-	test("redirects to dashboard if already logged in", async ({ page }) => {
+	test("shows dashboard link when already logged in", async ({ page }) => {
 		await page.goto("/");
 
+		// Landing page renders a "Go to Dashboard" link for authenticated users
+		// (no server-side redirect — the page is public with conditional content)
+		await page.getByRole("link", { name: /go to dashboard/i }).click();
 		await expect(page).toHaveURL(/\/dashboard/);
 	});
 });
