@@ -210,7 +210,7 @@ export default function Events() {
 						{calendarSelectedDate ? (
 							<div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
 								<h3 className="mb-3 text-sm font-semibold text-slate-900">
-									{formatDateLong(`${calendarSelectedDate}T00:00:00`, timezone)}
+									{formatDateLong(`${calendarSelectedDate}T12:00:00Z`, timezone)}
 								</h3>
 								{calendarDateEvents.length > 0 ? (
 									<div className="space-y-3">

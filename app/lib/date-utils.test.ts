@@ -13,6 +13,7 @@ import {
 	getTimezoneAbbreviation,
 	isValidTimezone,
 	localTimeToUTC,
+	parseDateOnly,
 	sanitizeTimezone,
 	utcToLocalParts,
 } from "./date-utils";
@@ -83,6 +84,28 @@ describe("date-utils", () => {
 		it("accepts string input", () => {
 			const result = formatDateRange("2026-03-01T00:00:00Z", "2026-03-28T00:00:00Z", "UTC");
 			expect(result).toBe("Mar 1 – Mar 28, 2026");
+		});
+
+		it("does not shift dates for midnight-UTC timestamps in Western timezones", () => {
+			// This is the core off-by-one bug: midnight UTC formatted in PDT shows previous day
+			const start = new Date("2026-04-12T00:00:00Z");
+			const end = new Date("2026-04-12T00:00:00Z");
+			expect(formatDateRange(start, end, "America/Los_Angeles")).toBe("Apr 12 – Apr 12, 2026");
+		});
+
+		it("does not shift dates for midnight-UTC timestamps in multiple timezones", () => {
+			const start = "2026-04-01T00:00:00.000Z";
+			const end = "2026-04-30T00:00:00.000Z";
+			expect(formatDateRange(start, end, "America/Los_Angeles")).toBe("Apr 1 – Apr 30, 2026");
+			expect(formatDateRange(start, end, "America/New_York")).toBe("Apr 1 – Apr 30, 2026");
+			expect(formatDateRange(start, end, "Asia/Tokyo")).toBe("Apr 1 – Apr 30, 2026");
+			expect(formatDateRange(start, end, "Europe/London")).toBe("Apr 1 – Apr 30, 2026");
+		});
+
+		it("handles YYYY-MM-DD string input without time component", () => {
+			expect(formatDateRange("2026-04-12", "2026-04-12", "America/Los_Angeles")).toBe(
+				"Apr 12 – Apr 12, 2026",
+			);
 		});
 	});
 
@@ -157,6 +180,57 @@ describe("date-utils", () => {
 		it("formats with short weekday, month, and day", () => {
 			const result = formatDateShort(testDate, "UTC");
 			expect(result).toBe("Wed, Mar 4");
+		});
+
+		it("shows correct date with noon-UTC anchored input", () => {
+			// When callers use T12:00:00Z, the date must be correct in all timezones
+			expect(formatDateShort("2026-04-12T12:00:00Z", "America/Los_Angeles")).toBe("Sun, Apr 12");
+			expect(formatDateShort("2026-04-12T12:00:00Z", "America/New_York")).toBe("Sun, Apr 12");
+			expect(formatDateShort("2026-04-12T12:00:00Z", "Asia/Tokyo")).toBe("Sun, Apr 12");
+			expect(formatDateShort("2026-04-12T12:00:00Z", "UTC")).toBe("Sun, Apr 12");
+		});
+	});
+
+	describe("parseDateOnly", () => {
+		it("anchors YYYY-MM-DD strings to noon UTC", () => {
+			const result = parseDateOnly("2026-04-12");
+			expect(result.getUTCHours()).toBe(12);
+			expect(result.getUTCMinutes()).toBe(0);
+			expect(result.getUTCDate()).toBe(12);
+			expect(result.getUTCMonth()).toBe(3); // April = 3
+		});
+
+		it("anchors midnight-UTC ISO strings to noon UTC", () => {
+			const result = parseDateOnly("2026-04-12T00:00:00.000Z");
+			expect(result.getUTCHours()).toBe(12);
+			expect(result.getUTCDate()).toBe(12);
+		});
+
+		it("anchors midnight-UTC Date objects to noon UTC", () => {
+			const midnightUTC = new Date("2026-04-12T00:00:00.000Z");
+			const result = parseDateOnly(midnightUTC);
+			expect(result.getUTCHours()).toBe(12);
+			expect(result.getUTCDate()).toBe(12);
+		});
+
+		it("produces correct date in Western timezones", () => {
+			const result = parseDateOnly("2026-04-12T00:00:00.000Z");
+			const formatted = result.toLocaleDateString("en-US", {
+				month: "long",
+				day: "numeric",
+				timeZone: "America/Los_Angeles",
+			});
+			expect(formatted).toBe("April 12");
+		});
+
+		it("produces correct date in Eastern timezones", () => {
+			const result = parseDateOnly("2026-04-12T00:00:00.000Z");
+			const formatted = result.toLocaleDateString("en-US", {
+				month: "long",
+				day: "numeric",
+				timeZone: "Asia/Tokyo",
+			});
+			expect(formatted).toBe("April 12");
 		});
 	});
 

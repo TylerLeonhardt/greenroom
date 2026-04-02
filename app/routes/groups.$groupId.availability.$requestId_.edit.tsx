@@ -288,7 +288,7 @@ export default function EditAvailabilityRequest() {
 							{selectedDates.length} date{selectedDates.length !== 1 ? "s" : ""} selected:{" "}
 							{[...selectedDates]
 								.sort()
-								.map((d) => formatDateShort(d + "T00:00:00"))
+								.map((d) => formatDateShort(`${d}T12:00:00Z`))
 								.join(", ")}
 						</p>
 					)}
