@@ -127,10 +127,17 @@ export function formatDateRange(
 	const sYear = s.toLocaleDateString("en-US", { year: "numeric", timeZone: tz });
 	const eYear = e.toLocaleDateString("en-US", { year: "numeric", timeZone: tz });
 
+	const sFormatted = s.toLocaleDateString("en-US", opts);
+	const eFormatted = e.toLocaleDateString("en-US", opts);
+	const eFormattedWithYear = e.toLocaleDateString("en-US", yearOpts);
+
 	if (sYear === eYear) {
-		return `${s.toLocaleDateString("en-US", opts)} – ${e.toLocaleDateString("en-US", yearOpts)}`;
+		if (sFormatted === eFormatted) {
+			return eFormattedWithYear;
+		}
+		return `${sFormatted} – ${eFormattedWithYear}`;
 	}
-	return `${s.toLocaleDateString("en-US", yearOpts)} – ${e.toLocaleDateString("en-US", yearOpts)}`;
+	return `${s.toLocaleDateString("en-US", yearOpts)} – ${eFormattedWithYear}`;
 }
 
 /**

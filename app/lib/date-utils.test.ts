@@ -90,7 +90,7 @@ describe("date-utils", () => {
 			// This is the core off-by-one bug: midnight UTC formatted in PDT shows previous day
 			const start = new Date("2026-04-12T00:00:00Z");
 			const end = new Date("2026-04-12T00:00:00Z");
-			expect(formatDateRange(start, end, "America/Los_Angeles")).toBe("Apr 12 – Apr 12, 2026");
+			expect(formatDateRange(start, end, "America/Los_Angeles")).toBe("Apr 12, 2026");
 		});
 
 		it("does not shift dates for midnight-UTC timestamps in multiple timezones", () => {
@@ -104,8 +104,17 @@ describe("date-utils", () => {
 
 		it("handles YYYY-MM-DD string input without time component", () => {
 			expect(formatDateRange("2026-04-12", "2026-04-12", "America/Los_Angeles")).toBe(
-				"Apr 12 – Apr 12, 2026",
+				"Apr 12, 2026",
 			);
+		});
+
+		it("collapses same-date range to a single date", () => {
+			expect(formatDateRange("2026-04-12", "2026-04-12", "UTC")).toBe("Apr 12, 2026");
+			expect(formatDateRange("2026-01-01", "2026-01-01", "America/New_York")).toBe("Jan 1, 2026");
+			// Different time components but same calendar date should still collapse
+			expect(
+				formatDateRange(new Date("2026-06-15T03:00:00Z"), new Date("2026-06-15T20:00:00Z"), "UTC"),
+			).toBe("Jun 15, 2026");
 		});
 	});
 
