@@ -54,5 +54,11 @@ export async function renderFixture(
 		return await window.__componentExplorer__.renderFixture(id);
 	}, fixtureId);
 
+	if (report.hasError) {
+		throw new Error(
+			`Fixture "${fixtureId}" failed to render. Events: ${JSON.stringify(report.events)}`,
+		);
+	}
+
 	return report;
 }
