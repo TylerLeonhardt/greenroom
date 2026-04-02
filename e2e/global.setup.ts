@@ -18,6 +18,9 @@ setup("seed and authenticate", async ({ page }) => {
 	const data = await seedTestData("e2e");
 	const solo = await seedStandaloneUser("e2e");
 
+	// Ensure auth directory exists (gitignored — absent on fresh clones and CI)
+	fs.mkdirSync("e2e/.auth", { recursive: true });
+
 	// Save test data so spec files can access group IDs, names, etc.
 	fs.writeFileSync(
 		TEST_DATA_PATH,

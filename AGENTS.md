@@ -420,7 +420,10 @@ Before committing:
 2. `pnpm run lint` — Biome linter passes
 3. `pnpm run build` — Production build succeeds
 
-CI runs on every push/PR to `master`: typecheck → lint → build → test
+CI runs on every push/PR to `master` with three parallel jobs:
+- **check** — typecheck → lint → build → vitest (unit tests)
+- **playwright-explorer** — Component explorer Playwright tests (172 tests, no DB needed). Uses `playwright.explorer.config.ts` which only starts the explorer Vite server.
+- **playwright-e2e** — App E2E Playwright tests (119 tests) with PostgreSQL 16 service container. Runs DB migrations, seeds test data, tests across Desktop Chrome, Mobile Safari, and Mobile Chrome.
 
 ### Code Style
 
@@ -456,7 +459,7 @@ CI runs on every push/PR to `master`: typecheck → lint → build → test
 - **Container:** Node.js 20 slim, multi-stage Docker build (deps → build → runtime)
 - **Migrations:** Auto-run on container startup via `scripts/migrate.mjs` (uses `drizzle-orm/node-postgres/migrator`, not drizzle-kit). Idempotent — safe with multiple replicas. Fails fast if migration fails (prevents app from starting with broken schema).
 - **CI/CD:** GitHub Actions
-  - `ci.yml` — typecheck + lint + build + test on push/PR to `master`
+  - `ci.yml` — Three parallel jobs: check (typecheck + lint + build + vitest), playwright-explorer (component tests), playwright-e2e (app E2E with PostgreSQL)
   - `deploy.yml` — Docker build → Azure Container Registry → Azure Container Apps on push to `master`
 - **Database:** Azure PostgreSQL (SSL in production, verified against DigiCert Global Root G2 CA cert in `certs/`)
 

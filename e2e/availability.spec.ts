@@ -40,8 +40,10 @@ test.describe("Respond to Availability Request", () => {
 		// This works around a Remix SSR hydration timing issue in headless Chromium
 		// where React's onClick handlers aren't attached to the availability grid buttons
 		const url = `/groups/${td.group.id}/availability/${td.availabilityRequest.id}`;
+		const csrfToken = await page.locator('input[name="_csrf"]').first().inputValue();
 		const resp = await page.request.post(url, {
 			form: {
+				_csrf: csrfToken,
 				intent: "respond",
 				responses: JSON.stringify(responses),
 			},
