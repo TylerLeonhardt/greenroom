@@ -677,7 +677,7 @@ function ConfigureStep({
 					{/* Per-date inputs */}
 					<div className="mt-4 space-y-3">
 						{selectedDates.map((date) => {
-							const { dayOfWeek, display } = formatDateDisplay(date);
+							const { dayOfWeek, display } = formatDateDisplay(date, timezone ?? undefined);
 							return (
 								<div key={date} className="flex items-center gap-3">
 									<div className="w-28 shrink-0">

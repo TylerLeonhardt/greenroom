@@ -134,7 +134,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 				}));
 			if (recipients.length === 0) return;
 
-			const dateRange = `${formatDateShort(`${dateRangeStart}T00:00:00`)} – ${formatDateShort(`${dateRangeEnd}T00:00:00`)}`;
+			const dateRange = `${formatDateShort(`${dateRangeStart}T12:00:00Z`)} – ${formatDateShort(`${dateRangeEnd}T12:00:00Z`)}`;
 			const timeRangeStr = formatTimeRange(startTimeVal, endTimeVal);
 			const dateRangeDisplay =
 				timeRangeStr !== "All day" ? `${dateRange} · ${timeRangeStr}` : dateRange;
@@ -449,7 +449,7 @@ export default function NewAvailabilityRequest() {
 									key={d}
 									className="rounded-md bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-800"
 								>
-									{formatDateShort(`${d}T00:00:00`)}
+									{formatDateShort(`${d}T12:00:00Z`)}
 								</span>
 							))}
 						</div>

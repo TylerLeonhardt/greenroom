@@ -110,8 +110,10 @@ export function formatDateRange(
 	timezone?: string,
 ): string {
 	const tz = sanitizeTimezone(timezone);
-	const s = typeof start === "string" ? new Date(start) : start;
-	const e = typeof end === "string" ? new Date(end) : end;
+	// Anchor to noon UTC — date ranges always represent date-only values
+	// (availability request date ranges, etc.) and must not shift days
+	const s = anchorToNoonUTC(typeof start === "string" ? new Date(start) : start);
+	const e = anchorToNoonUTC(typeof end === "string" ? new Date(end) : end);
 	const opts: Intl.DateTimeFormatOptions = {
 		month: "short",
 		day: "numeric",
@@ -182,6 +184,29 @@ export function formatDateDisplay(
  */
 function anchorToNoonUTC(date: Date): Date {
 	return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 12, 0, 0));
+}
+
+/**
+ * Parse a date-only value safely, anchoring to noon UTC to prevent
+ * timezone-induced date shifts.
+ *
+ * Use this for database values that represent calendar dates (not specific
+ * times of day) — e.g., `dateRangeStart`, `dateRangeEnd`, `expiresAt`.
+ * These are stored as midnight UTC and would roll back to the previous day
+ * when formatted in Western timezones.
+ *
+ * - "YYYY-MM-DD" strings → noon UTC on that date
+ * - Midnight-UTC timestamps → noon UTC on the same calendar day
+ * - Date objects → noon UTC on the same calendar day
+ */
+export function parseDateOnly(date: string | Date): Date {
+	if (typeof date === "string") {
+		if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+			return new Date(`${date}T12:00:00Z`);
+		}
+		return anchorToNoonUTC(new Date(date));
+	}
+	return anchorToNoonUTC(date);
 }
 
 /**

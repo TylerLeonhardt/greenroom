@@ -3,7 +3,7 @@ import { Link, useLoaderData } from "@remix-run/react";
 import { AlertCircle, CalendarDays, Clock, Plus, Users } from "lucide-react";
 import { EmptyState } from "~/components/empty-state";
 import { EventCard } from "~/components/event-card";
-import { formatDateShort } from "~/lib/date-utils";
+import { formatDateShort, parseDateOnly } from "~/lib/date-utils";
 import { requireUser } from "~/services/auth.server";
 import { getDashboardData } from "~/services/dashboard.server";
 
@@ -57,7 +57,11 @@ export default function Dashboard() {
 												<span>·</span>
 												<span className="flex items-center gap-1 text-amber-600">
 													<Clock className="h-3 w-3" />
-													Due {formatDateShort(req.expiresAt, user.timezone ?? undefined)}
+													Due{" "}
+													{formatDateShort(
+														parseDateOnly(req.expiresAt),
+														user.timezone ?? undefined,
+													)}
 												</span>
 											</>
 										)}
