@@ -14,7 +14,7 @@ export default defineConfig({
 	forbidOnly: !!process.env.CI,
 	retries: process.env.CI ? 2 : 1,
 	workers: process.env.CI ? 1 : undefined,
-	reporter: process.env.CI ? "github" : "html",
+	reporter: process.env.CI ? [["github"], ["html"]] : "html",
 	use: {
 		baseURL: process.env.E2E_BASE_URL || `http://localhost:${APP_PORT}`,
 		screenshot: "only-on-failure",

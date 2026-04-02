@@ -12,8 +12,26 @@ export interface SharedTestData {
 	availabilityRequest: { id: string; title: string; dates: string[] };
 }
 
-/** Loads test data saved by global.setup.ts */
+/**
+ * Loads test data saved by global.setup.ts.
+ *
+ * Returns empty placeholders when the file doesn't exist yet. This happens
+ * during Playwright's test-collection phase which evaluates all spec files
+ * at module scope *before* the setup project runs. Worker processes
+ * re-evaluate the files after setup completes, at which point the real
+ * data is available.
+ */
 export function loadTestData(): SharedTestData {
-	const raw = fs.readFileSync("e2e/.auth/test-data.json", "utf-8");
+	const path = "e2e/.auth/test-data.json";
+	if (!fs.existsSync(path)) {
+		return {
+			admin: { id: "", email: "", name: "" },
+			member: { id: "", email: "", name: "" },
+			solo: { id: "", email: "", name: "" },
+			group: { id: "", name: "", inviteCode: "" },
+			availabilityRequest: { id: "", title: "", dates: [] },
+		};
+	}
+	const raw = fs.readFileSync(path, "utf-8");
 	return JSON.parse(raw);
 }
