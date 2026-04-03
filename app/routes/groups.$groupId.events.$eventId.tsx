@@ -29,7 +29,8 @@ import { ActivityFeed } from "~/components/activity-feed";
 import { CsrfInput } from "~/components/csrf-input";
 import { DangerZone } from "~/components/danger-zone";
 import { EventDateCarousel } from "~/components/event-date-carousel";
-import { RoleBadge, RoleSelector } from "~/components/role-selector";
+import { ParticipantMenu } from "~/components/participant-menu";
+import { RoleBadge } from "~/components/role-selector";
 import { UserChipSelector } from "~/components/user-chip-selector";
 import { formatDateLong, formatEventTime, formatTime, utcToLocalParts } from "~/lib/date-utils";
 import { validateCsrfToken } from "~/services/csrf.server";
@@ -535,19 +536,7 @@ export default function EventDetail() {
 										const statusCfg = STATUS_CONFIG[a.status] ?? STATUS_CONFIG.pending;
 										return (
 											<li key={a.userId} className="flex items-center justify-between px-6 py-3">
-												<div className="flex items-center gap-2">
-													<span className="text-sm font-medium text-slate-900">{a.userName}</span>
-													{isAdmin ? (
-														<RoleSelector
-															userId={a.userId}
-															currentRole={a.role}
-															isShow={isShow}
-															notifyOnRoleChange={notifyOnRoleChange}
-														/>
-													) : (
-														<RoleBadge role={a.role} />
-													)}
-												</div>
+												<span className="text-sm font-medium text-slate-900">{a.userName}</span>
 												<div className="flex items-center gap-2">
 													<span
 														className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${statusCfg.badgeClass}`}
@@ -555,18 +544,12 @@ export default function EventDetail() {
 														{statusCfg.label}
 													</span>
 													{isAdmin && (
-														<Form method="post">
-															<CsrfInput />
-															<input type="hidden" name="intent" value="remove-assignment" />
-															<input type="hidden" name="userId" value={a.userId} />
-															<button
-																type="submit"
-																className="text-slate-400 transition-colors hover:text-red-500"
-																title="Remove"
-															>
-																<X className="h-4 w-4" />
-															</button>
-														</Form>
+														<ParticipantMenu
+															userId={a.userId}
+															currentRole={a.role}
+															isShow={isShow}
+															notifyOnRoleChange={notifyOnRoleChange}
+														/>
 													)}
 												</div>
 											</li>
@@ -708,21 +691,7 @@ export default function EventDetail() {
 														key={a.userId}
 														className="flex items-center justify-between px-6 py-3"
 													>
-														<div className="flex items-center gap-2">
-															<span className="text-sm font-medium text-slate-900">
-																{a.userName}
-															</span>
-															{isAdmin ? (
-																<RoleSelector
-																	userId={a.userId}
-																	currentRole={a.role}
-																	isShow={isShow}
-																	notifyOnRoleChange={notifyOnRoleChange}
-																/>
-															) : (
-																<RoleBadge role={a.role} />
-															)}
-														</div>
+														<span className="text-sm font-medium text-slate-900">{a.userName}</span>
 														<div className="flex items-center gap-2">
 															<span
 																className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${statusCfg.badgeClass}`}
@@ -730,18 +699,12 @@ export default function EventDetail() {
 																{statusCfg.label}
 															</span>
 															{isAdmin && (
-																<Form method="post">
-																	<CsrfInput />
-																	<input type="hidden" name="intent" value="remove-assignment" />
-																	<input type="hidden" name="userId" value={a.userId} />
-																	<button
-																		type="submit"
-																		className="text-slate-400 transition-colors hover:text-red-500"
-																		title="Remove"
-																	>
-																		<X className="h-4 w-4" />
-																	</button>
-																</Form>
+																<ParticipantMenu
+																	userId={a.userId}
+																	currentRole={a.role}
+																	isShow={isShow}
+																	notifyOnRoleChange={notifyOnRoleChange}
+																/>
 															)}
 														</div>
 													</li>
@@ -822,16 +785,7 @@ export default function EventDetail() {
 											<li key={a.userId} className="flex items-center justify-between px-6 py-3">
 												<div className="flex items-center gap-2">
 													<span className="text-sm font-medium text-slate-900">{a.userName}</span>
-													{isAdmin ? (
-														<RoleSelector
-															userId={a.userId}
-															currentRole={a.role}
-															isShow={isShow}
-															notifyOnRoleChange={notifyOnRoleChange}
-														/>
-													) : (
-														<RoleBadge role={a.role} />
-													)}
+													{!isAdmin && <RoleBadge role={a.role} />}
 												</div>
 												<div className="flex items-center gap-2">
 													<span
@@ -840,18 +794,12 @@ export default function EventDetail() {
 														{statusCfg.label}
 													</span>
 													{isAdmin && (
-														<Form method="post">
-															<CsrfInput />
-															<input type="hidden" name="intent" value="remove-assignment" />
-															<input type="hidden" name="userId" value={a.userId} />
-															<button
-																type="submit"
-																className="text-slate-400 transition-colors hover:text-red-500"
-																title="Remove"
-															>
-																<X className="h-4 w-4" />
-															</button>
-														</Form>
+														<ParticipantMenu
+															userId={a.userId}
+															currentRole={a.role}
+															isShow={isShow}
+															notifyOnRoleChange={notifyOnRoleChange}
+														/>
 													)}
 												</div>
 											</li>
@@ -992,16 +940,7 @@ export default function EventDetail() {
 										<li key={a.userId} className="flex items-center justify-between px-6 py-3">
 											<div className="flex items-center gap-2">
 												<span className="text-sm font-medium text-slate-900">{a.userName}</span>
-												{isAdmin ? (
-													<RoleSelector
-														userId={a.userId}
-														currentRole={a.role}
-														isShow={isShow}
-														notifyOnRoleChange={notifyOnRoleChange}
-													/>
-												) : (
-													<RoleBadge role={a.role} />
-												)}
+												{!isAdmin && <RoleBadge role={a.role} />}
 											</div>
 											<div className="flex items-center gap-2">
 												<span
@@ -1010,18 +949,12 @@ export default function EventDetail() {
 													{statusCfg.label}
 												</span>
 												{isAdmin && (
-													<Form method="post">
-														<CsrfInput />
-														<input type="hidden" name="intent" value="remove-assignment" />
-														<input type="hidden" name="userId" value={a.userId} />
-														<button
-															type="submit"
-															className="text-slate-400 transition-colors hover:text-red-500"
-															title="Remove"
-														>
-															<X className="h-4 w-4" />
-														</button>
-													</Form>
+													<ParticipantMenu
+														userId={a.userId}
+														currentRole={a.role}
+														isShow={isShow}
+														notifyOnRoleChange={notifyOnRoleChange}
+													/>
 												)}
 											</div>
 										</li>
