@@ -141,18 +141,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		timezone,
 	});
 
-	// Auto-assign available/maybe members when creating from an availability request
-	const validFromRequestIdForAssign =
-		typeof fromRequestId === "string" && fromRequestId ? fromRequestId : null;
-	if (validFromRequestIdForAssign && typeof date === "string") {
-		// Validate the availability request belongs to this group (IDOR prevention)
-		const requestGroupId = await getAvailabilityRequestGroupId(validFromRequestIdForAssign);
-		if (requestGroupId === groupId) {
-			await autoAssignFromAvailability(event.id, validFromRequestIdForAssign, date, user.id);
-		}
-	}
-
-	// Assign performers for show events (onConflictDoNothing handles overlap with auto-assign)
+	// Assign performers for show events BEFORE auto-assign so they get the
+	// "Performer" role.  Auto-assign's onConflictDoNothing will then skip them.
 	if (eventType === "show") {
 		const validPerformerIds = performerIds.filter(
 			(id): id is string => typeof id === "string" && id.length > 0,
@@ -165,6 +155,18 @@ export async function action({ request, params }: ActionFunctionArgs) {
 			if (verifiedIds.length > 0) {
 				await bulkAssignToEvent(event.id, verifiedIds, "Performer");
 			}
+		}
+	}
+
+	// Auto-assign available/maybe members when creating from an availability request
+	// (onConflictDoNothing skips members already assigned as Performers above)
+	const validFromRequestIdForAssign =
+		typeof fromRequestId === "string" && fromRequestId ? fromRequestId : null;
+	if (validFromRequestIdForAssign && typeof date === "string") {
+		// Validate the availability request belongs to this group (IDOR prevention)
+		const requestGroupId = await getAvailabilityRequestGroupId(validFromRequestIdForAssign);
+		if (requestGroupId === groupId) {
+			await autoAssignFromAvailability(event.id, validFromRequestIdForAssign, date, user.id);
 		}
 	}
 
