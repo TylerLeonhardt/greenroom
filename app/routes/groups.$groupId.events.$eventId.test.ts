@@ -689,7 +689,7 @@ describe("event detail action — change role", () => {
 		expect(updateAssignmentRole).not.toHaveBeenCalled();
 	});
 
-	it("returns error for invalid role", async () => {
+	it("accepts custom role names", async () => {
 		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
 			event: mockShowEvent,
 			assignments: [
@@ -698,12 +698,174 @@ describe("event detail action — change role", () => {
 		});
 
 		const result = await action({
-			request: makeChangeRoleRequest({ userId: "user-2", newRole: "InvalidRole" }),
+			request: makeChangeRoleRequest({ userId: "user-2", newRole: "Stage Manager" }),
 			params: { groupId: "g1", eventId: "event-1" },
 			context: {},
 		});
 
-		expect(result).toEqual({ error: "Invalid role." });
+		expect(result).toEqual({ success: true });
+		expect(updateAssignmentRole).toHaveBeenCalledWith("event-1", "user-2", "Stage Manager");
+	});
+
+	it("trims whitespace from role names", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: mockShowEvent,
+			assignments: [
+				{ userId: "user-2", userName: "Some User", role: "Performer", status: "confirmed" },
+			],
+		});
+
+		const result = await action({
+			request: makeChangeRoleRequest({ userId: "user-2", newRole: "  Director  " }),
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ success: true });
+		expect(updateAssignmentRole).toHaveBeenCalledWith("event-1", "user-2", "Director");
+	});
+
+	it("rejects empty role", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: mockShowEvent,
+			assignments: [
+				{ userId: "user-2", userName: "Some User", role: "Performer", status: "confirmed" },
+			],
+		});
+
+		const result = await action({
+			request: makeChangeRoleRequest({ userId: "user-2", newRole: "" }),
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ error: "Role cannot be empty." });
 		expect(updateAssignmentRole).not.toHaveBeenCalled();
+	});
+
+	it("rejects whitespace-only role", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: mockShowEvent,
+			assignments: [
+				{ userId: "user-2", userName: "Some User", role: "Performer", status: "confirmed" },
+			],
+		});
+
+		const result = await action({
+			request: makeChangeRoleRequest({ userId: "user-2", newRole: "   " }),
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ error: "Role cannot be empty." });
+		expect(updateAssignmentRole).not.toHaveBeenCalled();
+	});
+
+	it("rejects role exceeding 100 characters", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: mockShowEvent,
+			assignments: [
+				{ userId: "user-2", userName: "Some User", role: "Performer", status: "confirmed" },
+			],
+		});
+
+		const longRole = "A".repeat(101);
+		const result = await action({
+			request: makeChangeRoleRequest({ userId: "user-2", newRole: longRole }),
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ error: "Role must be 100 characters or less." });
+		expect(updateAssignmentRole).not.toHaveBeenCalled();
+	});
+
+	it("accepts role at exactly 100 characters", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: mockShowEvent,
+			assignments: [
+				{ userId: "user-2", userName: "Some User", role: "Performer", status: "confirmed" },
+			],
+		});
+
+		const maxRole = "A".repeat(100);
+		const result = await action({
+			request: makeChangeRoleRequest({ userId: "user-2", newRole: maxRole }),
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ success: true });
+		expect(updateAssignmentRole).toHaveBeenCalledWith("event-1", "user-2", maxRole);
+	});
+
+	it("changes role on non-show event", async () => {
+		const mockRehearsalEvent = {
+			id: "event-1",
+			groupId: "g1",
+			title: "Monday Rehearsal",
+			eventType: "rehearsal",
+			startTime: "2026-03-15T19:00:00.000Z",
+			endTime: "2026-03-15T21:00:00.000Z",
+		};
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: mockRehearsalEvent,
+			assignments: [{ userId: "user-2", userName: "Some User", role: null, status: "confirmed" }],
+		});
+
+		const result = await action({
+			request: makeChangeRoleRequest({ userId: "user-2", newRole: "Director" }),
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ success: true });
+		expect(updateAssignmentRole).toHaveBeenCalledWith("event-1", "user-2", "Director");
+	});
+
+	it("sends notification with custom role name", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: mockShowEvent,
+			assignments: [
+				{ userId: "user-2", userName: "Some User", role: "Performer", status: "confirmed" },
+			],
+		});
+		(getGroupMembersWithPreferences as ReturnType<typeof vi.fn>).mockResolvedValue([
+			{
+				id: "user-2",
+				name: "Some User",
+				email: "user@example.com",
+				timezone: "UTC",
+				notificationPreferences: {},
+			},
+		]);
+		(getGroupWithMembers as ReturnType<typeof vi.fn>).mockResolvedValue({
+			group: { id: "g1", name: "Test Group" },
+			members: [],
+		});
+
+		const result = await action({
+			request: makeChangeRoleRequest({
+				userId: "user-2",
+				newRole: "Stage Manager",
+				sendNotification: "on",
+			}),
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ success: true });
+		expect(updateAssignmentRole).toHaveBeenCalledWith("event-1", "user-2", "Stage Manager");
+
+		await vi.waitFor(() => {
+			expect(sendRoleChangeNotification).toHaveBeenCalledWith(
+				expect.objectContaining({
+					newRole: "Stage Manager",
+					recipient: expect.objectContaining({
+						email: "user@example.com",
+					}),
+				}),
+			);
+		});
 	});
 });
