@@ -11,7 +11,6 @@ import {
 } from "@remix-run/react";
 import {
 	ArrowLeft,
-	ArrowUpDown,
 	Calendar,
 	CalendarDays,
 	Check,
@@ -30,6 +29,7 @@ import { ActivityFeed } from "~/components/activity-feed";
 import { CsrfInput } from "~/components/csrf-input";
 import { DangerZone } from "~/components/danger-zone";
 import { EventDateCarousel } from "~/components/event-date-carousel";
+import { RoleBadge, RoleSelector } from "~/components/role-selector";
 import { UserChipSelector } from "~/components/user-chip-selector";
 import { formatDateLong, formatEventTime, formatTime, utcToLocalParts } from "~/lib/date-utils";
 import { validateCsrfToken } from "~/services/csrf.server";
@@ -251,15 +251,19 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		if (typeof targetUserId !== "string" || typeof newRole !== "string") {
 			return { error: "Invalid parameters." };
 		}
-		if (newRole !== "Performer" && newRole !== "Viewer") {
-			return { error: "Invalid role." };
+		const trimmedRole = newRole.trim();
+		if (!trimmedRole) {
+			return { error: "Role cannot be empty." };
+		}
+		if (trimmedRole.length > 100) {
+			return { error: "Role must be 100 characters or less." };
 		}
 		// Verify the target user is actually assigned to this event
 		const existingAssignment = eventData.assignments.find((a) => a.userId === targetUserId);
 		if (!existingAssignment) {
 			return { error: "User is not assigned to this event." };
 		}
-		await updateAssignmentRole(eventId, targetUserId, newRole);
+		await updateAssignmentRole(eventId, targetUserId, trimmedRole);
 
 		if (sendNotification) {
 			void (async () => {
@@ -283,7 +287,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 					eventType: event.eventType,
 					dateTime,
 					groupName,
-					newRole: newRole as "Performer" | "Viewer",
+					newRole: trimmedRole,
 					recipient: {
 						email: member.email,
 						name: member.name,
@@ -531,9 +535,18 @@ export default function EventDetail() {
 										const statusCfg = STATUS_CONFIG[a.status] ?? STATUS_CONFIG.pending;
 										return (
 											<li key={a.userId} className="flex items-center justify-between px-6 py-3">
-												<div>
+												<div className="flex items-center gap-2">
 													<span className="text-sm font-medium text-slate-900">{a.userName}</span>
-													<span className="ml-2 text-xs text-purple-500">Performer</span>
+													{isAdmin ? (
+														<RoleSelector
+															userId={a.userId}
+															currentRole={a.role}
+															isShow={isShow}
+															notifyOnRoleChange={notifyOnRoleChange}
+														/>
+													) : (
+														<RoleBadge role={a.role} />
+													)}
 												</div>
 												<div className="flex items-center gap-2">
 													<span
@@ -541,25 +554,6 @@ export default function EventDetail() {
 													>
 														{statusCfg.label}
 													</span>
-													{isAdmin && (
-														<Form method="post" className="flex items-center">
-															<CsrfInput />
-															<input type="hidden" name="intent" value="change-role" />
-															<input type="hidden" name="userId" value={a.userId} />
-															<input type="hidden" name="newRole" value="Viewer" />
-															{notifyOnRoleChange && (
-																<input type="hidden" name="sendNotification" value="on" />
-															)}
-															<button
-																type="submit"
-																disabled={isSubmitting}
-																className="text-slate-400 transition-colors hover:text-amber-500 disabled:opacity-50"
-																title="Move to watching"
-															>
-																<ArrowUpDown className="h-4 w-4" />
-															</button>
-														</Form>
-													)}
 													{isAdmin && (
 														<Form method="post">
 															<CsrfInput />
@@ -680,8 +674,8 @@ export default function EventDetail() {
 						</div>
 					)}
 
-					{/* Notify on role change toggle (admin only, shows only) */}
-					{isShow && isAdmin && (performers.length > 0 || viewers.length > 0) && (
+					{/* Notify on role change toggle (admin only) */}
+					{isAdmin && assignments.length > 0 && (
 						<label className="flex items-center gap-2 text-xs text-slate-500">
 							<input
 								type="checkbox"
@@ -714,32 +708,27 @@ export default function EventDetail() {
 														key={a.userId}
 														className="flex items-center justify-between px-6 py-3"
 													>
-														<span className="text-sm font-medium text-slate-900">{a.userName}</span>
+														<div className="flex items-center gap-2">
+															<span className="text-sm font-medium text-slate-900">
+																{a.userName}
+															</span>
+															{isAdmin ? (
+																<RoleSelector
+																	userId={a.userId}
+																	currentRole={a.role}
+																	isShow={isShow}
+																	notifyOnRoleChange={notifyOnRoleChange}
+																/>
+															) : (
+																<RoleBadge role={a.role} />
+															)}
+														</div>
 														<div className="flex items-center gap-2">
 															<span
 																className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${statusCfg.badgeClass}`}
 															>
 																{statusCfg.label}
 															</span>
-															{isAdmin && (
-																<Form method="post" className="flex items-center">
-																	<CsrfInput />
-																	<input type="hidden" name="intent" value="change-role" />
-																	<input type="hidden" name="userId" value={a.userId} />
-																	<input type="hidden" name="newRole" value="Performer" />
-																	{notifyOnRoleChange && (
-																		<input type="hidden" name="sendNotification" value="on" />
-																	)}
-																	<button
-																		type="submit"
-																		disabled={isSubmitting}
-																		className="text-slate-400 transition-colors hover:text-purple-500 disabled:opacity-50"
-																		title="Move to cast"
-																	>
-																		<ArrowUpDown className="h-4 w-4" />
-																	</button>
-																</Form>
-															)}
 															{isAdmin && (
 																<Form method="post">
 																	<CsrfInput />
@@ -831,9 +820,18 @@ export default function EventDetail() {
 										const statusCfg = STATUS_CONFIG[a.status] ?? STATUS_CONFIG.pending;
 										return (
 											<li key={a.userId} className="flex items-center justify-between px-6 py-3">
-												<div>
+												<div className="flex items-center gap-2">
 													<span className="text-sm font-medium text-slate-900">{a.userName}</span>
-													{a.role && <span className="ml-2 text-xs text-slate-500">{a.role}</span>}
+													{isAdmin ? (
+														<RoleSelector
+															userId={a.userId}
+															currentRole={a.role}
+															isShow={isShow}
+															notifyOnRoleChange={notifyOnRoleChange}
+														/>
+													) : (
+														<RoleBadge role={a.role} />
+													)}
 												</div>
 												<div className="flex items-center gap-2">
 													<span
@@ -992,9 +990,18 @@ export default function EventDetail() {
 									const statusCfg = STATUS_CONFIG[a.status] ?? STATUS_CONFIG.pending;
 									return (
 										<li key={a.userId} className="flex items-center justify-between px-6 py-3">
-											<div>
+											<div className="flex items-center gap-2">
 												<span className="text-sm font-medium text-slate-900">{a.userName}</span>
-												{a.role && <span className="ml-2 text-xs text-slate-500">{a.role}</span>}
+												{isAdmin ? (
+													<RoleSelector
+														userId={a.userId}
+														currentRole={a.role}
+														isShow={isShow}
+														notifyOnRoleChange={notifyOnRoleChange}
+													/>
+												) : (
+													<RoleBadge role={a.role} />
+												)}
 											</div>
 											<div className="flex items-center gap-2">
 												<span

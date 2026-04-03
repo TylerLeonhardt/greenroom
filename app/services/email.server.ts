@@ -363,7 +363,7 @@ export async function sendRoleChangeNotification(options: {
 	eventType: string;
 	dateTime: string;
 	groupName: string;
-	newRole: "Performer" | "Viewer";
+	newRole: string;
 	recipient: { email: string; name: string; notificationPreferences?: NotificationPreferences };
 	eventUrl: string;
 	preferencesUrl?: string;
@@ -375,15 +375,22 @@ export async function sendRoleChangeNotification(options: {
 		options.eventType === "show" ? "🎭" : options.eventType === "rehearsal" ? "🎯" : "📅";
 
 	const isPromotedToCast = options.newRole === "Performer";
+	const isMovedToWatching = options.newRole === "Viewer";
 	const heading = isPromotedToCast
 		? "You've Been Added to the Cast"
-		: "You've Been Moved to Watching";
+		: isMovedToWatching
+			? "You've Been Moved to Watching"
+			: `Your Role Has Been Changed to ${escapeHtml(options.newRole)}`;
 	const message = isPromotedToCast
 		? `you've been added to the cast for an upcoming event.`
-		: `you've been moved to watching for an upcoming event.`;
+		: isMovedToWatching
+			? `you've been moved to watching for an upcoming event.`
+			: `your role has been changed to <strong>${escapeHtml(options.newRole)}</strong> for an upcoming event.`;
 	const subject = isPromotedToCast
 		? `${typeEmoji} You're in the cast for "${escapeHtml(options.eventTitle)}"`
-		: `${typeEmoji} You've been moved to watching for "${escapeHtml(options.eventTitle)}"`;
+		: isMovedToWatching
+			? `${typeEmoji} You've been moved to watching for "${escapeHtml(options.eventTitle)}"`
+			: `${typeEmoji} Your role changed for "${escapeHtml(options.eventTitle)}"`;
 
 	const html = emailLayout(
 		`
@@ -399,7 +406,9 @@ ${ctaButton(options.eventUrl, "View Event Details")}`,
 
 	const textMessage = isPromotedToCast
 		? `you've been added to the cast`
-		: `you've been moved to watching`;
+		: isMovedToWatching
+			? `you've been moved to watching`
+			: `your role has been changed to ${options.newRole}`;
 	const text = `Hi ${options.recipient.name},\n\n${textMessage} for an event.\n\nEvent: ${options.eventTitle}\nGroup: ${options.groupName}\nWhen: ${options.dateTime}\n\nView event: ${options.eventUrl}`;
 
 	void sendEmail({
