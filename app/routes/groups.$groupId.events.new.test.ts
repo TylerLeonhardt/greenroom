@@ -50,8 +50,10 @@ vi.mock("~/services/csrf.server", () => ({
 import { action } from "~/routes/groups.$groupId.events.new";
 import {
 	autoAssignFromAvailability,
+	bulkAssignToEvent,
 	getAvailabilityRequestGroupId,
 } from "~/services/events.server";
+import { getGroupWithMembers } from "~/services/groups.server";
 
 function makeRequest(fields: Record<string, string | string[]>) {
 	const formData = new FormData();
@@ -263,6 +265,91 @@ describe("events.new validation", () => {
 		});
 		expect(result).toBeInstanceOf(Response);
 		expect((result as Response).status).toBe(302);
+		expect(autoAssignFromAvailability).not.toHaveBeenCalled();
+	});
+
+	it("assigns selected performers with Performer role before auto-assign when creating show from availability", async () => {
+		// Track call order to verify performers are assigned before auto-assign
+		const callOrder: string[] = [];
+		vi.mocked(bulkAssignToEvent).mockImplementation(async () => {
+			callOrder.push("bulkAssignToEvent");
+		});
+		vi.mocked(autoAssignFromAvailability).mockImplementation(async () => {
+			callOrder.push("autoAssignFromAvailability");
+			return [];
+		});
+		vi.mocked(getAvailabilityRequestGroupId).mockResolvedValue("g1");
+
+		// Mock group with all the performers as members
+		vi.mocked(getGroupWithMembers).mockResolvedValue({
+			group: { id: "g1", name: "Test Group" } as never,
+			members: [
+				{ id: "user-1", name: "Admin", email: "admin@test.com" },
+				{ id: "user-2", name: "Jessica", email: "jessica@test.com" },
+				{ id: "user-3", name: "Larry", email: "larry@test.com" },
+				{ id: "user-4", name: "Meagan", email: "meagan@test.com" },
+			] as never[],
+		});
+
+		const result = await action({
+			request: makeRequest({
+				...validEvent,
+				eventType: "show",
+				callTime: "18:00",
+				fromRequestId: "req-1",
+				performerIds: ["user-1", "user-2", "user-3", "user-4"],
+			}),
+			params: { groupId: "g1" },
+			context: {},
+		});
+
+		expect(result).toBeInstanceOf(Response);
+		expect((result as Response).status).toBe(302);
+
+		// Verify bulkAssignToEvent was called with all selected performers and "Performer" role
+		expect(bulkAssignToEvent).toHaveBeenCalledWith(
+			"event-1",
+			["user-1", "user-2", "user-3", "user-4"],
+			"Performer",
+		);
+
+		// Verify auto-assign was also called
+		expect(autoAssignFromAvailability).toHaveBeenCalledWith(
+			"event-1",
+			"req-1",
+			"2099-06-15",
+			"user-1",
+		);
+
+		// Critical: performer assignment must happen BEFORE auto-assign
+		// so that onConflictDoNothing in auto-assign skips already-assigned performers
+		expect(callOrder).toEqual(["bulkAssignToEvent", "autoAssignFromAvailability"]);
+	});
+
+	it("assigns selected performers with Performer role even without availability request", async () => {
+		vi.mocked(getGroupWithMembers).mockResolvedValue({
+			group: { id: "g1", name: "Test Group" } as never,
+			members: [
+				{ id: "user-1", name: "Admin", email: "admin@test.com" },
+				{ id: "user-2", name: "Jessica", email: "jessica@test.com" },
+			] as never[],
+		});
+
+		const result = await action({
+			request: makeRequest({
+				...validEvent,
+				eventType: "show",
+				callTime: "18:00",
+				performerIds: ["user-1", "user-2"],
+			}),
+			params: { groupId: "g1" },
+			context: {},
+		});
+
+		expect(result).toBeInstanceOf(Response);
+		expect((result as Response).status).toBe(302);
+
+		expect(bulkAssignToEvent).toHaveBeenCalledWith("event-1", ["user-1", "user-2"], "Performer");
 		expect(autoAssignFromAvailability).not.toHaveBeenCalled();
 	});
 });
