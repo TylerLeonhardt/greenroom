@@ -32,7 +32,11 @@ export function RoleSelector({
 	const roleInputRef = useRef<HTMLInputElement>(null);
 
 	const pendingRole = fetcher.formData?.get("newRole") as string | undefined;
-	const displayRole = pendingRole ?? currentRole;
+	const fetcherError =
+		fetcher.data && typeof fetcher.data === "object" && "error" in fetcher.data
+			? (fetcher.data as { error: string }).error
+			: null;
+	const displayRole = fetcherError ? currentRole : (pendingRole ?? currentRole);
 	const isUpdating = fetcher.state !== "idle";
 
 	// Click outside to close
@@ -62,6 +66,7 @@ export function RoleSelector({
 			setShowCustomInput(false);
 			return;
 		}
+		if (trimmed.length > 100) return;
 		if (roleInputRef.current && formRef.current) {
 			roleInputRef.current.value = trimmed;
 			fetcher.submit(formRef.current);
@@ -105,6 +110,9 @@ export function RoleSelector({
 				{displayRole ?? "Set role"}
 				<ChevronDown className="h-3 w-3" />
 			</button>
+
+			{/* Server error feedback */}
+			{fetcherError && <p className="mt-1 text-xs text-red-600">{fetcherError}</p>}
 
 			{/* Dropdown */}
 			{isOpen && (
