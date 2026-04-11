@@ -133,14 +133,17 @@ export async function submitAvailabilityResponse(data: {
 	requestId: string;
 	userId: string;
 	responses: Record<string, "available" | "maybe" | "not_available">;
+	notes?: Record<string, string>;
 }): Promise<void> {
 	const now = new Date();
+	const notes = data.notes ?? {};
 	await db
 		.insert(availabilityResponses)
 		.values({
 			requestId: data.requestId,
 			userId: data.userId,
 			responses: data.responses,
+			notes,
 			respondedAt: now,
 			updatedAt: now,
 		})
@@ -148,6 +151,7 @@ export async function submitAvailabilityResponse(data: {
 			target: [availabilityResponses.requestId, availabilityResponses.userId],
 			set: {
 				responses: data.responses,
+				notes,
 				updatedAt: now,
 			},
 		});
@@ -158,15 +162,22 @@ export async function submitAvailabilityResponse(data: {
 export async function getUserResponse(
 	requestId: string,
 	userId: string,
-): Promise<Record<string, string> | null> {
+): Promise<{ responses: Record<string, string>; notes: Record<string, string> } | null> {
 	const [row] = await db
-		.select({ responses: availabilityResponses.responses })
+		.select({
+			responses: availabilityResponses.responses,
+			notes: availabilityResponses.notes,
+		})
 		.from(availabilityResponses)
 		.where(
 			and(eq(availabilityResponses.requestId, requestId), eq(availabilityResponses.userId, userId)),
 		)
 		.limit(1);
-	return (row?.responses as Record<string, string>) ?? null;
+	if (!row) return null;
+	return {
+		responses: row.responses as Record<string, string>,
+		notes: (row.notes as Record<string, string>) ?? {},
+	};
 }
 
 // --- Get All Responses ---
@@ -176,6 +187,7 @@ export async function getRequestResponses(requestId: string): Promise<
 		userId: string;
 		userName: string;
 		responses: Record<string, string>;
+		notes: Record<string, string>;
 		respondedAt: Date;
 	}>
 > {
@@ -184,18 +196,20 @@ export async function getRequestResponses(requestId: string): Promise<
 			userId: availabilityResponses.userId,
 			userName: users.name,
 			responses: availabilityResponses.responses,
+			notes: availabilityResponses.notes,
 			respondedAt: availabilityResponses.respondedAt,
 		})
 		.from(availabilityResponses)
 		.innerJoin(users, eq(availabilityResponses.userId, users.id))
 		.where(eq(availabilityResponses.requestId, requestId))
 		.orderBy(users.name);
-	return rows as Array<{
-		userId: string;
-		userName: string;
-		responses: Record<string, string>;
-		respondedAt: Date;
-	}>;
+	return rows.map((r) => ({
+		userId: r.userId,
+		userName: r.userName,
+		responses: r.responses as Record<string, string>,
+		notes: (r.notes as Record<string, string>) ?? {},
+		respondedAt: r.respondedAt,
+	}));
 }
 
 // --- Aggregated Results ---
@@ -209,7 +223,7 @@ export async function getAggregatedResults(requestId: string): Promise<{
 		noResponse: number;
 		total: number;
 		score: number;
-		respondents: Array<{ name: string; status: string }>;
+		respondents: Array<{ name: string; status: string; note?: string }>;
 	}>;
 	totalMembers: number;
 	totalResponded: number;
@@ -234,19 +248,24 @@ export async function getAggregatedResults(requestId: string): Promise<{
 		let available = 0;
 		let maybe = 0;
 		let notAvailable = 0;
-		const respondents: Array<{ name: string; status: string }> = [];
+		const respondents: Array<{ name: string; status: string; note?: string }> = [];
 
 		for (const resp of responses) {
 			const status = resp.responses[date];
+			const note = resp.notes[date];
 			if (status === "available") {
 				available++;
-				respondents.push({ name: resp.userName, status: "available" });
+				respondents.push({ name: resp.userName, status: "available", ...(note ? { note } : {}) });
 			} else if (status === "maybe") {
 				maybe++;
-				respondents.push({ name: resp.userName, status: "maybe" });
+				respondents.push({ name: resp.userName, status: "maybe", ...(note ? { note } : {}) });
 			} else if (status === "not_available") {
 				notAvailable++;
-				respondents.push({ name: resp.userName, status: "not_available" });
+				respondents.push({
+					name: resp.userName,
+					status: "not_available",
+					...(note ? { note } : {}),
+				});
 			}
 		}
 

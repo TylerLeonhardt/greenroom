@@ -1,5 +1,5 @@
-import { Check, HelpCircle, X } from "lucide-react";
-import { useCallback } from "react";
+import { Check, HelpCircle, MessageSquarePlus, X } from "lucide-react";
+import { useCallback, useState } from "react";
 import { formatDateDisplay } from "~/lib/date-utils";
 
 type AvailabilityStatus = "available" | "maybe" | "not_available";
@@ -8,6 +8,8 @@ interface AvailabilityGridProps {
 	dates: string[];
 	responses: Record<string, AvailabilityStatus>;
 	onChange: (responses: Record<string, AvailabilityStatus>) => void;
+	notes?: Record<string, string>;
+	onNotesChange?: (notes: Record<string, string>) => void;
 	disabled?: boolean;
 	timeRange?: string | null;
 	timezone?: string | null;
@@ -38,10 +40,17 @@ export function AvailabilityGrid({
 	dates,
 	responses,
 	onChange,
+	notes = {},
+	onNotesChange,
 	disabled,
 	timeRange,
 	timezone,
 }: AvailabilityGridProps) {
+	const [expandedNotes, setExpandedNotes] = useState<Set<string>>(() => {
+		// Auto-expand dates that already have notes
+		return new Set(Object.keys(notes).filter((k) => notes[k]));
+	});
+
 	const setStatus = useCallback(
 		(date: string, status: AvailabilityStatus) => {
 			onChange({ ...responses, [date]: status });
@@ -63,6 +72,30 @@ export function AvailabilityGrid({
 	const clearAll = useCallback(() => {
 		onChange({});
 	}, [onChange]);
+
+	const toggleNoteExpanded = useCallback((date: string) => {
+		setExpandedNotes((prev) => {
+			const next = new Set(prev);
+			if (next.has(date)) {
+				next.delete(date);
+			} else {
+				next.add(date);
+			}
+			return next;
+		});
+	}, []);
+
+	const updateNote = useCallback(
+		(date: string, value: string) => {
+			if (!onNotesChange) return;
+			const updated = { ...notes, [date]: value };
+			if (!value) {
+				delete updated[date];
+			}
+			onNotesChange(updated);
+		},
+		[notes, onNotesChange],
+	);
 
 	return (
 		<div className="space-y-4">
@@ -140,7 +173,37 @@ export function AvailabilityGrid({
 														</button>
 													);
 												})}
+												{!disabled && onNotesChange && (
+													<button
+														type="button"
+														onClick={() => toggleNoteExpanded(date)}
+														className={`ml-1 inline-flex items-center rounded-lg p-1.5 text-xs transition-colors ${
+															expandedNotes.has(date) || notes[date]
+																? "text-emerald-600 hover:bg-emerald-50"
+																: "text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+														}`}
+														title={expandedNotes.has(date) ? "Hide note" : "Add note"}
+													>
+														<MessageSquarePlus className="h-3.5 w-3.5" />
+													</button>
+												)}
 											</div>
+											{(expandedNotes.has(date) || notes[date]) && !disabled && onNotesChange && (
+												<div className="mt-1.5">
+													<input
+														type="text"
+														value={notes[date] ?? ""}
+														onChange={(e) => updateNote(date, e.target.value)}
+														maxLength={200}
+														placeholder="Add a note..."
+														aria-label={`Note for ${display}`}
+														className="w-full rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:border-emerald-300 focus:outline-none focus:ring-1 focus:ring-emerald-300"
+													/>
+												</div>
+											)}
+											{notes[date] && disabled && (
+												<p className="mt-1 text-xs text-slate-500 italic">{notes[date]}</p>
+											)}
 										</td>
 									</tr>
 								);
@@ -184,6 +247,36 @@ export function AvailabilityGrid({
 									);
 								})}
 							</div>
+							{!disabled && onNotesChange && (
+								<div className="mt-2">
+									<button
+										type="button"
+										onClick={() => toggleNoteExpanded(date)}
+										className={`inline-flex items-center gap-1 text-xs transition-colors ${
+											expandedNotes.has(date) || notes[date]
+												? "text-emerald-600"
+												: "text-slate-400 hover:text-slate-600"
+										}`}
+									>
+										<MessageSquarePlus className="h-3.5 w-3.5" />
+										{notes[date] ? "Edit note" : "Add note"}
+									</button>
+									{(expandedNotes.has(date) || notes[date]) && (
+										<input
+											type="text"
+											value={notes[date] ?? ""}
+											onChange={(e) => updateNote(date, e.target.value)}
+											maxLength={200}
+											placeholder="Add a note..."
+											aria-label={`Note for ${display}`}
+											className="mt-1.5 w-full rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:border-emerald-300 focus:outline-none focus:ring-1 focus:ring-emerald-300"
+										/>
+									)}
+								</div>
+							)}
+							{notes[date] && disabled && (
+								<p className="mt-2 text-xs text-slate-500 italic">{notes[date]}</p>
+							)}
 						</div>
 					);
 				})}

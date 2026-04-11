@@ -1,0 +1,1 @@
+ALTER TABLE "availability_responses" ADD COLUMN "notes" jsonb;

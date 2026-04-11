@@ -19,7 +19,7 @@ interface DateResult {
 	noResponse: number;
 	total: number;
 	score: number;
-	respondents: Array<{ name: string; status: string }>;
+	respondents: Array<{ name: string; status: string; note?: string }>;
 }
 
 function makeDateResult(overrides: Partial<DateResult> = {}): DateResult {
@@ -549,6 +549,77 @@ describe("ResultsHeatmap", () => {
 			render(<ResultsHeatmap dates={dates} {...defaultProps} />);
 			expect(screen.queryByText("Respondents:")).toBeNull();
 			expect(screen.queryByText("Response")).toBeNull();
+		});
+	});
+
+	describe("respondent notes", () => {
+		it("displays notes inline under respondent name when present", async () => {
+			const user = userEvent.setup();
+			const dates = [
+				makeDateResult({
+					date: "2025-03-15",
+					respondents: [
+						{ name: "Alice", status: "available", note: "Leaving at 9pm" },
+						{ name: "Bob", status: "maybe" },
+					],
+				}),
+			];
+			const { container } = render(<ResultsHeatmap dates={dates} {...defaultProps} />);
+			const desktop = getDesktopTable(container);
+
+			// Expand the date row
+			const caretCells =
+				desktop.el.querySelectorAll<HTMLTableCellElement>("tbody tr td:first-child");
+			await user.click(caretCells[0]);
+
+			// Alice's note should be visible
+			expect(desktop.getByText('"Leaving at 9pm"')).toBeDefined();
+		});
+
+		it("does not show note text when respondent has no note", async () => {
+			const user = userEvent.setup();
+			const dates = [
+				makeDateResult({
+					date: "2025-03-15",
+					respondents: [
+						{ name: "Alice", status: "available" },
+						{ name: "Bob", status: "maybe" },
+					],
+				}),
+			];
+			const { container } = render(<ResultsHeatmap dates={dates} {...defaultProps} />);
+			const desktop = getDesktopTable(container);
+
+			const caretCells =
+				desktop.el.querySelectorAll<HTMLTableCellElement>("tbody tr td:first-child");
+			await user.click(caretCells[0]);
+
+			// No italic note elements should be present
+			const noteElements = desktop.el.querySelectorAll(".italic");
+			expect(noteElements.length).toBe(0);
+		});
+
+		it("shows notes for multiple respondents on the same date", async () => {
+			const user = userEvent.setup();
+			const dates = [
+				makeDateResult({
+					date: "2025-03-15",
+					respondents: [
+						{ name: "Alice", status: "available", note: "Can stay late" },
+						{ name: "Bob", status: "maybe", note: "Depends on work" },
+						{ name: "Carol", status: "not_available" },
+					],
+				}),
+			];
+			const { container } = render(<ResultsHeatmap dates={dates} {...defaultProps} />);
+			const desktop = getDesktopTable(container);
+
+			const caretCells =
+				desktop.el.querySelectorAll<HTMLTableCellElement>("tbody tr td:first-child");
+			await user.click(caretCells[0]);
+
+			expect(desktop.getByText('"Can stay late"')).toBeDefined();
+			expect(desktop.getByText('"Depends on work"')).toBeDefined();
 		});
 	});
 });

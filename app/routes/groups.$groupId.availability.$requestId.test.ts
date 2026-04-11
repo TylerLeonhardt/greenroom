@@ -103,6 +103,7 @@ describe("availability response action", () => {
 			requestId: "r1",
 			userId: "user-1",
 			responses,
+			notes: {},
 		});
 		expect(result).toEqual({ success: true, message: "Response saved!" });
 	});
@@ -259,6 +260,221 @@ describe("availability response action", () => {
 			expect(response).toBeInstanceOf(Response);
 			expect((response as Response).headers.get("Location")).toBe("/login");
 		}
+	});
+});
+
+describe("availability notes validation", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		(requireGroupMember as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: "user-1",
+			email: "test@example.com",
+			name: "Test User",
+			profileImage: null,
+		});
+	});
+
+	function makeFormData(responses: Record<string, string>, notes?: string): FormData {
+		const formData = new FormData();
+		formData.set("intent", "respond");
+		formData.set("responses", JSON.stringify(responses));
+		if (notes !== undefined) {
+			formData.set("notes", notes);
+		}
+		return formData;
+	}
+
+	function makeRequest(formData: FormData) {
+		return new Request("http://localhost/groups/g1/availability/r1", {
+			method: "POST",
+			body: formData,
+		});
+	}
+
+	it("saves response with valid notes", async () => {
+		const responses = { "2025-03-15": "available", "2025-03-16": "maybe" };
+		const notes = { "2025-03-15": "Leaving early at 9pm" };
+		const formData = makeFormData(responses, JSON.stringify(notes));
+
+		const result = await action({
+			request: makeRequest(formData),
+			params: { groupId: "g1", requestId: "r1" },
+			context: {},
+		});
+
+		expect(submitAvailabilityResponse).toHaveBeenCalledWith({
+			requestId: "r1",
+			userId: "user-1",
+			responses,
+			notes: { "2025-03-15": "Leaving early at 9pm" },
+		});
+		expect(result).toEqual({ success: true, message: "Response saved!" });
+	});
+
+	it("returns error for invalid notes JSON", async () => {
+		const responses = { "2025-03-15": "available" };
+		const formData = makeFormData(responses, "not valid json");
+
+		const result = await action({
+			request: makeRequest(formData),
+			params: { groupId: "g1", requestId: "r1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ error: "Invalid notes data." });
+		expect(submitAvailabilityResponse).not.toHaveBeenCalled();
+	});
+
+	it("returns error when a note exceeds 200 characters", async () => {
+		const responses = { "2025-03-15": "available" };
+		const notes = { "2025-03-15": "x".repeat(201) };
+		const formData = makeFormData(responses, JSON.stringify(notes));
+
+		const result = await action({
+			request: makeRequest(formData),
+			params: { groupId: "g1", requestId: "r1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ error: "Notes must be 200 characters or less per day." });
+		expect(submitAvailabilityResponse).not.toHaveBeenCalled();
+	});
+
+	it("filters out notes for dates without responses", async () => {
+		const responses = { "2025-03-15": "available" };
+		const notes = { "2025-03-15": "Confirmed", "2025-03-16": "Orphaned note" };
+		const formData = makeFormData(responses, JSON.stringify(notes));
+
+		const result = await action({
+			request: makeRequest(formData),
+			params: { groupId: "g1", requestId: "r1" },
+			context: {},
+		});
+
+		expect(submitAvailabilityResponse).toHaveBeenCalledWith({
+			requestId: "r1",
+			userId: "user-1",
+			responses,
+			notes: { "2025-03-15": "Confirmed" },
+		});
+		expect(result).toEqual({ success: true, message: "Response saved!" });
+	});
+
+	it("trims whitespace from notes", async () => {
+		const responses = { "2025-03-15": "available" };
+		const notes = { "2025-03-15": "  Has spaces  " };
+		const formData = makeFormData(responses, JSON.stringify(notes));
+
+		const result = await action({
+			request: makeRequest(formData),
+			params: { groupId: "g1", requestId: "r1" },
+			context: {},
+		});
+
+		expect(submitAvailabilityResponse).toHaveBeenCalledWith({
+			requestId: "r1",
+			userId: "user-1",
+			responses,
+			notes: { "2025-03-15": "Has spaces" },
+		});
+		expect(result).toEqual({ success: true, message: "Response saved!" });
+	});
+
+	it("filters out whitespace-only notes", async () => {
+		const responses = { "2025-03-15": "available" };
+		const notes = { "2025-03-15": "   " };
+		const formData = makeFormData(responses, JSON.stringify(notes));
+
+		const result = await action({
+			request: makeRequest(formData),
+			params: { groupId: "g1", requestId: "r1" },
+			context: {},
+		});
+
+		expect(submitAvailabilityResponse).toHaveBeenCalledWith({
+			requestId: "r1",
+			userId: "user-1",
+			responses,
+			notes: {},
+		});
+		expect(result).toEqual({ success: true, message: "Response saved!" });
+	});
+
+	it("returns error for notes with invalid date keys", async () => {
+		const responses = { "2025-03-15": "available" };
+		const notes = { "not-a-date": "Note" };
+		const formData = makeFormData(responses, JSON.stringify(notes));
+
+		const result = await action({
+			request: makeRequest(formData),
+			params: { groupId: "g1", requestId: "r1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ error: "Invalid notes data." });
+		expect(submitAvailabilityResponse).not.toHaveBeenCalled();
+	});
+
+	it("returns error when notes is a JSON array", async () => {
+		const responses = { "2025-03-15": "available" };
+		const formData = makeFormData(responses, '["not", "an", "object"]');
+
+		const result = await action({
+			request: makeRequest(formData),
+			params: { groupId: "g1", requestId: "r1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ error: "Invalid notes data." });
+		expect(submitAvailabilityResponse).not.toHaveBeenCalled();
+	});
+
+	it("returns error when notes is JSON null", async () => {
+		const responses = { "2025-03-15": "available" };
+		const formData = makeFormData(responses, "null");
+
+		const result = await action({
+			request: makeRequest(formData),
+			params: { groupId: "g1", requestId: "r1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ error: "Invalid notes data." });
+		expect(submitAvailabilityResponse).not.toHaveBeenCalled();
+	});
+
+	it("accepts a 200-character note (boundary)", async () => {
+		const responses = { "2025-03-15": "available" };
+		const notes = { "2025-03-15": "x".repeat(200) };
+		const formData = makeFormData(responses, JSON.stringify(notes));
+
+		const result = await action({
+			request: makeRequest(formData),
+			params: { groupId: "g1", requestId: "r1" },
+			context: {},
+		});
+
+		expect(submitAvailabilityResponse).toHaveBeenCalled();
+		expect(result).toEqual({ success: true, message: "Response saved!" });
+	});
+
+	it("handles empty notes object gracefully", async () => {
+		const responses = { "2025-03-15": "available" };
+		const formData = makeFormData(responses, "{}");
+
+		const result = await action({
+			request: makeRequest(formData),
+			params: { groupId: "g1", requestId: "r1" },
+			context: {},
+		});
+
+		expect(submitAvailabilityResponse).toHaveBeenCalledWith({
+			requestId: "r1",
+			userId: "user-1",
+			responses,
+			notes: {},
+		});
+		expect(result).toEqual({ success: true, message: "Response saved!" });
 	});
 });
 

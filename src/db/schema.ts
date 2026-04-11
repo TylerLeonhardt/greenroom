@@ -152,6 +152,7 @@ export const availabilityResponses = pgTable(
 		responses: jsonb("responses")
 			.$type<Record<string, "available" | "maybe" | "not_available">>()
 			.notNull(),
+		notes: jsonb("notes").$type<Record<string, string>>(),
 		respondedAt: timestamp("responded_at", { withTimezone: true }).defaultNow().notNull(),
 		updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 	},

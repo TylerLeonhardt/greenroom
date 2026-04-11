@@ -104,4 +104,80 @@ export default defineFixtureGroup({
 			return { dispose: () => root.unmount() };
 		},
 	}),
+	"With Notes": defineFixture({
+		description: "Grid with notes on some days — note inputs auto-expanded",
+		render: (container) => {
+			const responses: Record<string, AvailabilityStatus> = {
+				"2026-03-23": "available",
+				"2026-03-24": "maybe",
+				"2026-03-25": "not_available",
+				"2026-03-26": "available",
+			};
+			const notes: Record<string, string> = {
+				"2026-03-23": "Can arrive a bit late, around 7:15",
+				"2026-03-25": "Out of town for a wedding",
+			};
+			const root = createRoot(container);
+			root.render(
+				<AvailabilityGrid
+					dates={sampleDates}
+					responses={responses}
+					onChange={(r) => console.log("Responses changed:", r)}
+					notes={notes}
+					onNotesChange={(n) => console.log("Notes changed:", n)}
+					timezone="America/New_York"
+				/>,
+			);
+			return { dispose: () => root.unmount() };
+		},
+	}),
+	"No Notes": defineFixture({
+		description: "Grid with note buttons visible but no notes entered",
+		render: (container) => {
+			const responses: Record<string, AvailabilityStatus> = {
+				"2026-03-23": "available",
+				"2026-03-25": "maybe",
+			};
+			const root = createRoot(container);
+			root.render(
+				<AvailabilityGrid
+					dates={sampleDates}
+					responses={responses}
+					onChange={(r) => console.log("Responses changed:", r)}
+					notes={{}}
+					onNotesChange={(n) => console.log("Notes changed:", n)}
+					timezone="America/New_York"
+				/>,
+			);
+			return { dispose: () => root.unmount() };
+		},
+	}),
+	"Long Notes": defineFixture({
+		description: "Grid with notes at or near the 200-character limit",
+		render: (container) => {
+			const responses: Record<string, AvailabilityStatus> = {
+				"2026-03-23": "available",
+				"2026-03-24": "maybe",
+				"2026-03-25": "available",
+			};
+			const notes: Record<string, string> = {
+				"2026-03-23":
+					"I can make it but I'll need to leave by 8:30pm because I have another commitment across town and traffic can be really unpredictable at that hour so I want to make sure I leave enough time to get there",
+				"2026-03-24":
+					"Not 100% sure yet — waiting to hear back from my day job about whether I need to cover someone's shift. Should know by Wednesday at the latest. Will update as soon as I find out!",
+			};
+			const root = createRoot(container);
+			root.render(
+				<AvailabilityGrid
+					dates={sampleDates}
+					responses={responses}
+					onChange={(r) => console.log("Responses changed:", r)}
+					notes={notes}
+					onNotesChange={(n) => console.log("Notes changed:", n)}
+					timezone="America/New_York"
+				/>,
+			);
+			return { dispose: () => root.unmount() };
+		},
+	}),
 });
