@@ -19,7 +19,7 @@ interface DateResult {
 	noResponse: number;
 	total: number;
 	score: number;
-	respondents: Array<{ name: string; status: string }>;
+	respondents: Array<{ name: string; status: string; note?: string }>;
 }
 
 interface ResultsHeatmapProps {
@@ -63,8 +63,8 @@ const statusSortOrder: Record<string, number> = {
 };
 
 function sortRespondentsByResponse(
-	respondents: Array<{ name: string; status: string }>,
-): Array<{ name: string; status: string }> {
+	respondents: Array<{ name: string; status: string; note?: string }>,
+): Array<{ name: string; status: string; note?: string }> {
 	return [...respondents].sort((a, b) => {
 		const statusDiff = (statusSortOrder[a.status] ?? 3) - (statusSortOrder[b.status] ?? 3);
 		if (statusDiff !== 0) return statusDiff;
@@ -369,12 +369,21 @@ export function ResultsHeatmap({
 													<div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
 														{row.respondents.length > 0 ? (
 															sortRespondentsByResponse(row.respondents).map((r) => (
-																<div key={r.name} className="flex items-center gap-2 text-sm">
-																	{statusIcon[r.status]}
-																	<span className="text-slate-700">{r.name}</span>
-																	<span className="text-xs text-slate-400">
-																		{statusLabel[r.status]}
-																	</span>
+																<div key={r.name} className="flex items-start gap-2 text-sm">
+																	<span className="mt-0.5">{statusIcon[r.status]}</span>
+																	<div>
+																		<div className="flex items-center gap-2">
+																			<span className="text-slate-700">{r.name}</span>
+																			<span className="text-xs text-slate-400">
+																				{statusLabel[r.status]}
+																			</span>
+																		</div>
+																		{r.note && (
+																			<p className="mt-0.5 text-xs text-slate-500 italic">
+																				"{r.note}"
+																			</p>
+																		)}
+																	</div>
 																</div>
 															))
 														) : (
@@ -494,9 +503,14 @@ export function ResultsHeatmap({
 									<div className="space-y-2">
 										{row.respondents.length > 0 ? (
 											sortRespondentsByResponse(row.respondents).map((r) => (
-												<div key={r.name} className="flex items-center gap-2 text-sm">
-													{statusIcon[r.status]}
-													<span className="text-slate-700">{r.name}</span>
+												<div key={r.name} className="flex items-start gap-2 text-sm">
+													<span className="mt-0.5">{statusIcon[r.status]}</span>
+													<div>
+														<span className="text-slate-700">{r.name}</span>
+														{r.note && (
+															<p className="mt-0.5 text-xs text-slate-500 italic">"{r.note}"</p>
+														)}
+													</div>
 												</div>
 											))
 										) : (

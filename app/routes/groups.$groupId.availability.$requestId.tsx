@@ -63,7 +63,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 		throw new Response("Not Found", { status: 404 });
 	}
 
-	const userResponse = await getUserResponse(requestId, user.id);
+	const userResponseData = await getUserResponse(requestId, user.id);
 	const results = await getAggregatedResults(requestId);
 	const nonRespondentCount =
 		results && results.totalResponded < results.totalMembers
@@ -75,7 +75,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
 	return {
 		availRequest,
-		userResponse,
+		userResponse: userResponseData?.responses ?? null,
+		userNotes: userResponseData?.notes ?? {},
 		results,
 		isAdmin: admin,
 		user,
@@ -115,10 +116,44 @@ export async function action({ request, params }: ActionFunctionArgs) {
 			}
 		}
 
+		// Parse and validate optional per-day notes
+		const notesRaw = formData.get("notes");
+		let notes: Record<string, string> = {};
+		if (notesRaw && typeof notesRaw === "string" && notesRaw !== "{}") {
+			try {
+				const parsed = JSON.parse(notesRaw);
+				if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+					return { error: "Invalid notes data." };
+				}
+				notes = parsed;
+			} catch {
+				return { error: "Invalid notes data." };
+			}
+
+			for (const [key, value] of Object.entries(notes)) {
+				if (!datePattern.test(key) || typeof value !== "string") {
+					return { error: "Invalid notes data." };
+				}
+				if (value.length > 200) {
+					return { error: "Notes must be 200 characters or less per day." };
+				}
+			}
+
+			// Only keep notes for dates that have a response
+			const filteredNotes: Record<string, string> = {};
+			for (const [key, value] of Object.entries(notes)) {
+				if (responses[key] && value.trim()) {
+					filteredNotes[key] = value.trim();
+				}
+			}
+			notes = filteredNotes;
+		}
+
 		await submitAvailabilityResponse({
 			requestId,
 			userId: user.id,
 			responses,
+			notes,
 		});
 
 		return { success: true, message: "Response saved!" };
@@ -233,8 +268,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function AvailabilityRequestDetail() {
-	const { availRequest, userResponse, results, isAdmin, user, nonRespondentCount, reminderSentAt } =
-		useLoaderData<typeof loader>();
+	const {
+		availRequest,
+		userResponse,
+		userNotes,
+		results,
+		isAdmin,
+		user,
+		nonRespondentCount,
+		reminderSentAt,
+	} = useLoaderData<typeof loader>();
 	const parentData = useRouteLoaderData<typeof groupLayoutLoader>("routes/groups.$groupId");
 	const timezone = parentData?.user?.timezone ?? undefined;
 	const actionData = useActionData<typeof action>();
@@ -249,6 +292,9 @@ export default function AvailabilityRequestDetail() {
 	const dates = availRequest.requestedDates as string[];
 	const [responses, setResponses] = useState<Record<string, AvailabilityStatus>>(
 		(userResponse as Record<string, AvailabilityStatus>) ?? {},
+	);
+	const [notes, setNotes] = useState<Record<string, string>>(
+		(userNotes as Record<string, string>) ?? {},
 	);
 	const [view, setView] = useState<"respond" | "results">("respond");
 	const isClosed = availRequest.status === "closed";
@@ -415,6 +461,8 @@ export default function AvailabilityRequestDetail() {
 						dates={dates}
 						responses={responses}
 						onChange={setResponses}
+						notes={notes}
+						onNotesChange={setNotes}
 						disabled={isClosed}
 						timeRange={hasTimeRange ? timeRange : null}
 						timezone={timezone}
@@ -424,6 +472,7 @@ export default function AvailabilityRequestDetail() {
 							<CsrfInput />
 							<input type="hidden" name="intent" value="respond" />
 							<input type="hidden" name="responses" value={JSON.stringify(responses)} />
+							<input type="hidden" name="notes" value={JSON.stringify(notes)} />
 							<button
 								type="submit"
 								disabled={isSubmitting || Object.keys(responses).length === 0}

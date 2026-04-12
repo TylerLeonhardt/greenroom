@@ -11,7 +11,7 @@ interface DateResult {
 	noResponse: number;
 	total: number;
 	score: number;
-	respondents: Array<{ name: string; status: string }>;
+	respondents: Array<{ name: string; status: string; note?: string }>;
 }
 
 function makeDateResult(
@@ -20,7 +20,7 @@ function makeDateResult(
 	maybe: number,
 	notAvailable: number,
 	total: number,
-	respondents: Array<{ name: string; status: string }>,
+	respondents: Array<{ name: string; status: string; note?: string }>,
 ): DateResult {
 	return {
 		date,
@@ -357,6 +357,54 @@ export default defineFixtureGroup({
 						groupId="fixture-group-1"
 						requestId="fixture-request-5"
 						timeRange="7:00 PM - 9:00 PM"
+						timezone="America/New_York"
+					/>
+				</div>,
+			);
+			return { dispose: () => root.unmount() };
+		},
+	}),
+	"With Respondent Notes": defineFixture({
+		description: "Respondents with per-day notes shown inline",
+		render: (container) => {
+			const datesWithNotes: DateResult[] = [
+				makeDateResult("2026-03-23", 5, 1, 1, 8, [
+					{ name: "Alex", status: "available", note: "Can arrive by 6:45" },
+					{ name: "Jordan", status: "available", note: "Bringing a friend to watch" },
+					{ name: "Casey", status: "available" },
+					{ name: "Morgan", status: "not_available", note: "Out of town for a wedding" },
+					{ name: "Riley", status: "available" },
+					{ name: "Taylor", status: "available" },
+					{ name: "Sam", status: "maybe", note: "Depends on work schedule" },
+				]),
+				makeDateResult("2026-03-24", 3, 2, 2, 8, [
+					{ name: "Alex", status: "available" },
+					{ name: "Jordan", status: "maybe", note: "Might have a conflict with another show" },
+					{ name: "Casey", status: "not_available" },
+					{ name: "Morgan", status: "not_available" },
+					{ name: "Riley", status: "available" },
+					{ name: "Taylor", status: "available" },
+					{ name: "Sam", status: "maybe" },
+				]),
+				makeDateResult("2026-03-25", 6, 0, 1, 8, [
+					{ name: "Alex", status: "available", note: "This is my preferred date!" },
+					{ name: "Jordan", status: "available" },
+					{ name: "Casey", status: "available" },
+					{ name: "Morgan", status: "not_available" },
+					{ name: "Riley", status: "available" },
+					{ name: "Taylor", status: "available" },
+					{ name: "Sam", status: "available" },
+				]),
+			];
+			const root = createRoot(container);
+			root.render(
+				<div className="max-w-4xl p-4">
+					<ResultsHeatmap
+						dates={datesWithNotes}
+						totalMembers={8}
+						totalResponded={7}
+						groupId="fixture-group-1"
+						requestId="fixture-request-notes"
 						timezone="America/New_York"
 					/>
 				</div>,
