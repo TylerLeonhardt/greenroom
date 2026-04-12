@@ -260,7 +260,6 @@ export function ResultsHeatmap({
 								<th className="px-3 py-3 text-center text-xs font-medium text-amber-500">🤔</th>
 								<th className="px-3 py-3 text-center text-xs font-medium text-rose-600">❌</th>
 								<th className="px-3 py-3 text-center text-xs font-medium text-slate-400">—</th>
-								<th className="px-4 py-3 text-center text-xs font-medium text-slate-500">Score</th>
 								<th className="px-4 py-3 text-right text-xs font-medium text-slate-500" />
 							</tr>
 						</thead>
@@ -346,11 +345,6 @@ export function ResultsHeatmap({
 											<td className="px-3 py-3 text-center text-sm text-slate-400">
 												{row.noResponse}
 											</td>
-											<td className="px-4 py-3 text-center">
-												<span className="inline-flex items-center rounded-full bg-slate-900/5 px-2 py-0.5 text-xs font-semibold text-slate-700">
-													{row.score}
-												</span>
-											</td>
 											<td className="px-4 py-3 text-right">
 												{!batchSelecting && (
 													<a
@@ -365,7 +359,7 @@ export function ResultsHeatmap({
 										</tr>
 										{isExpanded && (
 											<tr key={`${row.date}-detail`}>
-												<td colSpan={batchSelecting ? 10 : 9} className="bg-slate-50 px-8 py-4">
+												<td colSpan={batchSelecting ? 9 : 8} className="bg-slate-50 px-8 py-4">
 													<div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
 														{row.respondents.length > 0 ? (
 															sortRespondentsByResponse(row.respondents).map((r) => (
@@ -473,30 +467,25 @@ export function ResultsHeatmap({
 										</div>
 									</div>
 								</div>
-								<div className="flex items-center gap-2">
-									<span className="rounded-full bg-slate-900/5 px-2 py-0.5 text-xs font-semibold text-slate-700">
-										{row.score}
-									</span>
-									<button
-										type="button"
-										onClick={(e) => {
+								<button
+									type="button"
+									onClick={(e) => {
+										e.stopPropagation();
+										toggleExpanded(row.date);
+									}}
+									onKeyDown={(e) => {
+										if (e.key === "Enter" || e.key === " ") {
 											e.stopPropagation();
-											toggleExpanded(row.date);
-										}}
-										onKeyDown={(e) => {
-											if (e.key === "Enter" || e.key === " ") {
-												e.stopPropagation();
-											}
-										}}
-										className="p-1"
-									>
-										{isExpanded ? (
-											<ChevronDown className="h-4 w-4 text-slate-400" />
-										) : (
-											<ChevronRight className="h-4 w-4 text-slate-400" />
-										)}
-									</button>
-								</div>
+										}
+									}}
+									className="p-1"
+								>
+									{isExpanded ? (
+										<ChevronDown className="h-4 w-4 text-slate-400" />
+									) : (
+										<ChevronRight className="h-4 w-4 text-slate-400" />
+									)}
+								</button>
 							</div>
 							{isExpanded && (
 								<div className="border-t border-slate-200 bg-white p-4">

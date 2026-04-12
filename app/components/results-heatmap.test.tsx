@@ -98,14 +98,13 @@ describe("ResultsHeatmap", () => {
 			expect(desktop.getByText("2025-03-17")).toBeDefined();
 		});
 
-		it("shows score badges", () => {
+		it("does not show score badges in the UI", () => {
 			const dates = makeThreeDates();
 			const { container } = render(<ResultsHeatmap dates={dates} {...defaultProps} />);
 			const desktop = getDesktopTable(container);
-			// Score badges are in spans with specific classes
+			// Score badges were removed — score is only used internally for sorting
 			const badges = desktop.el.querySelectorAll("span.inline-flex.items-center.rounded-full");
-			const scores = Array.from(badges).map((b) => b.textContent);
-			expect(scores).toEqual(["7", "5", "3"]);
+			expect(Array.from(badges)).toEqual([]);
 		});
 
 		it("shows star on top dates", () => {
