@@ -58,6 +58,7 @@ import {
 	isGroupAdmin,
 	requireGroupMember,
 } from "~/services/groups.server";
+import { logger } from "~/services/logger.server";
 import type { loader as groupLayoutLoader } from "./groups.$groupId";
 
 export const meta: MetaFunction = () => {
@@ -208,36 +209,39 @@ export async function action({ request, params }: ActionFunctionArgs) {
 			const newlyAssignedIds = verifiedIds.filter((id) => !existingAssignmentIds.has(id));
 			if (newlyAssignedIds.length > 0) {
 				void (async () => {
-					const membersWithPrefs = await getGroupMembersWithPreferences(groupId);
-					const prefsMap = new Map(membersWithPrefs.map((m) => [m.id, m]));
-					const appUrl = process.env.APP_URL ?? "http://localhost:5173";
-					const eventUrl = `${appUrl}/groups/${groupId}/events/${eventId}`;
-					const preferencesUrl = `${appUrl}/groups/${groupId}/notifications`;
-					const event = eventData.event;
-					const groupName = groupData?.group.name ?? "";
+					try {
+						const membersWithPrefs = await getGroupMembersWithPreferences(groupId);
+						const prefsMap = new Map(membersWithPrefs.map((m) => [m.id, m]));
+						const appUrl = process.env.APP_URL ?? "http://localhost:5173";
+						const eventUrl = `${appUrl}/groups/${groupId}/events/${eventId}`;
+						const preferencesUrl = `${appUrl}/groups/${groupId}/notifications`;
+						const event = eventData.event;
+						const groupName = groupData?.group.name ?? "";
 
-					for (const userId of newlyAssignedIds) {
-						const member = prefsMap.get(userId);
-						if (!member) continue;
-						const tz = member.timezone ?? undefined;
-						const dateTime = formatEventTime(
-							event.startTime as unknown as string,
-							event.endTime as unknown as string,
-							tz,
+						for (const userId of newlyAssignedIds) {
+							const member = prefsMap.get(userId);
+							if (!member) continue;
+							const tz = member.timezone ?? undefined;
+							const dateTime = formatEventTime(event.startTime, event.endTime, tz);
+							void sendEventAssignmentNotification({
+								eventTitle: event.title,
+								eventType: event.eventType,
+								dateTime,
+								groupName,
+								recipient: {
+									email: member.email,
+									name: member.name,
+									notificationPreferences: member.notificationPreferences,
+								},
+								eventUrl,
+								preferencesUrl,
+							});
+						}
+					} catch (error) {
+						logger.error(
+							{ err: error, groupId, eventId },
+							"Failed to send event assignment notifications",
 						);
-						void sendEventAssignmentNotification({
-							eventTitle: event.title,
-							eventType: event.eventType,
-							dateTime,
-							groupName,
-							recipient: {
-								email: member.email,
-								name: member.name,
-								notificationPreferences: member.notificationPreferences,
-							},
-							eventUrl,
-							preferencesUrl,
-						});
 					}
 				})();
 			}
@@ -268,35 +272,35 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
 		if (sendNotification) {
 			void (async () => {
-				const membersWithPrefs = await getGroupMembersWithPreferences(groupId);
-				const member = membersWithPrefs.find((m) => m.id === targetUserId);
-				if (!member) return;
-				const appUrl = process.env.APP_URL ?? "http://localhost:5173";
-				const eventUrl = `${appUrl}/groups/${groupId}/events/${eventId}`;
-				const preferencesUrl = `${appUrl}/groups/${groupId}/notifications`;
-				const event = eventData.event;
-				const groupData = await getGroupWithMembers(groupId);
-				const groupName = groupData?.group.name ?? "";
-				const tz = member.timezone ?? undefined;
-				const dateTime = formatEventTime(
-					event.startTime as unknown as string,
-					event.endTime as unknown as string,
-					tz,
-				);
-				void sendRoleChangeNotification({
-					eventTitle: event.title,
-					eventType: event.eventType,
-					dateTime,
-					groupName,
-					newRole: trimmedRole,
-					recipient: {
-						email: member.email,
-						name: member.name,
-						notificationPreferences: member.notificationPreferences,
-					},
-					eventUrl,
-					preferencesUrl,
-				});
+				try {
+					const membersWithPrefs = await getGroupMembersWithPreferences(groupId);
+					const member = membersWithPrefs.find((m) => m.id === targetUserId);
+					if (!member) return;
+					const appUrl = process.env.APP_URL ?? "http://localhost:5173";
+					const eventUrl = `${appUrl}/groups/${groupId}/events/${eventId}`;
+					const preferencesUrl = `${appUrl}/groups/${groupId}/notifications`;
+					const event = eventData.event;
+					const groupData = await getGroupWithMembers(groupId);
+					const groupName = groupData?.group.name ?? "";
+					const tz = member.timezone ?? undefined;
+					const dateTime = formatEventTime(event.startTime, event.endTime, tz);
+					void sendRoleChangeNotification({
+						eventTitle: event.title,
+						eventType: event.eventType,
+						dateTime,
+						groupName,
+						newRole: trimmedRole,
+						recipient: {
+							email: member.email,
+							name: member.name,
+							notificationPreferences: member.notificationPreferences,
+						},
+						eventUrl,
+						preferencesUrl,
+					});
+				} catch (error) {
+					logger.error({ err: error, groupId, eventId }, "Failed to send role change notification");
+				}
 			})();
 		}
 		return { success: true };
@@ -367,9 +371,7 @@ export default function EventDetail() {
 	const dateStr = formatDateLong(event.startTime, timezone);
 	const startTimeStr = formatTime(event.startTime, timezone);
 	const endTimeStr = formatTime(event.endTime, timezone);
-	const callTimeStr = event.callTime
-		? formatTime(event.callTime as unknown as string, timezone)
-		: null;
+	const callTimeStr = event.callTime ? formatTime(event.callTime, timezone) : null;
 
 	const toggleUser = (id: string) => {
 		const next = new Set(selectedUserIds);
