@@ -38,6 +38,7 @@ import {
 	getGroupWithMembers,
 	requireGroupAdminOrPermission,
 } from "~/services/groups.server";
+import { logger } from "~/services/logger.server";
 import { sendEventCreatedWebhook } from "~/services/webhook.server";
 import type { NotificationPreferences } from "../../src/db/schema.js";
 
@@ -178,126 +179,133 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		typeof fromRequestId === "string" && fromRequestId ? fromRequestId : null;
 
 	void (async () => {
-		const [groupData, membersWithPrefs] = await Promise.all([
-			getGroupWithMembers(groupId),
-			getGroupMembersWithPreferences(groupId),
-		]);
-		if (!groupData) return;
+		try {
+			const [groupData, membersWithPrefs] = await Promise.all([
+				getGroupWithMembers(groupId),
+				getGroupMembersWithPreferences(groupId),
+			]);
+			if (!groupData) return;
 
-		const prefsMap = new Map(membersWithPrefs.map((m) => [m.id, m.notificationPreferences]));
+			const prefsMap = new Map(membersWithPrefs.map((m) => [m.id, m.notificationPreferences]));
 
-		if (validFromRequestId && typeof date === "string") {
-			// Availability-aware notifications
-			const availData = await getAvailabilityForEventDate(validFromRequestId, date);
-			const memberMap = new Map(
-				groupData.members.map((m) => [
-					m.id,
-					{
+			if (validFromRequestId && typeof date === "string") {
+				// Availability-aware notifications
+				const availData = await getAvailabilityForEventDate(validFromRequestId, date);
+				const memberMap = new Map(
+					groupData.members.map((m) => [
+						m.id,
+						{
+							email: m.email,
+							name: m.name,
+							timezone: m.timezone,
+							notificationPreferences: prefsMap.get(m.id),
+						},
+					]),
+				);
+
+				const availableRecipients: Array<{
+					email: string;
+					name: string;
+					timezone?: string | null;
+					notificationPreferences?: NotificationPreferences;
+				}> = [];
+				const maybeRecipients: Array<{
+					email: string;
+					name: string;
+					timezone?: string | null;
+					notificationPreferences?: NotificationPreferences;
+				}> = [];
+				const respondedUserIds = new Set<string>();
+
+				for (const entry of availData) {
+					if (entry.userId === user.id) {
+						respondedUserIds.add(entry.userId);
+						continue;
+					}
+					respondedUserIds.add(entry.userId);
+					const member = memberMap.get(entry.userId);
+					if (!member) continue;
+					if (entry.status === "available") {
+						availableRecipients.push(member);
+					} else if (entry.status === "maybe") {
+						maybeRecipients.push(member);
+					}
+					// not_available → no email
+				}
+
+				// Members who didn't respond at all
+				const noResponseRecipients = groupData.members
+					.filter((m) => m.id !== user.id && !respondedUserIds.has(m.id))
+					.map((m) => ({
 						email: m.email,
 						name: m.name,
 						timezone: m.timezone,
 						notificationPreferences: prefsMap.get(m.id),
-					},
-				]),
-			);
+					}));
 
-			const availableRecipients: Array<{
-				email: string;
-				name: string;
-				timezone?: string | null;
-				notificationPreferences?: NotificationPreferences;
-			}> = [];
-			const maybeRecipients: Array<{
-				email: string;
-				name: string;
-				timezone?: string | null;
-				notificationPreferences?: NotificationPreferences;
-			}> = [];
-			const respondedUserIds = new Set<string>();
+				void sendEventFromAvailabilityNotification({
+					eventTitle: event.title,
+					eventType: event.eventType,
+					startTime: event.startTime,
+					endTime: event.endTime,
+					location: event.location ?? undefined,
+					groupName: groupData.group.name,
+					eventUrl,
+					availableRecipients,
+					maybeRecipients,
+					noResponseRecipients,
+					preferencesUrl,
+				});
+			} else {
+				// Standard notification
+				const recipients = groupData.members
+					.filter((m) => m.id !== user.id)
+					.map((m) => ({
+						email: m.email,
+						name: m.name,
+						timezone: m.timezone,
+						notificationPreferences: prefsMap.get(m.id),
+					}));
+				if (recipients.length === 0) return;
 
-			for (const entry of availData) {
-				if (entry.userId === user.id) {
-					respondedUserIds.add(entry.userId);
-					continue;
-				}
-				respondedUserIds.add(entry.userId);
-				const member = memberMap.get(entry.userId);
-				if (!member) continue;
-				if (entry.status === "available") {
-					availableRecipients.push(member);
-				} else if (entry.status === "maybe") {
-					maybeRecipients.push(member);
-				}
-				// not_available → no email
+				void sendEventCreatedNotification({
+					eventTitle: event.title,
+					eventType: event.eventType,
+					startTime: event.startTime,
+					endTime: event.endTime,
+					location: event.location ?? undefined,
+					groupName: groupData.group.name,
+					recipients,
+					eventUrl,
+					preferencesUrl,
+				});
 			}
 
-			// Members who didn't respond at all
-			const noResponseRecipients = groupData.members
-				.filter((m) => m.id !== user.id && !respondedUserIds.has(m.id))
-				.map((m) => ({
-					email: m.email,
-					name: m.name,
-					timezone: m.timezone,
-					notificationPreferences: prefsMap.get(m.id),
-				}));
-
-			void sendEventFromAvailabilityNotification({
-				eventTitle: event.title,
-				eventType: event.eventType,
-				startTime: event.startTime,
-				endTime: event.endTime,
-				location: event.location ?? undefined,
-				groupName: groupData.group.name,
-				eventUrl,
-				availableRecipients,
-				maybeRecipients,
-				noResponseRecipients,
-				preferencesUrl,
-			});
-		} else {
-			// Standard notification
-			const recipients = groupData.members
-				.filter((m) => m.id !== user.id)
-				.map((m) => ({
-					email: m.email,
-					name: m.name,
-					timezone: m.timezone,
-					notificationPreferences: prefsMap.get(m.id),
-				}));
-			if (recipients.length === 0) return;
-
-			void sendEventCreatedNotification({
-				eventTitle: event.title,
-				eventType: event.eventType,
-				startTime: event.startTime,
-				endTime: event.endTime,
-				location: event.location ?? undefined,
-				groupName: groupData.group.name,
-				recipients,
-				eventUrl,
-				preferencesUrl,
-			});
-		}
-
-		// Fire-and-forget Discord webhook
-		if (groupData.group.webhookUrl) {
-			const tz = event.timezone ?? undefined;
-			const webhookDateTime = formatEventTime(event.startTime, event.endTime, tz);
-			const tzAbbrev = getTimezoneAbbreviation(event.startTime, tz);
-			const webhookCallTime = event.callTime ? formatTime(event.callTime, tz) : null;
-			sendEventCreatedWebhook(groupData.group.webhookUrl, {
-				groupName: groupData.group.name,
-				eventTitle: event.title,
-				eventType: event.eventType,
-				dateTime: tzAbbrev ? `${webhookDateTime} (${tzAbbrev})` : webhookDateTime,
-				location: event.location ?? undefined,
-				callTime: webhookCallTime
-					? tzAbbrev
-						? `${webhookCallTime} (${tzAbbrev})`
-						: webhookCallTime
-					: undefined,
-				eventUrl,
-			});
+			// Fire-and-forget Discord webhook
+			if (groupData.group.webhookUrl) {
+				const tz = event.timezone ?? undefined;
+				const webhookDateTime = formatEventTime(event.startTime, event.endTime, tz);
+				const tzAbbrev = getTimezoneAbbreviation(event.startTime, tz);
+				const webhookCallTime = event.callTime ? formatTime(event.callTime, tz) : null;
+				sendEventCreatedWebhook(groupData.group.webhookUrl, {
+					groupName: groupData.group.name,
+					eventTitle: event.title,
+					eventType: event.eventType,
+					dateTime: tzAbbrev ? `${webhookDateTime} (${tzAbbrev})` : webhookDateTime,
+					location: event.location ?? undefined,
+					callTime: webhookCallTime
+						? tzAbbrev
+							? `${webhookCallTime} (${tzAbbrev})`
+							: webhookCallTime
+						: undefined,
+					eventUrl,
+				});
+			}
+		} catch (error) {
+			logger.error(
+				{ err: error, groupId, eventId: event.id },
+				"Failed to send event creation notifications",
+			);
 		}
 	})();
 

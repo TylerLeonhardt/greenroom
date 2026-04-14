@@ -29,6 +29,7 @@ import {
 	getGroupWithMembers,
 	requireGroupAdminOrPermission,
 } from "~/services/groups.server";
+import { logger } from "~/services/logger.server";
 import { sendBatchEventsCreatedWebhook } from "~/services/webhook.server";
 import type { NotificationPreferences } from "../../src/db/schema.js";
 
@@ -158,120 +159,124 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	const preferencesUrl = `${appUrl}/groups/${groupId}/notifications`;
 
 	void (async () => {
-		const [groupData, membersWithPrefs] = await Promise.all([
-			getGroupWithMembers(groupId),
-			getGroupMembersWithPreferences(groupId),
-		]);
-		if (!groupData) return;
+		try {
+			const [groupData, membersWithPrefs] = await Promise.all([
+				getGroupWithMembers(groupId),
+				getGroupMembersWithPreferences(groupId),
+			]);
+			if (!groupData) return;
 
-		const prefsMap = new Map(membersWithPrefs.map((m) => [m.id, m.notificationPreferences]));
+			const prefsMap = new Map(membersWithPrefs.map((m) => [m.id, m.notificationPreferences]));
 
-		// Build per-member "best status" across all batch dates
-		const memberBestStatus = new Map<string, "available" | "maybe" | "not_available">();
-		const respondedUserIds = new Set<string>();
+			// Build per-member "best status" across all batch dates
+			const memberBestStatus = new Map<string, "available" | "maybe" | "not_available">();
+			const respondedUserIds = new Set<string>();
 
-		for (const date of selectedDates) {
-			const availData = await getAvailabilityForEventDate(requestId, date);
-			for (const entry of availData) {
-				respondedUserIds.add(entry.userId);
-				const current = memberBestStatus.get(entry.userId);
-				if (entry.status === "available") {
-					memberBestStatus.set(entry.userId, "available");
-				} else if (entry.status === "maybe" && current !== "available") {
-					memberBestStatus.set(entry.userId, "maybe");
-				} else if (!current) {
-					memberBestStatus.set(entry.userId, entry.status as "not_available");
+			for (const date of selectedDates) {
+				const availData = await getAvailabilityForEventDate(requestId, date);
+				for (const entry of availData) {
+					respondedUserIds.add(entry.userId);
+					const current = memberBestStatus.get(entry.userId);
+					if (entry.status === "available") {
+						memberBestStatus.set(entry.userId, "available");
+					} else if (entry.status === "maybe" && current !== "available") {
+						memberBestStatus.set(entry.userId, "maybe");
+					} else if (!current) {
+						memberBestStatus.set(entry.userId, entry.status as "not_available");
+					}
 				}
 			}
-		}
 
-		const memberMap = new Map(
-			groupData.members.map((m) => [
-				m.id,
-				{
-					email: m.email,
-					name: m.name,
-					timezone: m.timezone,
-					notificationPreferences: prefsMap.get(m.id) as NotificationPreferences | undefined,
-				},
-			]),
-		);
+			const memberMap = new Map(
+				groupData.members.map((m) => [
+					m.id,
+					{
+						email: m.email,
+						name: m.name,
+						timezone: m.timezone,
+						notificationPreferences: prefsMap.get(m.id) as NotificationPreferences | undefined,
+					},
+				]),
+			);
 
-		const availableRecipients: Array<{
-			email: string;
-			name: string;
-			timezone?: string | null;
-			notificationPreferences?: NotificationPreferences;
-		}> = [];
-		const maybeRecipients: Array<{
-			email: string;
-			name: string;
-			timezone?: string | null;
-			notificationPreferences?: NotificationPreferences;
-		}> = [];
-		const noResponseRecipients: Array<{
-			email: string;
-			name: string;
-			timezone?: string | null;
-			notificationPreferences?: NotificationPreferences;
-		}> = [];
+			const availableRecipients: Array<{
+				email: string;
+				name: string;
+				timezone?: string | null;
+				notificationPreferences?: NotificationPreferences;
+			}> = [];
+			const maybeRecipients: Array<{
+				email: string;
+				name: string;
+				timezone?: string | null;
+				notificationPreferences?: NotificationPreferences;
+			}> = [];
+			const noResponseRecipients: Array<{
+				email: string;
+				name: string;
+				timezone?: string | null;
+				notificationPreferences?: NotificationPreferences;
+			}> = [];
 
-		for (const member of groupData.members) {
-			if (member.id === user.id) continue;
-			const info = memberMap.get(member.id);
-			if (!info) continue;
+			for (const member of groupData.members) {
+				if (member.id === user.id) continue;
+				const info = memberMap.get(member.id);
+				if (!info) continue;
 
-			const bestStatus = memberBestStatus.get(member.id);
-			if (!respondedUserIds.has(member.id)) {
-				noResponseRecipients.push(info);
-			} else if (bestStatus === "available") {
-				availableRecipients.push(info);
-			} else if (bestStatus === "maybe") {
-				maybeRecipients.push(info);
-			} else if (bestStatus === "not_available") {
-				// Explicitly said "not available" for all batch dates → no email
-			} else {
-				// Responded to the request but didn't mark these specific dates
-				noResponseRecipients.push(info);
+				const bestStatus = memberBestStatus.get(member.id);
+				if (!respondedUserIds.has(member.id)) {
+					noResponseRecipients.push(info);
+				} else if (bestStatus === "available") {
+					availableRecipients.push(info);
+				} else if (bestStatus === "maybe") {
+					maybeRecipients.push(info);
+				} else if (bestStatus === "not_available") {
+					// Explicitly said "not available" for all batch dates → no email
+				} else {
+					// Responded to the request but didn't mark these specific dates
+					noResponseRecipients.push(info);
+				}
 			}
-		}
 
-		const eventDetails = events.map((e) => ({
-			title: e.title,
-			eventType: e.eventType,
-			startTime: e.startTime,
-			endTime: e.endTime,
-			location: e.location ?? undefined,
-			eventUrl: `${appUrl}/groups/${groupId}/events/${e.id}`,
-		}));
+			const eventDetails = events.map((e) => ({
+				title: e.title,
+				eventType: e.eventType,
+				startTime: e.startTime,
+				endTime: e.endTime,
+				location: e.location ?? undefined,
+				eventUrl: `${appUrl}/groups/${groupId}/events/${e.id}`,
+			}));
 
-		void sendBatchEventsFromAvailabilityNotification({
-			events: eventDetails,
-			groupName: groupData.group.name,
-			availableRecipients,
-			maybeRecipients,
-			noResponseRecipients,
-			eventsUrl,
-			preferencesUrl,
-		});
-
-		if (groupData.group.webhookUrl) {
-			const tz = timezone ?? undefined;
-			const webhookEvents = events.map((e) => {
-				const dateTime = formatEventTime(e.startTime, e.endTime, tz);
-				const tzAbbrev = getTimezoneAbbreviation(e.startTime, tz);
-				return {
-					dateTime: tzAbbrev ? `${dateTime} (${tzAbbrev})` : dateTime,
-					location: e.location ?? undefined,
-				};
-			});
-			sendBatchEventsCreatedWebhook(groupData.group.webhookUrl, {
+			void sendBatchEventsFromAvailabilityNotification({
+				events: eventDetails,
 				groupName: groupData.group.name,
-				title: title.trim(),
-				eventType,
-				events: webhookEvents,
+				availableRecipients,
+				maybeRecipients,
+				noResponseRecipients,
 				eventsUrl,
+				preferencesUrl,
 			});
+
+			if (groupData.group.webhookUrl) {
+				const tz = timezone ?? undefined;
+				const webhookEvents = events.map((e) => {
+					const dateTime = formatEventTime(e.startTime, e.endTime, tz);
+					const tzAbbrev = getTimezoneAbbreviation(e.startTime, tz);
+					return {
+						dateTime: tzAbbrev ? `${dateTime} (${tzAbbrev})` : dateTime,
+						location: e.location ?? undefined,
+					};
+				});
+				sendBatchEventsCreatedWebhook(groupData.group.webhookUrl, {
+					groupName: groupData.group.name,
+					title: title.trim(),
+					eventType,
+					events: webhookEvents,
+					eventsUrl,
+				});
+			}
+		} catch (error) {
+			logger.error({ err: error, groupId, requestId }, "Failed to send batch event notifications");
 		}
 	})();
 
