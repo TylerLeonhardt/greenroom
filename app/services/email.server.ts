@@ -455,7 +455,7 @@ export async function sendEventFromAvailabilityNotification(options: {
 
 	const layoutOpts = { preferencesUrl: options.preferencesUrl };
 
-	// Email people who said "available" — they're confirmed
+	// Email people who said "available" — event is scheduled, ask them to confirm
 	for (const recipient of options.availableRecipients) {
 		const prefs = mergeWithDefaults(recipient.notificationPreferences);
 		if (!prefs.eventNotifications.email) continue;
@@ -472,19 +472,19 @@ export async function sendEventFromAvailabilityNotification(options: {
 
 		const html = emailLayout(
 			`
-<h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0f172a;">You're Confirmed!</h2>
-<p style="color:#475569;margin:0 0 20px;">Great news, ${escapeHtml(recipient.name)} - the event you said you were available for is happening!</p>
+<h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0f172a;">An Event Has Been Scheduled!</h2>
+<p style="color:#475569;margin:0 0 20px;">Great news, ${escapeHtml(recipient.name)} — an event you said you were available for has been scheduled! Please confirm your attendance.</p>
 ${eventBlock}
-${ctaButton(options.eventUrl, "View Event Details")}
-<p style="color:#64748b;font-size:13px;margin:0;">You indicated you were available for this date. See you there!</p>`,
+${ctaButton(options.eventUrl, "Confirm Attendance")}
+<p style="color:#64748b;font-size:13px;margin:0;">You indicated you were available for this date. Please confirm your attendance.</p>`,
 			layoutOpts,
 		);
 
-		const text = `Hi ${recipient.name},\n\nGreat news - you're confirmed! The event you said you were available for is happening.\n\nEvent: ${options.eventTitle}\nGroup: ${options.groupName}\nWhen: ${dateTime}${options.location ? `\nWhere: ${options.location}` : ""}\n\nView details: ${options.eventUrl}`;
+		const text = `Hi ${recipient.name},\n\nGreat news — an event you said you were available for has been scheduled! Please confirm your attendance.\n\nEvent: ${options.eventTitle}\nGroup: ${options.groupName}\nWhen: ${dateTime}${options.location ? `\nWhere: ${options.location}` : ""}\n\nConfirm your attendance: ${options.eventUrl}`;
 
 		void sendEmail({
 			to: recipient.email,
-			subject: `${typeEmoji} You're confirmed — "${options.eventTitle}" is happening!`,
+			subject: `${typeEmoji} "${options.eventTitle}" is happening on ${dateTime}!`,
 			html,
 			text,
 		});
@@ -902,19 +902,19 @@ ${locLine}</div>`;
 
 		const html = emailLayout(
 			`
-<h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0f172a;">You're Booked!</h2>
-<p style="color:#475569;margin:0 0 20px;">Great news, ${escapeHtml(recipient.name)} — ${count} event${haveHas} been scheduled based on your availability.</p>
+<h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0f172a;">Events Have Been Scheduled!</h2>
+<p style="color:#475569;margin:0 0 20px;">Great news, ${escapeHtml(recipient.name)} — ${count} event${haveHas} been scheduled based on your availability! Please review and confirm your attendance.</p>
 ${buildEventListHtml(tz)}
 ${ctaButton(options.eventsUrl, "View Events")}
-<p style="color:#64748b;font-size:13px;margin:0;">You indicated you were available for ${count === 1 ? "this date" : "these dates"}. See you there!</p>`,
+<p style="color:#64748b;font-size:13px;margin:0;">You indicated you were available for ${count === 1 ? "this date" : "these dates"}. Please confirm your attendance.</p>`,
 			layoutOpts,
 		);
 
-		const text = `Hi ${recipient.name},\n\nGreat news! ${count} event${haveHas} been scheduled based on your availability.\n\n${buildEventListText(tz)}\n\nView events: ${options.eventsUrl}`;
+		const text = `Hi ${recipient.name},\n\nGreat news! ${count} event${haveHas} been scheduled based on your availability. Please review and confirm your attendance.\n\n${buildEventListText(tz)}\n\nView events: ${options.eventsUrl}`;
 
 		void sendEmail({
 			to: recipient.email,
-			subject: `📅 You're booked for ${count} event${s}!`,
+			subject: `📅 ${count} event${s} scheduled — confirm your attendance!`,
 			html,
 			text,
 		});
