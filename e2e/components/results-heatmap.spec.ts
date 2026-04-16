@@ -78,23 +78,16 @@ test.describe("ResultsHeatmap", () => {
 	test("Batch Mode — shows batch selection controls", async ({ page }) => {
 		await renderFixture(page, "results-heatmap", "Batch Mode");
 
-		// Batch mode should show the "Select Dates" button
-		await expect(
-			page.getByRole("button", { name: /Select Dates|Cancel Selection/i }),
-		).toBeVisible();
+		// Batch mode should show quick-select buttons (always visible)
+		await expect(page.getByRole("button", { name: "Select Top 5" })).toBeVisible();
+		await expect(page.getByRole("button", { name: "Select All" })).toBeVisible();
 	});
 
 	test("Batch Mode — select dates and create events", async ({ page, isMobile }) => {
 		test.skip(isMobile === true, "Desktop-only test");
 		await renderFixture(page, "results-heatmap", "Batch Mode");
 
-		// Enter selection mode
-		const selectButton = page.getByRole("button", { name: "Select Dates" });
-		if (await selectButton.isVisible()) {
-			await selectButton.click();
-		}
-
-		// Quick select buttons should appear
+		// Quick select buttons should be visible (batch selection is always active)
 		await expect(page.getByRole("button", { name: "Select Top 5" })).toBeVisible();
 		await expect(page.getByRole("button", { name: "Select All" })).toBeVisible();
 

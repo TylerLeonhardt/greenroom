@@ -85,7 +85,6 @@ export function ResultsHeatmap({
 }: ResultsHeatmapProps) {
 	const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
 	const [sortBy, setSortBy] = useState<"date" | "score">("date");
-	const [batchSelecting, setBatchSelecting] = useState(false);
 	const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set());
 
 	const toggleExpanded = useCallback((date: string) => {
@@ -189,47 +188,29 @@ export function ResultsHeatmap({
 					<div className="flex items-center gap-3">
 						<button
 							type="button"
-							onClick={() => {
-								setBatchSelecting(!batchSelecting);
-								if (batchSelecting) clearSelection();
-							}}
-							className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-								batchSelecting
-									? "bg-emerald-600 text-white"
-									: "border border-emerald-300 text-emerald-700 hover:bg-emerald-100"
-							}`}
+							onClick={() => selectTopN(5)}
+							className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"
 						>
-							{batchSelecting ? "Cancel Selection" : "Select Dates"}
+							Select Top 5
 						</button>
-						{batchSelecting && (
-							<>
-								<button
-									type="button"
-									onClick={() => selectTopN(5)}
-									className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"
-								>
-									Select Top 5
-								</button>
-								<button
-									type="button"
-									onClick={() => setSelectedDates(new Set(dates.map((d) => d.date)))}
-									className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"
-								>
-									Select All
-								</button>
-								{selectedDates.size > 0 && (
-									<button
-										type="button"
-										onClick={clearSelection}
-										className="text-xs text-slate-500 hover:text-slate-700"
-									>
-										Clear
-									</button>
-								)}
-							</>
+						<button
+							type="button"
+							onClick={() => setSelectedDates(new Set(dates.map((d) => d.date)))}
+							className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"
+						>
+							Select All
+						</button>
+						{selectedDates.size > 0 && (
+							<button
+								type="button"
+								onClick={clearSelection}
+								className="text-xs text-slate-500 hover:text-slate-700"
+							>
+								Clear
+							</button>
 						)}
 					</div>
-					{batchSelecting && selectedDates.size > 0 && (
+					{selectedDates.size > 0 && (
 						<div className="flex items-center gap-3">
 							<span className="text-sm font-medium text-slate-700">
 								{selectedDates.size} date{selectedDates.size !== 1 ? "s" : ""} selected
@@ -252,7 +233,7 @@ export function ResultsHeatmap({
 					<table className="w-full">
 						<thead>
 							<tr className="bg-slate-50">
-								{batchSelecting && <th className="w-8 px-2 py-3" />}
+								{batchMode && <th className="w-8 px-2 py-3" />}
 								<th className="w-8 px-3 py-3" />
 								<th className="px-4 py-3 text-left text-xs font-medium text-slate-500">Date</th>
 								<th className="px-4 py-3 text-left text-xs font-medium text-slate-500">Day</th>
@@ -260,7 +241,6 @@ export function ResultsHeatmap({
 								<th className="px-3 py-3 text-center text-xs font-medium text-amber-500">🤔</th>
 								<th className="px-3 py-3 text-center text-xs font-medium text-rose-600">❌</th>
 								<th className="px-3 py-3 text-center text-xs font-medium text-slate-400">—</th>
-								<th className="px-4 py-3 text-right text-xs font-medium text-slate-500" />
 							</tr>
 						</thead>
 						<tbody className="divide-y divide-slate-100">
@@ -272,19 +252,19 @@ export function ResultsHeatmap({
 									<Fragment key={row.date}>
 										<tr
 											className={`cursor-pointer transition-colors ${
-												batchSelecting && selectedDates.has(row.date)
+												batchMode && selectedDates.has(row.date)
 													? "bg-emerald-100 hover:bg-emerald-200/70"
 													: `${getHeatColor(row.score, maxScore)} hover:bg-slate-100/50`
 											}`}
 											onClick={() => {
-												if (batchSelecting) {
+												if (batchMode) {
 													toggleDate(row.date);
 												} else {
 													toggleExpanded(row.date);
 												}
 											}}
 										>
-											{batchSelecting && (
+											{batchMode && (
 												<td className="px-2 py-3 text-center">
 													<button
 														type="button"
@@ -345,21 +325,10 @@ export function ResultsHeatmap({
 											<td className="px-3 py-3 text-center text-sm text-slate-400">
 												{row.noResponse}
 											</td>
-											<td className="px-4 py-3 text-right">
-												{!batchSelecting && (
-													<a
-														href={`/groups/${groupId}/events/new?date=${row.date}${requestId ? `&fromRequest=${requestId}` : ""}`}
-														onClick={(e) => e.stopPropagation()}
-														className="text-xs font-medium text-emerald-600 hover:text-emerald-700"
-													>
-														Create Event
-													</a>
-												)}
-											</td>
 										</tr>
 										{isExpanded && (
 											<tr key={`${row.date}-detail`}>
-												<td colSpan={batchSelecting ? 9 : 8} className="bg-slate-50 px-8 py-4">
+												<td colSpan={batchMode ? 8 : 7} className="bg-slate-50 px-8 py-4">
 													<div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
 														{row.respondents.length > 0 ? (
 															sortRespondentsByResponse(row.respondents).map((r) => (
@@ -405,7 +374,7 @@ export function ResultsHeatmap({
 						<div
 							key={row.date}
 							className={`overflow-hidden rounded-xl border ${
-								batchSelecting && selectedDates.has(row.date)
+								batchMode && selectedDates.has(row.date)
 									? "border-emerald-300 bg-emerald-100"
 									: `border-slate-200 ${getHeatColor(row.score, maxScore)}`
 							}`}
@@ -415,7 +384,7 @@ export function ResultsHeatmap({
 								role="button"
 								tabIndex={0}
 								onClick={() => {
-									if (batchSelecting) {
+									if (batchMode) {
 										toggleDate(row.date);
 									} else {
 										toggleExpanded(row.date);
@@ -424,7 +393,7 @@ export function ResultsHeatmap({
 								onKeyDown={(e) => {
 									if (e.key === "Enter" || e.key === " ") {
 										e.preventDefault();
-										if (batchSelecting) {
+										if (batchMode) {
 											toggleDate(row.date);
 										} else {
 											toggleExpanded(row.date);
@@ -434,7 +403,7 @@ export function ResultsHeatmap({
 								className="flex w-full items-center justify-between p-4 text-left"
 							>
 								<div className="flex items-center gap-3">
-									{batchSelecting && (
+									{batchMode && (
 										<button
 											type="button"
 											onClick={(e) => {
@@ -506,12 +475,6 @@ export function ResultsHeatmap({
 											<span className="text-sm text-slate-400">No responses yet</span>
 										)}
 									</div>
-									<a
-										href={`/groups/${groupId}/events/new?date=${row.date}${requestId ? `&fromRequest=${requestId}` : ""}`}
-										className="mt-3 inline-block text-xs font-medium text-emerald-600 hover:text-emerald-700"
-									>
-										Create Event →
-									</a>
 								</div>
 							)}
 						</div>
@@ -519,7 +482,7 @@ export function ResultsHeatmap({
 				})}
 			</div>
 			{/* Mobile floating batch action bar */}
-			{batchMode && batchSelecting && selectedDates.size > 0 && (
+			{batchMode && selectedDates.size > 0 && (
 				<div className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200 bg-white p-4 shadow-lg sm:hidden">
 					<div className="flex items-center justify-between">
 						<span className="text-sm font-medium text-slate-700">
