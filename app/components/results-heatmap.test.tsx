@@ -212,8 +212,6 @@ describe("ResultsHeatmap", () => {
 				/>,
 			);
 
-			// Enter batch selecting mode
-			await user.click(screen.getByText("Select Dates"));
 			const desktop = getDesktopTable(container);
 
 			// In batch mode, the first td is the checkbox, the second is the caret.
@@ -241,7 +239,6 @@ describe("ResultsHeatmap", () => {
 				/>,
 			);
 
-			await user.click(screen.getByText("Select Dates"));
 			const desktop = getDesktopTable(container);
 
 			// Click caret button on first row
@@ -267,7 +264,6 @@ describe("ResultsHeatmap", () => {
 				/>,
 			);
 
-			await user.click(screen.getByText("Select Dates"));
 			const desktop = getDesktopTable(container);
 
 			// Click the checkbox button (inside first td) on the first row
@@ -294,7 +290,6 @@ describe("ResultsHeatmap", () => {
 				/>,
 			);
 
-			await user.click(screen.getByText("Select Dates"));
 			const desktop = getDesktopTable(container);
 
 			// Click the row itself (not checkbox, not caret) — e.g. the date text cell
@@ -325,9 +320,6 @@ describe("ResultsHeatmap", () => {
 				/>,
 			);
 
-			// Enter batch selecting mode
-			await user.click(screen.getByText("Select Dates"));
-
 			// Mobile cards are in div.sm\:hidden — get the mobile wrapper
 			const mobileWrapper = container.querySelector(".sm\\:hidden");
 			expect(mobileWrapper).not.toBeNull();
@@ -348,31 +340,13 @@ describe("ResultsHeatmap", () => {
 	});
 
 	describe("batch selection", () => {
-		it("shows Select Dates button when batchMode is true", () => {
+		it("shows batch toolbar when batchMode is true", () => {
 			const dates = [makeDateResult()];
 			render(
 				<ResultsHeatmap dates={dates} {...defaultProps} batchMode={true} onBatchCreate={vi.fn()} />,
 			);
-			expect(screen.getByText("Select Dates")).toBeDefined();
-		});
-
-		it("toggles batch selecting mode", async () => {
-			const user = userEvent.setup();
-			const dates = [makeDateResult()];
-			render(
-				<ResultsHeatmap dates={dates} {...defaultProps} batchMode={true} onBatchCreate={vi.fn()} />,
-			);
-
-			// Initially shows "Select Dates"
-			const btn = screen.getByText("Select Dates");
-			await user.click(btn);
-
-			// Now in batch selecting mode — button text changes to "Cancel Selection"
-			expect(screen.getByText("Cancel Selection")).toBeDefined();
-
-			// Click cancel to exit batch mode
-			await user.click(screen.getByText("Cancel Selection"));
-			expect(screen.getByText("Select Dates")).toBeDefined();
+			expect(screen.getByText("Select Top 5")).toBeDefined();
+			expect(screen.getByText("Select All")).toBeDefined();
 		});
 
 		it("selects and deselects dates", async () => {
@@ -388,7 +362,6 @@ describe("ResultsHeatmap", () => {
 				/>,
 			);
 
-			await user.click(screen.getByText("Select Dates"));
 			const desktop = getDesktopTable(container);
 
 			// Click the row to select the first date
@@ -420,7 +393,6 @@ describe("ResultsHeatmap", () => {
 				/>,
 			);
 
-			await user.click(screen.getByText("Select Dates"));
 			const desktop = getDesktopTable(container);
 
 			// Select first two dates
@@ -459,7 +431,6 @@ describe("ResultsHeatmap", () => {
 				/>,
 			);
 
-			await user.click(screen.getByText("Select Dates"));
 			await user.click(screen.getByText("Select Top 5"));
 
 			// Should show "5 dates selected"
