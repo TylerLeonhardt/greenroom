@@ -905,12 +905,12 @@ ${locLine}</div>`;
 <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0f172a;">Events Have Been Scheduled!</h2>
 <p style="color:#475569;margin:0 0 20px;">Great news, ${escapeHtml(recipient.name)} — ${count} event${haveHas} been scheduled based on your availability! Please review and confirm your attendance.</p>
 ${buildEventListHtml(tz)}
-${ctaButton(options.eventsUrl, "View Events")}
+${ctaButton(options.eventsUrl, "Review & Confirm")}
 <p style="color:#64748b;font-size:13px;margin:0;">You indicated you were available for ${count === 1 ? "this date" : "these dates"}. Please confirm your attendance.</p>`,
 			layoutOpts,
 		);
 
-		const text = `Hi ${recipient.name},\n\nGreat news! ${count} event${haveHas} been scheduled based on your availability. Please review and confirm your attendance.\n\n${buildEventListText(tz)}\n\nView events: ${options.eventsUrl}`;
+		const text = `Hi ${recipient.name},\n\nGreat news! ${count} event${haveHas} been scheduled based on your availability. Please review and confirm your attendance.\n\n${buildEventListText(tz)}\n\nReview & confirm: ${options.eventsUrl}`;
 
 		void sendEmail({
 			to: recipient.email,

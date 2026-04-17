@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
 import { db } from "../../src/db/index.js";
 import {
 	availabilityRequests,
@@ -130,8 +130,10 @@ export async function autoAssignFromAvailability(
 
 export async function getGroupEvents(
 	groupId: string,
-	options?: { upcoming?: boolean; eventType?: string },
-): Promise<Array<Event & { assignmentCount: number; confirmedCount: number }>> {
+	options?: { upcoming?: boolean; eventType?: string; userId?: string },
+): Promise<
+	Array<Event & { assignmentCount: number; confirmedCount: number; userStatus: string | null }>
+> {
 	const conditions = [eq(events.groupId, groupId)];
 
 	if (options?.upcoming) {
@@ -167,6 +169,13 @@ export async function getGroupEvents(
 				select count(*) from event_assignments
 				where event_assignments.event_id = events.id and event_assignments.status = 'confirmed'
 			) as int)`,
+			userStatus: options?.userId
+				? sql<string | null>`(
+					select ea.status from event_assignments ea
+					where ea.event_id = events.id and ea.user_id = ${options.userId}
+					limit 1
+				)`
+				: sql<string | null>`null`,
 		})
 		.from(events)
 		.where(and(...conditions))
@@ -540,4 +549,54 @@ export async function getEventActivityFeed(
 		newStatus: "pending" | "confirmed" | "declined";
 		changedAt: Date;
 	}>;
+}
+
+// --- Bulk Confirm ---
+
+/** Confirm all pending event assignments for a user in a group (upcoming events only). */
+export async function confirmAllPendingEventsInGroup(
+	groupId: string,
+	userId: string,
+): Promise<{ confirmedCount: number; eventIds: string[] }> {
+	// Find upcoming events in this group where the user has a pending assignment
+	const pendingAssignments = await db
+		.select({ eventId: eventAssignments.eventId })
+		.from(eventAssignments)
+		.innerJoin(events, eq(eventAssignments.eventId, events.id))
+		.where(
+			and(
+				eq(events.groupId, groupId),
+				eq(eventAssignments.userId, userId),
+				eq(eventAssignments.status, "pending"),
+				gte(events.startTime, new Date()),
+			),
+		);
+
+	if (pendingAssignments.length === 0) {
+		return { confirmedCount: 0, eventIds: [] };
+	}
+
+	const candidateEventIds = pendingAssignments.map((a) => a.eventId);
+
+	// Bulk update — use RETURNING to know exactly which rows changed
+	const updated = await db
+		.update(eventAssignments)
+		.set({ status: "confirmed" })
+		.where(
+			and(
+				eq(eventAssignments.userId, userId),
+				eq(eventAssignments.status, "pending"),
+				inArray(eventAssignments.eventId, candidateEventIds),
+			),
+		)
+		.returning({ eventId: eventAssignments.eventId });
+
+	const eventIds = updated.map((r) => r.eventId);
+
+	// Record RSVP changes only for actually-updated rows
+	for (const eventId of eventIds) {
+		await recordRsvpChange(eventId, userId, "pending", "confirmed");
+	}
+
+	return { confirmedCount: eventIds.length, eventIds };
 }

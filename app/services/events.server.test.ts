@@ -62,6 +62,7 @@ const {
 	getAvailabilityForEventDate,
 	recordRsvpChange,
 	getEventActivityFeed,
+	confirmAllPendingEventsInGroup,
 	ASSIGNMENT_STATUS_ORDER,
 } = await import("~/services/events.server");
 
@@ -1448,6 +1449,96 @@ describe("events.server", () => {
 			await getEventActivityFeed("event-1", 10);
 
 			expect(chain.limit).toHaveBeenCalledWith(10);
+		});
+	});
+
+	// ============================================================
+	// confirmAllPendingEventsInGroup
+	// ============================================================
+	describe("confirmAllPendingEventsInGroup", () => {
+		it("returns zero when no pending assignments exist", async () => {
+			// Mock the select query that finds pending assignments
+			const selectChain = chainMock(null);
+			selectChain.where = vi.fn().mockResolvedValue([]);
+			selectChain.innerJoin = vi.fn().mockReturnValue(selectChain);
+			selectChain.from = vi.fn().mockReturnValue(selectChain);
+			mockSelect.mockReturnValueOnce(selectChain);
+
+			const result = await confirmAllPendingEventsInGroup("group-1", "user-1");
+
+			expect(result.confirmedCount).toBe(0);
+			expect(result.eventIds).toEqual([]);
+		});
+
+		it("confirms all pending assignments and records RSVP changes", async () => {
+			// Mock finding pending assignments
+			const selectChain = chainMock(null);
+			selectChain.where = vi
+				.fn()
+				.mockResolvedValue([{ eventId: "event-1" }, { eventId: "event-2" }]);
+			selectChain.innerJoin = vi.fn().mockReturnValue(selectChain);
+			selectChain.from = vi.fn().mockReturnValue(selectChain);
+			mockSelect.mockReturnValueOnce(selectChain);
+
+			// Mock bulk update with RETURNING
+			const updateChain = chainMock(null);
+			updateChain.returning = vi
+				.fn()
+				.mockResolvedValue([{ eventId: "event-1" }, { eventId: "event-2" }]);
+			updateChain.where = vi.fn().mockReturnValue(updateChain);
+			mockSet.mockReturnValueOnce(updateChain);
+
+			// Mock recordRsvpChange inserts (two events)
+			mockReturning.mockResolvedValueOnce([]);
+			mockReturning.mockResolvedValueOnce([]);
+
+			const result = await confirmAllPendingEventsInGroup("group-1", "user-1");
+
+			expect(result.confirmedCount).toBe(2);
+			expect(result.eventIds).toEqual(["event-1", "event-2"]);
+
+			// Verify update was called
+			expect(mockUpdate).toHaveBeenCalled();
+			expect(mockSet).toHaveBeenCalledWith({ status: "confirmed" });
+
+			// Verify RSVP changes were recorded for each event
+			expect(mockInsert).toHaveBeenCalledTimes(2);
+		});
+
+		it("only confirms actually-updated rows from RETURNING", async () => {
+			// Mock finding 3 pending assignments
+			const selectChain = chainMock(null);
+			selectChain.where = vi
+				.fn()
+				.mockResolvedValue([
+					{ eventId: "event-1" },
+					{ eventId: "event-2" },
+					{ eventId: "event-3" },
+				]);
+			selectChain.innerJoin = vi.fn().mockReturnValue(selectChain);
+			selectChain.from = vi.fn().mockReturnValue(selectChain);
+			mockSelect.mockReturnValueOnce(selectChain);
+
+			// Mock update RETURNING only 2 rows (race: one was already confirmed)
+			const updateChain = chainMock(null);
+			updateChain.returning = vi
+				.fn()
+				.mockResolvedValue([{ eventId: "event-1" }, { eventId: "event-3" }]);
+			updateChain.where = vi.fn().mockReturnValue(updateChain);
+			mockSet.mockReturnValueOnce(updateChain);
+
+			// Mock recordRsvpChange inserts
+			mockReturning.mockResolvedValueOnce([]);
+			mockReturning.mockResolvedValueOnce([]);
+
+			const result = await confirmAllPendingEventsInGroup("group-1", "user-1");
+
+			// Should report only the 2 rows that were actually updated
+			expect(result.confirmedCount).toBe(2);
+			expect(result.eventIds).toEqual(["event-1", "event-3"]);
+
+			// Only 2 RSVP records, not 3
+			expect(mockInsert).toHaveBeenCalledTimes(2);
 		});
 	});
 });
