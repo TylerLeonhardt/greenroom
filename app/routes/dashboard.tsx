@@ -138,9 +138,11 @@ export default function Dashboard() {
 								endTime={event.endTime as unknown as string}
 								location={event.location}
 								groupName={event.groupName}
+								assignmentCount={event.assignmentCount}
+								confirmedCount={event.confirmedCount}
 								userStatus={event.userStatus}
 								timezone={user.timezone}
-								compact
+								showActions
 							/>
 						))}
 					</div>
