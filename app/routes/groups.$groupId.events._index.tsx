@@ -1,12 +1,21 @@
-import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
-import { Link, useLoaderData, useRouteLoaderData, useSearchParams } from "@remix-run/react";
-import { CalendarDays, List, Plus } from "lucide-react";
+import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
+import {
+	Link,
+	useFetcher,
+	useLoaderData,
+	useRouteLoaderData,
+	useSearchParams,
+} from "@remix-run/react";
+import { CalendarDays, Check, Clock, List, Plus } from "lucide-react";
 import { useState } from "react";
+import { CsrfInput } from "~/components/csrf-input";
 import { EmptyState } from "~/components/empty-state";
 import { EventCalendar } from "~/components/event-calendar";
 import { EventCard } from "~/components/event-card";
 import { formatDateLong } from "~/lib/date-utils";
-import { getGroupEvents } from "~/services/events.server";
+import { getAvailabilityRequest } from "~/services/availability.server";
+import { validateCsrfToken } from "~/services/csrf.server";
+import { confirmAllPendingEventsInGroup, getGroupEvents } from "~/services/events.server";
 import { requireGroupMember } from "~/services/groups.server";
 import type { loader as groupLayoutLoader } from "./groups.$groupId";
 
@@ -17,18 +26,57 @@ export const meta: MetaFunction = () => {
 export async function loader({ request, params }: LoaderFunctionArgs) {
 	const groupId = params.groupId ?? "";
 	const user = await requireGroupMember(request, groupId);
-	const allEvents = await getGroupEvents(groupId);
-	return { events: allEvents, userId: user.id };
+	const allEvents = await getGroupEvents(groupId, { userId: user.id });
+
+	// Find pending upcoming events for the banner
+	const now = new Date();
+	const pendingUpcoming = allEvents.filter(
+		(e) => e.userStatus === "pending" && new Date(e.startTime) >= now,
+	);
+
+	let pendingRequestTitle: string | null = null;
+	if (pendingUpcoming.length > 0) {
+		const requestIds = [
+			...new Set(pendingUpcoming.map((e) => e.createdFromRequestId).filter(Boolean)),
+		];
+		if (requestIds.length === 1 && requestIds[0]) {
+			const req = await getAvailabilityRequest(requestIds[0]);
+			pendingRequestTitle = req?.title ?? null;
+		}
+	}
+
+	return {
+		events: allEvents,
+		userId: user.id,
+		pendingCount: pendingUpcoming.length,
+		pendingRequestTitle,
+	};
+}
+
+export async function action({ request, params }: ActionFunctionArgs) {
+	const groupId = params.groupId ?? "";
+	const user = await requireGroupMember(request, groupId);
+	const formData = await request.formData();
+	await validateCsrfToken(request, formData);
+	const intent = formData.get("intent");
+
+	if (intent === "confirm-all") {
+		const result = await confirmAllPendingEventsInGroup(groupId, user.id);
+		return { success: true, confirmedCount: result.confirmedCount };
+	}
+
+	return { success: false };
 }
 
 export default function Events() {
-	const { events } = useLoaderData<typeof loader>();
+	const { events, pendingCount, pendingRequestTitle } = useLoaderData<typeof loader>();
 	const parentData = useRouteLoaderData<typeof groupLayoutLoader>("routes/groups.$groupId");
 	const role = parentData?.role;
 	const groupId = parentData?.group?.id ?? "";
 	const timezone = parentData?.user?.timezone ?? undefined;
 	const canCreateEvents = role === "admin" || parentData?.group?.membersCanCreateEvents === true;
 	const [searchParams] = useSearchParams();
+	const confirmAllFetcher = useFetcher();
 
 	const [view, setView] = useState<"list" | "calendar">(
 		(searchParams.get("view") as "list" | "calendar") || "list",
@@ -41,6 +89,10 @@ export default function Events() {
 	const filtered = typeFilter === "all" ? events : events.filter((e) => e.eventType === typeFilter);
 	const upcoming = filtered.filter((e) => new Date(e.startTime) >= now);
 	const past = filtered.filter((e) => new Date(e.startTime) < now).reverse();
+
+	// Optimistic: hide banner after confirm-all is submitted
+	const isConfirmingAll = confirmAllFetcher.state !== "idle";
+	const showBanner = pendingCount > 0 && !isConfirmingAll;
 
 	const calendarDateEvents =
 		calendarSelectedDate && events.length > 0
@@ -105,6 +157,39 @@ export default function Events() {
 				</div>
 			</div>
 
+			{/* Confirm All Banner */}
+			{showBanner && (
+				<div className="mb-6 rounded-xl border border-dashed border-emerald-300 bg-emerald-50/50 p-4">
+					<div className="flex items-center justify-between gap-4">
+						<div className="flex items-center gap-3">
+							<div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100">
+								<Clock className="h-4 w-4 text-amber-600" />
+							</div>
+							<div>
+								<p className="text-sm font-semibold text-slate-700">
+									{pendingCount} event{pendingCount !== 1 ? "s" : ""} pending your confirmation
+								</p>
+								{pendingRequestTitle && (
+									<p className="text-xs text-slate-500">
+										Created from &ldquo;{pendingRequestTitle}&rdquo; request
+									</p>
+								)}
+							</div>
+						</div>
+						<confirmAllFetcher.Form method="post">
+							<CsrfInput />
+							<input type="hidden" name="intent" value="confirm-all" />
+							<button
+								type="submit"
+								className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+							>
+								<Check className="h-4 w-4" /> Confirm All {pendingCount}
+							</button>
+						</confirmAllFetcher.Form>
+					</div>
+				</div>
+			)}
+
 			{/* List View */}
 			{view === "list" && (
 				<div className="space-y-6">
@@ -149,7 +234,13 @@ export default function Events() {
 												location={event.location}
 												assignmentCount={event.assignmentCount}
 												confirmedCount={event.confirmedCount}
+												userStatus={
+													isConfirmingAll && event.userStatus === "pending"
+														? "confirmed"
+														: event.userStatus
+												}
 												timezone={timezone}
+												showActions
 											/>
 										))}
 									</div>
@@ -180,6 +271,7 @@ export default function Events() {
 													location={event.location}
 													assignmentCount={event.assignmentCount}
 													confirmedCount={event.confirmedCount}
+													userStatus={event.userStatus}
 													timezone={timezone}
 												/>
 											))}
