@@ -22,6 +22,7 @@ export default defineFixtureGroup({
 				options: ["confirmed", "declined", "pending"],
 			},
 			{ type: "boolean", name: "compact", defaultValue: false },
+			{ type: "boolean", name: "showActions", defaultValue: false },
 			{ type: "string", name: "location", defaultValue: "Main Theater" },
 		],
 		render: (container, { props }) => {
@@ -39,8 +40,9 @@ export default defineFixtureGroup({
 							location={props.location as string}
 							assignmentCount={12}
 							confirmedCount={10}
-							userStatus={props.userStatus === "pending" ? null : (props.userStatus as string)}
+							userStatus={props.userStatus as string}
 							compact={props.compact as boolean}
+							showActions={props.showActions as boolean}
 							timezone="America/New_York"
 						/>
 					</div>
@@ -116,6 +118,34 @@ export default defineFixtureGroup({
 							startTime="2026-03-28T18:00:00Z"
 							endTime="2026-03-28T20:00:00Z"
 							compact
+							timezone="America/New_York"
+						/>
+					</div>
+				</MemoryRouter>,
+			);
+			return { dispose: () => root.unmount() };
+		},
+	}),
+	"Pending with Actions": defineFixture({
+		description: "Pending assignment with inline confirm/decline buttons",
+		render: (container) => {
+			const root = createRoot(container);
+			root.render(
+				<MemoryRouter>
+					<div className="max-w-sm">
+						<EventCard
+							id="fixture-pending"
+							groupId="fixture-group-1"
+							title="Weekend Workshop"
+							eventType="rehearsal"
+							startTime="2026-04-05T10:00:00Z"
+							endTime="2026-04-05T13:00:00Z"
+							location="Studio A"
+							assignmentCount={6}
+							confirmedCount={3}
+							userStatus="pending"
+							showActions
+							compact={false}
 							timezone="America/New_York"
 						/>
 					</div>
