@@ -19,6 +19,26 @@ const mockWhere = vi.fn();
 const mockFrom = vi.fn();
 const mockSelect = vi.fn();
 
+// Transaction mock: builds a distinct tx object so tests can verify
+// that the implementation uses tx (not the global db) inside the callback.
+const mockTxReturning = vi.fn();
+const mockTxValues = vi.fn().mockReturnValue({
+	returning: mockTxReturning,
+	onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+});
+const mockTxInsert = vi.fn().mockReturnValue({ values: mockTxValues });
+const mockTxSet = vi.fn();
+const mockTxUpdate = vi.fn().mockReturnValue({ set: mockTxSet });
+const mockTxSelect = vi.fn();
+const mockTransaction = vi.fn(async (fn: (tx: unknown) => unknown) => {
+	const txMock = {
+		select: mockTxSelect,
+		insert: mockTxInsert,
+		update: mockTxUpdate,
+	};
+	return fn(txMock);
+});
+
 vi.mock("../../src/db/index.js", () => ({
 	db: {
 		select: mockSelect,
@@ -33,6 +53,7 @@ vi.mock("../../src/db/index.js", () => ({
 		update: mockUpdate,
 		set: mockSet,
 		delete: mockDelete,
+		transaction: mockTransaction,
 	},
 }));
 
@@ -1457,56 +1478,58 @@ describe("events.server", () => {
 	// ============================================================
 	describe("confirmAllPendingEventsInGroup", () => {
 		it("returns zero when no pending assignments exist", async () => {
-			// Mock the select query that finds pending assignments
+			// Mock the select query inside the transaction that finds pending assignments
 			const selectChain = chainMock(null);
 			selectChain.where = vi.fn().mockResolvedValue([]);
 			selectChain.innerJoin = vi.fn().mockReturnValue(selectChain);
 			selectChain.from = vi.fn().mockReturnValue(selectChain);
-			mockSelect.mockReturnValueOnce(selectChain);
+			mockTxSelect.mockReturnValueOnce(selectChain);
 
 			const result = await confirmAllPendingEventsInGroup("group-1", "user-1");
 
+			expect(mockTransaction).toHaveBeenCalled();
 			expect(result.confirmedCount).toBe(0);
 			expect(result.eventIds).toEqual([]);
 		});
 
 		it("confirms all pending assignments and records RSVP changes", async () => {
-			// Mock finding pending assignments
+			// Mock finding pending assignments (via tx.select)
 			const selectChain = chainMock(null);
 			selectChain.where = vi
 				.fn()
 				.mockResolvedValue([{ eventId: "event-1" }, { eventId: "event-2" }]);
 			selectChain.innerJoin = vi.fn().mockReturnValue(selectChain);
 			selectChain.from = vi.fn().mockReturnValue(selectChain);
-			mockSelect.mockReturnValueOnce(selectChain);
+			mockTxSelect.mockReturnValueOnce(selectChain);
 
-			// Mock bulk update with RETURNING
+			// Mock bulk update with RETURNING (via tx.update)
 			const updateChain = chainMock(null);
 			updateChain.returning = vi
 				.fn()
 				.mockResolvedValue([{ eventId: "event-1" }, { eventId: "event-2" }]);
 			updateChain.where = vi.fn().mockReturnValue(updateChain);
-			mockSet.mockReturnValueOnce(updateChain);
+			mockTxSet.mockReturnValueOnce(updateChain);
 
-			// Mock recordRsvpChange inserts (two events)
-			mockReturning.mockResolvedValueOnce([]);
-			mockReturning.mockResolvedValueOnce([]);
+			// Mock recordRsvpChange inserts via tx.insert (two events)
+			mockTxReturning.mockResolvedValueOnce([]);
+			mockTxReturning.mockResolvedValueOnce([]);
 
 			const result = await confirmAllPendingEventsInGroup("group-1", "user-1");
 
+			expect(mockTransaction).toHaveBeenCalled();
 			expect(result.confirmedCount).toBe(2);
 			expect(result.eventIds).toEqual(["event-1", "event-2"]);
 
-			// Verify update was called
-			expect(mockUpdate).toHaveBeenCalled();
-			expect(mockSet).toHaveBeenCalledWith({ status: "confirmed" });
+			// Verify update was called via tx
+			expect(mockTxUpdate).toHaveBeenCalled();
+			expect(mockTxSet).toHaveBeenCalledWith({ status: "confirmed" });
 
-			// Verify RSVP changes were recorded for each event
-			expect(mockInsert).toHaveBeenCalledTimes(2);
+			// Verify RSVP changes were recorded via tx for each event
+			expect(mockTxInsert).toHaveBeenCalledTimes(2);
 		});
 
 		it("only confirms actually-updated rows from RETURNING", async () => {
-			// Mock finding 3 pending assignments
+			// Mock finding 3 pending assignments (via tx.select)
 			const selectChain = chainMock(null);
 			selectChain.where = vi
 				.fn()
@@ -1517,7 +1540,7 @@ describe("events.server", () => {
 				]);
 			selectChain.innerJoin = vi.fn().mockReturnValue(selectChain);
 			selectChain.from = vi.fn().mockReturnValue(selectChain);
-			mockSelect.mockReturnValueOnce(selectChain);
+			mockTxSelect.mockReturnValueOnce(selectChain);
 
 			// Mock update RETURNING only 2 rows (race: one was already confirmed)
 			const updateChain = chainMock(null);
@@ -1525,20 +1548,21 @@ describe("events.server", () => {
 				.fn()
 				.mockResolvedValue([{ eventId: "event-1" }, { eventId: "event-3" }]);
 			updateChain.where = vi.fn().mockReturnValue(updateChain);
-			mockSet.mockReturnValueOnce(updateChain);
+			mockTxSet.mockReturnValueOnce(updateChain);
 
-			// Mock recordRsvpChange inserts
-			mockReturning.mockResolvedValueOnce([]);
-			mockReturning.mockResolvedValueOnce([]);
+			// Mock recordRsvpChange inserts via tx
+			mockTxReturning.mockResolvedValueOnce([]);
+			mockTxReturning.mockResolvedValueOnce([]);
 
 			const result = await confirmAllPendingEventsInGroup("group-1", "user-1");
 
+			expect(mockTransaction).toHaveBeenCalled();
 			// Should report only the 2 rows that were actually updated
 			expect(result.confirmedCount).toBe(2);
 			expect(result.eventIds).toEqual(["event-1", "event-3"]);
 
-			// Only 2 RSVP records, not 3
-			expect(mockInsert).toHaveBeenCalledTimes(2);
+			// Only 2 RSVP records via tx, not 3
+			expect(mockTxInsert).toHaveBeenCalledTimes(2);
 		});
 	});
 });
