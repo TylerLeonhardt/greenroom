@@ -42,7 +42,10 @@ import {
 import { validateCsrfToken } from "~/services/csrf.server";
 import { sendAvailabilityReminderNotification } from "~/services/email.server";
 import { getGroupById, isGroupAdmin, requireGroupMember } from "~/services/groups.server";
-import { checkReminderRateLimit } from "~/services/rate-limit.server";
+import {
+	checkAvailabilityResponseRateLimit,
+	checkReminderRateLimit,
+} from "~/services/rate-limit.server";
 import { trackEvent } from "~/services/telemetry.server";
 import { sendAvailabilityReminderWebhook } from "~/services/webhook.server";
 import type { loader as groupLayoutLoader } from "./groups.$groupId";
@@ -96,6 +99,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	const intent = formData.get("intent");
 
 	if (intent === "respond") {
+		const rateCheck = checkAvailabilityResponseRateLimit(user.id);
+		if (rateCheck.limited) {
+			return Response.json(
+				{ error: "You've submitted too many responses recently. Please try again later." },
+				{ status: 429, headers: { "Retry-After": String(rateCheck.retryAfter) } },
+			);
+		}
+
 		const responsesRaw = formData.get("responses");
 		let responses: Record<string, AvailabilityStatus> = {};
 		try {

@@ -54,6 +54,8 @@ vi.mock("~/services/csrf.server", () => ({
 // Mock rate limiting — allow all by default
 vi.mock("~/services/rate-limit.server", () => ({
 	checkReminderRateLimit: vi.fn().mockReturnValue({ limited: false }),
+	checkAvailabilityResponseRateLimit: vi.fn().mockReturnValue({ limited: false }),
+	_resetForTests: vi.fn(),
 }));
 
 import { action, loader } from "~/routes/groups.$groupId.availability.$requestId";

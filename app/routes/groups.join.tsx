@@ -5,6 +5,7 @@ import { CsrfInput } from "~/components/csrf-input";
 import { getOptionalUser, requireUser } from "~/services/auth.server";
 import { validateCsrfToken } from "~/services/csrf.server";
 import { joinGroup } from "~/services/groups.server";
+import { checkGroupJoinRateLimit } from "~/services/rate-limit.server";
 
 export const meta: MetaFunction = () => {
 	return [{ title: "Join Group — My Call Time" }];
@@ -19,6 +20,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export async function action({ request }: ActionFunctionArgs) {
 	const user = await requireUser(request);
+
+	const rateCheck = checkGroupJoinRateLimit(user.id);
+	if (rateCheck.limited) {
+		return Response.json(
+			{ error: "You've made too many join attempts today. Please try again later." },
+			{ status: 429, headers: { "Retry-After": String(rateCheck.retryAfter) } },
+		);
+	}
+
 	const formData = await request.formData();
 	await validateCsrfToken(request, formData);
 	const code = formData.get("code");
