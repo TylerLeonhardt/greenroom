@@ -15,6 +15,7 @@ import {
 	updateGroupPermissions,
 } from "~/services/groups.server";
 import { logger } from "~/services/logger.server";
+import { trackEvent } from "~/services/telemetry.server";
 import { isValidWebhookUrl, sendTestWebhook } from "~/services/webhook.server";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -34,7 +35,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
 export async function action({ request, params }: ActionFunctionArgs) {
 	const groupId = params.groupId ?? "";
-	await requireGroupAdmin(request, groupId);
+	const user = await requireGroupAdmin(request, groupId);
 	const formData = await request.formData();
 	await validateCsrfToken(request, formData);
 	const intent = formData.get("intent");
@@ -165,6 +166,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		}
 
 		await deleteGroup(groupId);
+		trackEvent("GroupDeleted", { userId: user.id, groupId });
 		return redirect("/dashboard");
 	}
 

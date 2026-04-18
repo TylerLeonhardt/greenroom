@@ -43,6 +43,7 @@ import { validateCsrfToken } from "~/services/csrf.server";
 import { sendAvailabilityReminderNotification } from "~/services/email.server";
 import { getGroupById, isGroupAdmin, requireGroupMember } from "~/services/groups.server";
 import { checkReminderRateLimit } from "~/services/rate-limit.server";
+import { trackEvent } from "~/services/telemetry.server";
 import { sendAvailabilityReminderWebhook } from "~/services/webhook.server";
 import type { loader as groupLayoutLoader } from "./groups.$groupId";
 
@@ -154,6 +155,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
 			userId: user.id,
 			responses,
 			notes,
+		});
+		trackEvent("AvailabilityResponseSubmitted", {
+			userId: user.id,
+			requestId,
+			groupId,
 		});
 
 		return { success: true, message: "Response saved!" };

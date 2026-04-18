@@ -14,6 +14,7 @@ import {
 	requireGroupMember,
 } from "~/services/groups.server";
 import { logger } from "~/services/logger.server";
+import { trackEvent } from "~/services/telemetry.server";
 import type { loader as groupLayoutLoader } from "./groups.$groupId";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -30,7 +31,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
 export async function action({ request, params }: ActionFunctionArgs) {
 	const groupId = params.groupId ?? "";
-	await requireGroupAdmin(request, groupId);
+	const user = await requireGroupAdmin(request, groupId);
 
 	const formData = await request.formData();
 	await validateCsrfToken(request, formData);
@@ -43,6 +44,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		}
 		try {
 			await removeMember(groupId, userId);
+			trackEvent("MemberRemoved", {
+				userId: user.id,
+				removedUserId: userId,
+				groupId,
+			});
 		} catch (error) {
 			logger.error({ err: error, route: "groups.$groupId._index" }, "Failed to remove member");
 			return { error: error instanceof Error ? error.message : "Failed to remove member." };
