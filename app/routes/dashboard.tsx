@@ -3,6 +3,7 @@ import { Link, useLoaderData } from "@remix-run/react";
 import { AlertCircle, CalendarDays, Clock, Plus, Users } from "lucide-react";
 import { EmptyState } from "~/components/empty-state";
 import { EventCard } from "~/components/event-card";
+import { PendingGroupCard } from "~/components/pending-group-card";
 import { formatDateShort, parseDateOnly } from "~/lib/date-utils";
 import { requireUser } from "~/services/auth.server";
 import { getDashboardData } from "~/services/dashboard.server";
@@ -72,35 +73,13 @@ export default function Dashboard() {
 								</span>
 							</Link>
 						))}
-						{pendingConfirmations.map((evt) => (
-							<Link
-								key={evt.id}
-								to={`/groups/${evt.groupId}/events/${evt.id}`}
-								className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-4 transition-all hover:border-amber-300 hover:shadow-sm"
-							>
-								<div className="min-w-0 flex-1">
-									<div className="flex items-center gap-2">
-										<span className="text-sm">
-											{evt.eventType === "show"
-												? "🎭"
-												: evt.eventType === "rehearsal"
-													? "🎯"
-													: "📅"}
-										</span>
-										<span className="truncate text-sm font-semibold text-slate-900">
-											Confirm attendance: &ldquo;{evt.title}&rdquo;
-										</span>
-									</div>
-									<div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
-										<span>{evt.groupName}</span>
-										<span>·</span>
-										<span>{formatDateShort(evt.startTime, user.timezone ?? undefined)}</span>
-									</div>
-								</div>
-								<span className="ml-4 shrink-0 text-sm font-medium text-emerald-600">
-									Confirm →
-								</span>
-							</Link>
+						{pendingConfirmations.map((group) => (
+							<PendingGroupCard
+								key={group.groupId}
+								groupId={group.groupId}
+								groupName={group.groupName}
+								count={group.count}
+							/>
 						))}
 					</div>
 				</div>

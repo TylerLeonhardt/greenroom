@@ -98,22 +98,12 @@ export async function getDashboardData(userId: string) {
 			)
 			.orderBy(availabilityRequests.expiresAt),
 
-		// Events where user is assigned with pending status
+		// Pending confirmations grouped by group
 		db
 			.select({
-				id: events.id,
 				groupId: events.groupId,
-				title: events.title,
-				description: events.description,
-				eventType: events.eventType,
-				startTime: events.startTime,
-				endTime: events.endTime,
-				location: events.location,
-				createdById: events.createdById,
-				createdFromRequestId: events.createdFromRequestId,
-				createdAt: events.createdAt,
-				updatedAt: events.updatedAt,
 				groupName: groups.name,
+				count: sql<number>`cast(count(*) as int)`,
 			})
 			.from(eventAssignments)
 			.innerJoin(events, eq(eventAssignments.eventId, events.id))
@@ -125,7 +115,8 @@ export async function getDashboardData(userId: string) {
 					gte(events.startTime, new Date()),
 				),
 			)
-			.orderBy(events.startTime),
+			.groupBy(events.groupId, groups.name)
+			.orderBy(groups.name),
 	]);
 
 	// Format date ranges for pending requests
