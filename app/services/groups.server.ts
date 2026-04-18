@@ -10,6 +10,7 @@ import {
 } from "../../src/db/schema.js";
 import { requireUser } from "./auth.server.js";
 import { mergeWithDefaults } from "./notification-utils.server.js";
+import { trackEvent } from "./telemetry.server.js";
 
 type Group = typeof groups.$inferSelect;
 
@@ -55,6 +56,7 @@ export async function createGroup(
 
 				return group;
 			});
+			trackEvent("GroupCreated", { userId, groupId: result.id });
 			return result;
 		} catch (error) {
 			// If unique constraint violation on invite_code, retry
@@ -161,6 +163,7 @@ export async function joinGroup(
 		notificationPreferences: DEFAULT_NOTIFICATION_PREFERENCES,
 	});
 
+	trackEvent("GroupJoined", { userId, groupId: group.id });
 	return { success: true, groupId: group.id };
 }
 

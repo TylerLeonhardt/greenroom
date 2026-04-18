@@ -39,6 +39,7 @@ import {
 	isGroupAdmin,
 	requireGroupMember,
 } from "~/services/groups.server";
+import { trackEvent } from "~/services/telemetry.server";
 import { sendEventEditedWebhook } from "~/services/webhook.server";
 
 export const meta: MetaFunction = () => {
@@ -104,6 +105,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
 	if (intent === "delete") {
 		await deleteEvent(eventId);
+		trackEvent("EventDeleted", { userId: user.id, eventId, groupId });
 		return redirect(`/groups/${groupId}/events`);
 	}
 
@@ -198,6 +200,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		callTime: newCallTime,
 		timezone,
 	});
+
+	trackEvent("EventUpdated", { userId: user.id, eventId, groupId });
 
 	// Handle re-confirmation: reset confirmed attendees to pending
 	if (requestReconfirmation && data.assignments.length > 0) {
