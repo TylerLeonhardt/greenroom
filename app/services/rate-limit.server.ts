@@ -91,23 +91,23 @@ export function checkReminderRateLimit(requestId: string) {
 }
 
 export function checkGroupCreateRateLimit(userId: string) {
-	return checkRateLimit(`group-create:${userId}`, 5, ONE_DAY_MS);
+	return checkRateLimit(`group-create:${userId}`, 50, ONE_DAY_MS);
 }
 
 export function checkEventCreateRateLimit(userId: string) {
-	return checkRateLimit(`event-create:${userId}`, 20, ONE_DAY_MS);
+	return checkRateLimit(`event-create:${userId}`, 200, ONE_DAY_MS);
 }
 
 export function checkAvailabilityRequestCreateRateLimit(userId: string) {
-	return checkRateLimit(`avail-request-create:${userId}`, 10, ONE_DAY_MS);
+	return checkRateLimit(`avail-request-create:${userId}`, 100, ONE_DAY_MS);
 }
 
 export function checkAvailabilityResponseRateLimit(userId: string) {
-	return checkRateLimit(`avail-response:${userId}`, 50, ONE_HOUR_MS);
+	return checkRateLimit(`avail-response:${userId}`, 500, ONE_HOUR_MS);
 }
 
 export function checkGroupJoinRateLimit(userId: string) {
-	return checkRateLimit(`group-join:${userId}`, 10, ONE_DAY_MS);
+	return checkRateLimit(`group-join:${userId}`, 100, ONE_DAY_MS);
 }
 
 /** Visible for testing */
