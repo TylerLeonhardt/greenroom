@@ -76,8 +76,9 @@ export function ResultsHeatmap({
 	dates,
 	totalMembers,
 	totalResponded,
-	groupId,
-	requestId,
+	// groupId and requestId kept in props interface for callers but unused here
+	groupId: _groupId,
+	requestId: _requestId,
 	timeRange,
 	timezone,
 	batchMode,
