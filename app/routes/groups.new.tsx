@@ -6,6 +6,7 @@ import { requireUser } from "~/services/auth.server";
 import { validateCsrfToken } from "~/services/csrf.server";
 import { createGroup } from "~/services/groups.server";
 import { logger } from "~/services/logger.server";
+import { checkGroupCreateRateLimit } from "~/services/rate-limit.server";
 
 export const meta: MetaFunction = () => {
 	return [{ title: "Create Group — My Call Time" }];
@@ -18,6 +19,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export async function action({ request }: ActionFunctionArgs) {
 	const user = await requireUser(request);
+
+	const rateCheck = checkGroupCreateRateLimit(user.id);
+	if (rateCheck.limited) {
+		return Response.json(
+			{ errors: { form: "You've created too many groups today. Please try again later." } },
+			{ status: 429, headers: { "Retry-After": String(rateCheck.retryAfter) } },
+		);
+	}
+
 	const formData = await request.formData();
 	await validateCsrfToken(request, formData);
 

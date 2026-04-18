@@ -22,6 +22,7 @@ import {
 	getGroupMembersWithPreferences,
 	requireGroupAdminOrPermission,
 } from "~/services/groups.server";
+import { checkAvailabilityRequestCreateRateLimit } from "~/services/rate-limit.server";
 import { sendAvailabilityRequestWebhook } from "~/services/webhook.server";
 
 export const meta: MetaFunction = () => {
@@ -37,6 +38,17 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 export async function action({ request, params }: ActionFunctionArgs) {
 	const groupId = params.groupId ?? "";
 	const user = await requireGroupAdminOrPermission(request, groupId, "membersCanCreateRequests");
+
+	const rateCheck = checkAvailabilityRequestCreateRateLimit(user.id);
+	if (rateCheck.limited) {
+		return Response.json(
+			{
+				error: "You've created too many availability requests today. Please try again later.",
+			},
+			{ status: 429, headers: { "Retry-After": String(rateCheck.retryAfter) } },
+		);
+	}
+
 	const formData = await request.formData();
 	await validateCsrfToken(request, formData);
 

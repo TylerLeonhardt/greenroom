@@ -1,4 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { _resetForTests } from "~/services/rate-limit.server";
+
+// Reset rate limiter before each test to prevent cross-test interference
+beforeEach(() => {
+	_resetForTests();
+});
 
 // Mock auth service
 vi.mock("~/services/auth.server", () => ({

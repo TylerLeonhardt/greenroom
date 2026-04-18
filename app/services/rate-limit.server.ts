@@ -67,6 +67,8 @@ function getClientIp(request: Request): string {
 }
 
 const ONE_MINUTE_MS = 60 * 1000;
+const ONE_HOUR_MS = 60 * 60 * 1000;
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 export function checkLoginRateLimit(request: Request) {
 	const ip = getClientIp(request);
@@ -86,6 +88,26 @@ const FIVE_MINUTES_MS = 5 * 60 * 1000;
 
 export function checkReminderRateLimit(requestId: string) {
 	return checkRateLimit(`availability-reminder:${requestId}`, 1, FIVE_MINUTES_MS);
+}
+
+export function checkGroupCreateRateLimit(userId: string) {
+	return checkRateLimit(`group-create:${userId}`, 5, ONE_DAY_MS);
+}
+
+export function checkEventCreateRateLimit(userId: string) {
+	return checkRateLimit(`event-create:${userId}`, 20, ONE_DAY_MS);
+}
+
+export function checkAvailabilityRequestCreateRateLimit(userId: string) {
+	return checkRateLimit(`avail-request-create:${userId}`, 10, ONE_DAY_MS);
+}
+
+export function checkAvailabilityResponseRateLimit(userId: string) {
+	return checkRateLimit(`avail-response:${userId}`, 50, ONE_HOUR_MS);
+}
+
+export function checkGroupJoinRateLimit(userId: string) {
+	return checkRateLimit(`group-join:${userId}`, 10, ONE_DAY_MS);
 }
 
 /** Visible for testing */

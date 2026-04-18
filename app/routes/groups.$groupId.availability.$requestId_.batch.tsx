@@ -29,6 +29,7 @@ import {
 	getGroupWithMembers,
 	requireGroupAdminOrPermission,
 } from "~/services/groups.server";
+import { checkEventCreateRateLimit } from "~/services/rate-limit.server";
 import { sendBatchEventsCreatedWebhook } from "~/services/webhook.server";
 import type { NotificationPreferences } from "../../src/db/schema.js";
 
@@ -70,6 +71,15 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	const groupId = params.groupId ?? "";
 	const requestId = params.requestId ?? "";
 	const user = await requireGroupAdminOrPermission(request, groupId, "membersCanCreateEvents");
+
+	const rateCheck = checkEventCreateRateLimit(user.id);
+	if (rateCheck.limited) {
+		return Response.json(
+			{ error: "You've created too many events today. Please try again later." },
+			{ status: 429, headers: { "Retry-After": String(rateCheck.retryAfter) } },
+		);
+	}
+
 	const formData = await request.formData();
 	await validateCsrfToken(request, formData);
 
