@@ -99,8 +99,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	}
 
 	const sortedDates = [...selectedDates].sort();
-	const dateRangeStart = new Date(sortedDates[0] + "T00:00:00");
-	const dateRangeEnd = new Date(sortedDates[sortedDates.length - 1] + "T00:00:00");
+	const dateRangeStart = new Date(`${sortedDates[0]}T00:00:00`);
+	const dateRangeEnd = new Date(`${sortedDates[sortedDates.length - 1]}T00:00:00`);
 
 	const changes = detectAvailabilityRequestChanges(
 		{
@@ -116,7 +116,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	);
 
 	if (!hasAnyAvailabilityRequestChanges(changes)) {
-		return redirect("/groups/" + groupId + "/availability/" + requestId);
+		return redirect(`/groups/${groupId}/availability/${requestId}`);
 	}
 
 	await updateAvailabilityRequest(requestId, {
@@ -130,8 +130,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	if (notifyMembers && hasAnyAvailabilityRequestChanges(changes)) {
 		const changeSummary = formatAvailabilityRequestChangeSummary(changes);
 		const appUrl = process.env.APP_URL ?? "http://localhost:5173";
-		const preferencesUrl = appUrl + "/groups/" + groupId + "/notifications";
-		const requestUrl = appUrl + "/groups/" + groupId + "/availability/" + requestId;
+		const preferencesUrl = `${appUrl}/groups/${groupId}/notifications`;
+		const requestUrl = `${appUrl}/groups/${groupId}/availability/${requestId}`;
 
 		void Promise.all([getGroupById(groupId), getGroupMembersWithPreferences(groupId)]).then(
 			([group, members]) => {
@@ -166,7 +166,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		);
 	}
 
-	return redirect("/groups/" + groupId + "/availability/" + requestId);
+	return redirect(`/groups/${groupId}/availability/${requestId}`);
 }
 
 export default function EditAvailabilityRequest() {
