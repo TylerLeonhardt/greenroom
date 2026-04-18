@@ -6,7 +6,16 @@ function createChainableMock(resolvedValue: unknown[] = []) {
 		// biome-ignore lint/suspicious/noThenProperty: needed to make the mock awaitable for Promise.all
 		then: (resolve: (v: unknown) => void) => resolve(resolvedValue),
 	};
-	const methods = ["select", "from", "innerJoin", "leftJoin", "where", "orderBy", "limit", "groupBy"];
+	const methods = [
+		"select",
+		"from",
+		"innerJoin",
+		"leftJoin",
+		"where",
+		"orderBy",
+		"limit",
+		"groupBy",
+	];
 	for (const method of methods) {
 		chain[method] = vi.fn().mockReturnValue(chain);
 	}
