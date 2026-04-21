@@ -1,0 +1,210 @@
+{
+	"version": "Notebook/1.0",
+	"items": [
+		{
+			"type": 1,
+			"content": {
+				"json": "# GreenRoom Activity Dashboard\nCustom telemetry overview for the My Call Time application."
+			},
+			"name": "text - title"
+		},
+		{
+			"type": 9,
+			"content": {
+				"version": "KqlParameterItem/1.0",
+				"parameters": [
+					{
+						"id": "a2b6a5c0-1e2f-4d3c-8b9a-0f1e2d3c4b5a",
+						"version": "KqlParameterItem/1.0",
+						"name": "TimeRange",
+						"type": 4,
+						"isRequired": true,
+						"value": {
+							"durationMs": 604800000
+						},
+						"typeSettings": {
+							"selectableValues": [
+								{ "durationMs": 3600000 },
+								{ "durationMs": 14400000 },
+								{ "durationMs": 43200000 },
+								{ "durationMs": 86400000 },
+								{ "durationMs": 259200000 },
+								{ "durationMs": 604800000 },
+								{ "durationMs": 1209600000 },
+								{ "durationMs": 2592000000 }
+							],
+							"allowCustom": true
+						},
+						"label": "Time Range"
+					}
+				],
+				"style": "pills",
+				"queryType": 0,
+				"resourceType": "microsoft.insights/components"
+			},
+			"name": "parameters - timerange"
+		},
+		{
+			"type": 1,
+			"content": {
+				"json": "## Overview"
+			},
+			"name": "text - overview"
+		},
+		{
+			"type": 3,
+			"content": {
+				"version": "KqlItem/1.0",
+				"query": "customEvents\n| where timestamp {TimeRange}\n| summarize count() by name\n| order by count_ desc",
+				"size": 0,
+				"title": "Total Events by Type",
+				"queryType": 0,
+				"resourceType": "microsoft.insights/components",
+				"visualization": "barchart",
+				"chartSettings": {
+					"xAxis": "name",
+					"yAxis": ["count_"]
+				}
+			},
+			"name": "query - overview"
+		},
+		{
+			"type": 1,
+			"content": {
+				"json": "## Activity Over Time"
+			},
+			"name": "text - activity"
+		},
+		{
+			"type": 3,
+			"content": {
+				"version": "KqlItem/1.0",
+				"query": "customEvents\n| where timestamp {TimeRange}\n| summarize count() by bin(timestamp, 1h), name\n| order by timestamp asc",
+				"size": 0,
+				"title": "Events per Hour (stacked by type)",
+				"queryType": 0,
+				"resourceType": "microsoft.insights/components",
+				"visualization": "timechart"
+			},
+			"name": "query - activity-over-time"
+		},
+		{
+			"type": 1,
+			"content": {
+				"json": "## User Signups"
+			},
+			"name": "text - signups"
+		},
+		{
+			"type": 3,
+			"content": {
+				"version": "KqlItem/1.0",
+				"query": "customEvents\n| where name == \"UserCreated\" and timestamp {TimeRange}\n| summarize count() by bin(timestamp, 1d), tostring(customDimensions.method)\n| order by timestamp asc",
+				"size": 0,
+				"title": "Signups Over Time (by method)",
+				"queryType": 0,
+				"resourceType": "microsoft.insights/components",
+				"visualization": "timechart"
+			},
+			"name": "query - signups"
+		},
+		{
+			"type": 1,
+			"content": {
+				"json": "## Top Active Users (Abuse Detection)"
+			},
+			"name": "text - active-users"
+		},
+		{
+			"type": 3,
+			"content": {
+				"version": "KqlItem/1.0",
+				"query": "customEvents\n| where timestamp {TimeRange}\n| extend userId = tostring(customDimensions.userId)\n| where isnotempty(userId)\n| summarize actions = count(), distinctEvents = dcount(name) by userId\n| top 20 by actions",
+				"size": 1,
+				"title": "Top 20 Users by Action Count",
+				"queryType": 0,
+				"resourceType": "microsoft.insights/components",
+				"visualization": "table",
+				"gridSettings": {
+					"sortBy": [
+						{
+							"itemKey": "actions",
+							"sortOrder": 2
+						}
+					]
+				}
+			},
+			"name": "query - active-users"
+		},
+		{
+			"type": 1,
+			"content": {
+				"json": "## Email Health"
+			},
+			"name": "text - email"
+		},
+		{
+			"type": 3,
+			"content": {
+				"version": "KqlItem/1.0",
+				"query": "customEvents\n| where name == \"EmailSent\" and timestamp {TimeRange}\n| summarize count() by tostring(customDimensions.success)",
+				"size": 0,
+				"title": "Email Success / Failure Rate",
+				"queryType": 0,
+				"resourceType": "microsoft.insights/components",
+				"visualization": "piechart"
+			},
+			"name": "query - email-health"
+		},
+		{
+			"type": 1,
+			"content": {
+				"json": "## Group Activity"
+			},
+			"name": "text - groups"
+		},
+		{
+			"type": 3,
+			"content": {
+				"version": "KqlItem/1.0",
+				"query": "customEvents\n| where name in (\"GroupCreated\", \"GroupJoined\", \"GroupDeleted\") and timestamp {TimeRange}\n| summarize count() by bin(timestamp, 1d), name\n| order by timestamp asc",
+				"size": 0,
+				"title": "Groups Created, Joined, and Deleted Over Time",
+				"queryType": 0,
+				"resourceType": "microsoft.insights/components",
+				"visualization": "timechart"
+			},
+			"name": "query - group-activity"
+		},
+		{
+			"type": 1,
+			"content": {
+				"json": "## Request Failures & Performance"
+			},
+			"name": "text - failures"
+		},
+		{
+			"type": 3,
+			"content": {
+				"version": "KqlItem/1.0",
+				"query": "requests\n| where timestamp {TimeRange} and resultCode startswith \"5\"\n| summarize count() by bin(timestamp, 1h)\n| order by timestamp asc",
+				"size": 0,
+				"title": "Failed Requests (5xx) per Hour",
+				"queryType": 0,
+				"resourceType": "microsoft.insights/components",
+				"visualization": "timechart",
+				"chartSettings": {
+					"seriesLabelSettings": [
+						{
+							"seriesName": "count_",
+							"label": "5xx Errors",
+							"color": "red"
+						}
+					]
+				}
+			},
+			"name": "query - request-failures"
+		}
+	],
+	"$schema": "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json"
+}
