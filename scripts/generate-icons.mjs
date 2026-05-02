@@ -1,5 +1,5 @@
 /**
- * Generates favicon.ico and apple-touch-icon.png from the emoji SVG.
+ * Generates favicon.ico and apple-touch-icon.png from public/favicon.svg.
  *
  * Usage: node scripts/generate-icons.mjs
  *
@@ -15,10 +15,7 @@ import sharp from "sharp";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, "..", "public");
 
-const EMERALD_600 = "#059669";
-
-// SVG source with the performing arts emoji
-const emojiSvg = readFileSync(path.join(publicDir, "favicon.svg"), "utf-8");
+const faviconSvg = readFileSync(path.join(publicDir, "favicon.svg"));
 
 /**
  * Wraps one or more PNG buffers into a single ICO file.
@@ -60,31 +57,22 @@ function createIco(pngBuffers) {
 	return Buffer.concat([header, ...dirEntries, ...pngBuffers]);
 }
 
-async function renderEmojiPng(size, background = null) {
-	// Create SVG with explicit dimensions and optional background
-	const bgRect = background
-		? `<rect width="100" height="100" rx="18" fill="${background}"/>`
-		: "";
-	const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${size}" height="${size}">${bgRect}<text y=".9em" font-size="90">🎭</text></svg>`;
-
-	return sharp(Buffer.from(svg)).resize(size, size).png().toBuffer();
+async function renderPng(size) {
+	return sharp(faviconSvg).resize(size, size).png().toBuffer();
 }
 
 async function main() {
-	console.log("Generating icons...");
+	console.log("Generating icons from public/favicon.svg...");
 
 	// Generate favicon.ico with 16x16 and 32x32 sizes
-	const [png16, png32] = await Promise.all([
-		renderEmojiPng(16),
-		renderEmojiPng(32),
-	]);
+	const [png16, png32] = await Promise.all([renderPng(16), renderPng(32)]);
 
 	const ico = createIco([png16, png32]);
 	writeFileSync(path.join(publicDir, "favicon.ico"), ico);
 	console.log(`  ✓ favicon.ico (${ico.length} bytes, 16x16 + 32x32)`);
 
-	// Generate apple-touch-icon.png at 180x180 with emerald background
-	const applePng = await renderEmojiPng(180, EMERALD_600);
+	// Generate apple-touch-icon.png at 180x180
+	const applePng = await renderPng(180);
 	writeFileSync(path.join(publicDir, "apple-touch-icon.png"), applePng);
 	console.log(`  ✓ apple-touch-icon.png (${applePng.length} bytes, 180x180)`);
 
