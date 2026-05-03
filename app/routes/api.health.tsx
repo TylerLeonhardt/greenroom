@@ -6,7 +6,7 @@ import { db } from "../../src/db/index.js";
 export async function loader(_args: LoaderFunctionArgs) {
 	try {
 		const timeout = new Promise<never>((_, reject) =>
-			setTimeout(() => reject(new Error("Health check timeout")), 2000),
+			setTimeout(() => reject(new Error("Health check timeout")), 5000),
 		);
 		await Promise.race([db.execute(sql`SELECT 1`), timeout]);
 	} catch (error) {
