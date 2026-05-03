@@ -43,8 +43,8 @@ test.describe("EventCalendar", () => {
 	test("With Events — event dots are displayed", async ({ page }) => {
 		await renderFixture(page, "event-calendar", "With Events");
 
-		// Event dots are small colored circles (h-1.5 w-1.5 rounded-full)
-		const dots = page.locator(".rounded-full.h-1\\.5");
+		// Event dots use data-testid for resilient selection
+		const dots = page.getByTestId("event-dot");
 		await expect(dots.first()).toBeVisible();
 	});
 
@@ -55,7 +55,7 @@ test.describe("EventCalendar", () => {
 		await expect(page.getByText("Sun")).toBeVisible();
 
 		// No event dots
-		const dots = page.locator(".rounded-full.h-1\\.5");
+		const dots = page.getByTestId("event-dot");
 		await expect(dots).toHaveCount(0);
 	});
 });

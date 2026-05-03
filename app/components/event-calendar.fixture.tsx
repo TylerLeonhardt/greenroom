@@ -51,6 +51,7 @@ export default defineFixtureGroup({
 				<div className="max-w-lg">
 					<EventCalendar
 						events={sampleEvents}
+						initialDate={new Date(2026, 2, 1)}
 						onDateClick={(date, events) => console.log("Date clicked:", date, events)}
 					/>
 				</div>,

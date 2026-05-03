@@ -15,6 +15,8 @@ interface EventCalendarProps {
 		startTime: string;
 	}>;
 	onDateClick?: (date: string, events: EventIndicator[]) => void;
+	/** Override the initially displayed month (defaults to today). */
+	initialDate?: Date;
 }
 
 const EVENT_TYPE_COLORS: Record<string, string> = {
@@ -29,10 +31,11 @@ function toDateKey(date: Date): string {
 	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-export function EventCalendar({ events, onDateClick }: EventCalendarProps) {
+export function EventCalendar({ events, onDateClick, initialDate }: EventCalendarProps) {
 	const today = new Date();
-	const [year, setYear] = useState(today.getFullYear());
-	const [month, setMonth] = useState(today.getMonth());
+	const start = initialDate ?? today;
+	const [year, setYear] = useState(start.getFullYear());
+	const [month, setMonth] = useState(start.getMonth());
 
 	const todayKey = toDateKey(today);
 
@@ -143,6 +146,7 @@ export function EventCalendar({ events, onDateClick }: EventCalendarProps) {
 									{dayEvents.slice(0, 3).map((e) => (
 										<span
 											key={e.id}
+											data-testid="event-dot"
 											className={`h-1.5 w-1.5 rounded-full ${EVENT_TYPE_COLORS[e.eventType] ?? "bg-slate-600"}`}
 										/>
 									))}
