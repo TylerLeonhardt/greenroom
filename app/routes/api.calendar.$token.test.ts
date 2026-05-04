@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock calendar token service
 vi.mock("~/services/calendar-token.server", () => ({
@@ -26,11 +26,17 @@ vi.mock("../../src/db/index.js", () => ({
 
 import { getUserByCalendarToken } from "~/services/calendar-token.server";
 import { getUserCalendarEvents } from "~/services/events.server";
+import { _resetForTests } from "~/services/rate-limit.server";
 import { loader } from "./api.calendar.$token";
 
 describe("GET /api/calendar/:token.ics", () => {
 	const validHexToken = "aabb1122ccdd3344eeff5566aabb1122";
 	const unknownHexToken = "deadbeefdeadbeefdeadbeefdeadbeef";
+
+	beforeEach(() => {
+		vi.resetAllMocks();
+		_resetForTests();
+	});
 	const mockEvents = [
 		{
 			id: "event-1",
@@ -127,7 +133,7 @@ describe("GET /api/calendar/:token.ics", () => {
 		expect(response.headers.get("Content-Disposition")).toBeNull();
 	});
 
-	it("sets cache control to private, no-store", async () => {
+	it("sets Cache-Control to public, max-age=300", async () => {
 		(getUserByCalendarToken as ReturnType<typeof vi.fn>).mockResolvedValue({
 			id: "user-1",
 			timezone: null,
@@ -140,7 +146,7 @@ describe("GET /api/calendar/:token.ics", () => {
 			context: {},
 		});
 
-		expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+		expect(response.headers.get("Cache-Control")).toBe("public, max-age=300");
 	});
 
 	it("sets X-Robots-Tag to prevent indexing", async () => {
@@ -342,5 +348,99 @@ describe("GET /api/calendar/:token.ics", () => {
 		expect(body).toContain("SUMMARY:Team Meeting");
 		// With null role and no callTime, should use regular startTime
 		expect(body).toContain("DTSTART:20260322T180000Z");
+	});
+
+	it("includes ETag header in response", async () => {
+		(getUserByCalendarToken as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: "user-1",
+			timezone: null,
+		});
+		(getUserCalendarEvents as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+		const response = await loader({
+			request: new Request(`http://localhost/api/calendar/${validHexToken}.ics`),
+			params: { token: `${validHexToken}.ics` },
+			context: {},
+		});
+
+		const etag = response.headers.get("ETag");
+		expect(etag).toBeTruthy();
+		expect(etag).toMatch(/^"[a-f0-9]{64}"$/);
+	});
+
+	it("returns 304 Not Modified when If-None-Match matches ETag", async () => {
+		(getUserByCalendarToken as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: "user-1",
+			timezone: null,
+		});
+		(getUserCalendarEvents as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+		// First request to get the ETag
+		const first = await loader({
+			request: new Request(`http://localhost/api/calendar/${validHexToken}.ics`),
+			params: { token: `${validHexToken}.ics` },
+			context: {},
+		});
+		const etag = first.headers.get("ETag") as string;
+
+		// Second request with If-None-Match
+		const second = await loader({
+			request: new Request(`http://localhost/api/calendar/${validHexToken}.ics`, {
+				headers: { "If-None-Match": etag },
+			}),
+			params: { token: `${validHexToken}.ics` },
+			context: {},
+		});
+
+		expect(second.status).toBe(304);
+		const body = await second.text();
+		expect(body).toBe("");
+	});
+
+	it("returns 200 with full content when If-None-Match does not match", async () => {
+		(getUserByCalendarToken as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: "user-1",
+			timezone: null,
+		});
+		(getUserCalendarEvents as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+		const response = await loader({
+			request: new Request(`http://localhost/api/calendar/${validHexToken}.ics`, {
+				headers: { "If-None-Match": '"stale-etag-value"' },
+			}),
+			params: { token: `${validHexToken}.ics` },
+			context: {},
+		});
+
+		expect(response.status).toBe(200);
+		const body = await response.text();
+		expect(body).toContain("BEGIN:VCALENDAR");
+	});
+
+	it("returns 429 when rate limited", async () => {
+		(getUserByCalendarToken as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: "user-1",
+			timezone: null,
+		});
+		(getUserCalendarEvents as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+		// Exhaust the 30-request limit
+		for (let i = 0; i < 30; i++) {
+			await loader({
+				request: new Request(`http://localhost/api/calendar/${validHexToken}.ics`),
+				params: { token: `${validHexToken}.ics` },
+				context: {},
+			});
+		}
+
+		// 31st request should be rate limited
+		const response = await loader({
+			request: new Request(`http://localhost/api/calendar/${validHexToken}.ics`),
+			params: { token: `${validHexToken}.ics` },
+			context: {},
+		});
+
+		expect(response.status).toBe(429);
+		expect(response.headers.get("Retry-After")).toBeTruthy();
 	});
 });

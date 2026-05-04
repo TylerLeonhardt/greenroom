@@ -1,9 +1,11 @@
+import { createHash } from "node:crypto";
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { generateCalendarFeed } from "~/lib/ical-utils";
 import { getUserByCalendarToken } from "~/services/calendar-token.server";
 import { getUserCalendarEvents } from "~/services/events.server";
+import { checkCalendarFeedRateLimit } from "~/services/rate-limit.server";
 
-export async function loader({ params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {
 	const rawToken = params.token;
 	if (!rawToken) {
 		throw new Response("Not Found", { status: 404 });
@@ -18,6 +20,15 @@ export async function loader({ params }: LoaderFunctionArgs) {
 	const token = rawToken.slice(0, -4);
 	if (!token || !/^[a-f0-9]+$/.test(token)) {
 		throw new Response("Not Found", { status: 404 });
+	}
+
+	// Rate limit by token — 30 requests per hour
+	const rateLimit = checkCalendarFeedRateLimit(token);
+	if (rateLimit.limited) {
+		return new Response("Too Many Requests", {
+			status: 429,
+			headers: { "Retry-After": String(rateLimit.retryAfter) },
+		});
 	}
 
 	const user = await getUserByCalendarToken(token);
@@ -43,11 +54,25 @@ export async function loader({ params }: LoaderFunctionArgs) {
 
 	const icsContent = generateCalendarFeed(calendarEvents);
 
+	// ETag for conditional request support
+	const etag = `"${createHash("sha256").update(icsContent).digest("hex")}"`;
+	const ifNoneMatch = request.headers.get("If-None-Match");
+	if (ifNoneMatch === etag) {
+		return new Response(null, {
+			status: 304,
+			headers: {
+				ETag: etag,
+				"Cache-Control": "public, max-age=300",
+			},
+		});
+	}
+
 	return new Response(icsContent, {
 		status: 200,
 		headers: {
 			"Content-Type": "text/calendar; charset=utf-8",
-			"Cache-Control": "private, no-store",
+			"Cache-Control": "public, max-age=300",
+			ETag: etag,
 			"X-Robots-Tag": "noindex, nofollow",
 		},
 	});
