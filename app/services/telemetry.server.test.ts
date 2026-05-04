@@ -1,5 +1,63 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+describe("redactSensitiveUrls", () => {
+	it("redacts calendar feed token from a full URL", async () => {
+		const { redactSensitiveUrls } = await import("./telemetry.server");
+		expect(redactSensitiveUrls("https://mycalltime.app/api/calendar/abc123TOKEN.ics")).toBe(
+			"https://mycalltime.app/api/calendar/[REDACTED].ics",
+		);
+	});
+
+	it("redacts calendar feed token from a path-only URL", async () => {
+		const { redactSensitiveUrls } = await import("./telemetry.server");
+		expect(redactSensitiveUrls("/api/calendar/abc123TOKEN.ics")).toBe(
+			"/api/calendar/[REDACTED].ics",
+		);
+	});
+
+	it("redacts calendar token from request name with HTTP method prefix", async () => {
+		const { redactSensitiveUrls } = await import("./telemetry.server");
+		expect(redactSensitiveUrls("GET /api/calendar/secretToken99.ics")).toBe(
+			"GET /api/calendar/[REDACTED].ics",
+		);
+	});
+
+	it("does not modify URLs that don't contain calendar tokens", async () => {
+		const { redactSensitiveUrls } = await import("./telemetry.server");
+		expect(redactSensitiveUrls("/api/health")).toBe("/api/health");
+		expect(redactSensitiveUrls("/groups/123/events")).toBe("/groups/123/events");
+	});
+
+	it("redacts Discord webhook URLs (discord.com)", async () => {
+		const { redactSensitiveUrls } = await import("./telemetry.server");
+		expect(redactSensitiveUrls("https://discord.com/api/webhooks/123456789/abcDEF_token")).toBe(
+			"https://discord.com/api/webhooks/[REDACTED]/[REDACTED]",
+		);
+	});
+
+	it("redacts Discord webhook URLs (discordapp.com)", async () => {
+		const { redactSensitiveUrls } = await import("./telemetry.server");
+		expect(redactSensitiveUrls("https://discordapp.com/api/webhooks/999/xyzTOKEN123")).toBe(
+			"https://discord.com/api/webhooks/[REDACTED]/[REDACTED]",
+		);
+	});
+
+	it("redacts multiple sensitive URLs in one string", async () => {
+		const { redactSensitiveUrls } = await import("./telemetry.server");
+		const input = "Ref: /api/calendar/t1.ics and https://discord.com/api/webhooks/1/tok";
+		const result = redactSensitiveUrls(input);
+		expect(result).toContain("/api/calendar/[REDACTED].ics");
+		expect(result).toContain("https://discord.com/api/webhooks/[REDACTED]/[REDACTED]");
+		expect(result).not.toContain("t1");
+		expect(result).not.toContain("tok");
+	});
+
+	it("handles empty strings", async () => {
+		const { redactSensitiveUrls } = await import("./telemetry.server");
+		expect(redactSensitiveUrls("")).toBe("");
+	});
+});
+
 describe("telemetry.server", () => {
 	beforeEach(() => {
 		vi.resetModules();
@@ -60,7 +118,7 @@ describe("telemetry.server", () => {
 		});
 	});
 
-	it("registers a telemetry processor that marks client errors (4xx) as successful", async () => {
+	it("registers telemetry processors for URL redaction and client-error success override", async () => {
 		const processors: Array<(envelope: unknown) => boolean> = [];
 		vi.doMock("applicationinsights", () => ({
 			default: {
@@ -88,46 +146,170 @@ describe("telemetry.server", () => {
 		vi.stubEnv("APPLICATIONINSIGHTS_CONNECTION_STRING", "InstrumentationKey=test-key");
 		await import("./telemetry.server");
 
-		expect(processors).toHaveLength(1);
-		const processor = processors[0];
+		expect(processors).toHaveLength(2);
+	});
 
-		// 404 (Not Found) should be marked as successful
-		const envelope404 = {
-			data: { baseData: { responseCode: "404", success: false } },
-		};
-		expect(processor(envelope404)).toBe(true);
-		expect(envelope404.data.baseData.success).toBe(true);
+	describe("URL redaction processor", () => {
+		let processor: (envelope: unknown) => boolean;
 
-		// 405 (Method Not Allowed) should be marked as successful
-		const envelope405 = {
-			data: { baseData: { responseCode: "405", success: false } },
-		};
-		expect(processor(envelope405)).toBe(true);
-		expect(envelope405.data.baseData.success).toBe(true);
+		beforeEach(async () => {
+			vi.resetModules();
+			const processors: Array<(envelope: unknown) => boolean> = [];
+			vi.doMock("applicationinsights", () => ({
+				default: {
+					setup: vi.fn().mockReturnValue({
+						setAutoCollectRequests: vi.fn().mockReturnValue({
+							setAutoCollectExceptions: vi.fn().mockReturnValue({
+								setAutoCollectDependencies: vi.fn().mockReturnValue({
+									setAutoCollectPerformance: vi.fn().mockReturnValue({
+										setSendLiveMetrics: vi.fn().mockReturnValue({
+											start: vi.fn(),
+										}),
+									}),
+								}),
+							}),
+						}),
+					}),
+					defaultClient: {
+						trackEvent: vi.fn(),
+						addTelemetryProcessor: vi.fn((fn: (envelope: unknown) => boolean) =>
+							processors.push(fn),
+						),
+						context: { tags: {}, keys: { cloudRole: "cloudRole" } },
+					},
+				},
+			}));
 
-		// 429 (Too Many Requests) should be marked as successful
-		const envelope429 = {
-			data: { baseData: { responseCode: "429", success: false } },
-		};
-		expect(processor(envelope429)).toBe(true);
-		expect(envelope429.data.baseData.success).toBe(true);
+			vi.stubEnv("APPLICATIONINSIGHTS_CONNECTION_STRING", "InstrumentationKey=test-key");
+			await import("./telemetry.server");
+			processor = processors[0];
+		});
 
-		// 500 (Server Error) should remain unchanged
-		const envelope500 = {
-			data: { baseData: { responseCode: "500", success: false } },
-		};
-		expect(processor(envelope500)).toBe(true);
-		expect(envelope500.data.baseData.success).toBe(false);
+		it("redacts calendar token from request URL", () => {
+			const envelope = {
+				data: {
+					baseData: {
+						url: "https://mycalltime.app/api/calendar/secret-token-123.ics",
+						name: "GET /api/calendar/secret-token-123.ics",
+					},
+				},
+			};
+			expect(processor(envelope)).toBe(true);
+			expect(envelope.data.baseData.url).toBe("https://mycalltime.app/api/calendar/[REDACTED].ics");
+			expect(envelope.data.baseData.name).toBe("GET /api/calendar/[REDACTED].ics");
+		});
 
-		// 200 (OK) should remain successful
-		const envelope200 = {
-			data: { baseData: { responseCode: "200", success: true } },
-		};
-		expect(processor(envelope200)).toBe(true);
-		expect(envelope200.data.baseData.success).toBe(true);
+		it("redacts Discord webhook URL from dependency data", () => {
+			const envelope = {
+				data: {
+					baseData: {
+						data: "https://discord.com/api/webhooks/123456789/webhookToken",
+						name: "POST https://discord.com/api/webhooks/123456789/webhookToken",
+					},
+				},
+			};
+			expect(processor(envelope)).toBe(true);
+			expect(envelope.data.baseData.data).toBe(
+				"https://discord.com/api/webhooks/[REDACTED]/[REDACTED]",
+			);
+			expect(envelope.data.baseData.name).toBe(
+				"POST https://discord.com/api/webhooks/[REDACTED]/[REDACTED]",
+			);
+		});
 
-		// Envelope without baseData should not crash
-		const envelopeEmpty = { data: {} };
-		expect(processor(envelopeEmpty)).toBe(true);
+		it("does not modify non-sensitive URLs", () => {
+			const envelope = {
+				data: { baseData: { url: "/dashboard", name: "GET /dashboard" } },
+			};
+			expect(processor(envelope)).toBe(true);
+			expect(envelope.data.baseData.url).toBe("/dashboard");
+			expect(envelope.data.baseData.name).toBe("GET /dashboard");
+		});
+
+		it("handles envelope without baseData", () => {
+			const envelope = { data: {} };
+			expect(processor(envelope)).toBe(true);
+		});
+
+		it("handles non-string fields gracefully", () => {
+			const envelope = { data: { baseData: { url: 12345, name: null } } };
+			expect(processor(envelope)).toBe(true);
+			expect(envelope.data.baseData.url).toBe(12345);
+			expect(envelope.data.baseData.name).toBeNull();
+		});
+	});
+
+	describe("client-error success override processor", () => {
+		let processor: (envelope: unknown) => boolean;
+
+		beforeEach(async () => {
+			vi.resetModules();
+			const processors: Array<(envelope: unknown) => boolean> = [];
+			vi.doMock("applicationinsights", () => ({
+				default: {
+					setup: vi.fn().mockReturnValue({
+						setAutoCollectRequests: vi.fn().mockReturnValue({
+							setAutoCollectExceptions: vi.fn().mockReturnValue({
+								setAutoCollectDependencies: vi.fn().mockReturnValue({
+									setAutoCollectPerformance: vi.fn().mockReturnValue({
+										setSendLiveMetrics: vi.fn().mockReturnValue({
+											start: vi.fn(),
+										}),
+									}),
+								}),
+							}),
+						}),
+					}),
+					defaultClient: {
+						trackEvent: vi.fn(),
+						addTelemetryProcessor: vi.fn((fn: (envelope: unknown) => boolean) =>
+							processors.push(fn),
+						),
+						context: { tags: {}, keys: { cloudRole: "cloudRole" } },
+					},
+				},
+			}));
+
+			vi.stubEnv("APPLICATIONINSIGHTS_CONNECTION_STRING", "InstrumentationKey=test-key");
+			await import("./telemetry.server");
+			processor = processors[1];
+		});
+
+		it("marks 404 as successful", () => {
+			const envelope = {
+				data: { baseData: { responseCode: "404", success: false } },
+			};
+			expect(processor(envelope)).toBe(true);
+			expect(envelope.data.baseData.success).toBe(true);
+		});
+
+		it("marks 429 as successful", () => {
+			const envelope = {
+				data: { baseData: { responseCode: "429", success: false } },
+			};
+			expect(processor(envelope)).toBe(true);
+			expect(envelope.data.baseData.success).toBe(true);
+		});
+
+		it("does not mark 500 as successful", () => {
+			const envelope = {
+				data: { baseData: { responseCode: "500", success: false } },
+			};
+			expect(processor(envelope)).toBe(true);
+			expect(envelope.data.baseData.success).toBe(false);
+		});
+
+		it("keeps 200 as successful", () => {
+			const envelope = {
+				data: { baseData: { responseCode: "200", success: true } },
+			};
+			expect(processor(envelope)).toBe(true);
+			expect(envelope.data.baseData.success).toBe(true);
+		});
+
+		it("handles envelope without baseData", () => {
+			const envelope = { data: {} };
+			expect(processor(envelope)).toBe(true);
+		});
 	});
 });
