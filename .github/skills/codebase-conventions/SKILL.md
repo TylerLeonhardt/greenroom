@@ -5,6 +5,8 @@ description: GreenRoom (My Call Time) project stack, coding conventions, route p
 
 # GreenRoom Codebase Conventions
 
+Start here for a quick orientation. Detailed patterns live in the specialized skills listed at the bottom.
+
 ## Project Stack
 
 | Layer | Technology |
@@ -68,152 +70,6 @@ src/
 
 The `.server.ts` suffix is required for service files — Remix uses it to strip server-only code from the client bundle.
 
-## Route Patterns
-
-### File-Based Routing
-
-Remix v2 flat file routing maps dots to path segments:
-
-```
-groups.$groupId.events.new.tsx  →  /groups/:groupId/events/new
-groups.$groupId.tsx             →  Layout route (renders <Outlet />)
-groups.$groupId._index.tsx      →  Index route for the layout
-settings_.delete-account.tsx    →  /settings/delete-account (escaped from settings layout)
-```
-
-### Loader/Action Pattern
-
-Every route that reads data has a `loader`. Every route that writes data has an `action`:
-
-```typescript
-export async function loader({ request, params }: LoaderFunctionArgs) {
-	const groupId = params.groupId ?? "";
-	const user = await requireGroupMember(request, groupId);
-	const data = await getGroupEvents(groupId);
-	return { events: data, userId: user.id };
-}
-
-export async function action({ request, params }: ActionFunctionArgs) {
-	const groupId = params.groupId ?? "";
-	const user = await requireGroupAdmin(request, groupId);
-	const formData = await request.formData();
-	const intent = formData.get("intent");
-	// ... handle based on intent
-}
-```
-
-### Intent-Based Multi-Action Routes
-
-When a route has multiple form actions, use a hidden `intent` field:
-
-```typescript
-// In the action:
-if (intent === "close") { /* ... */ }
-if (intent === "reopen") { /* ... */ }
-if (intent === "respond") { /* ... */ }
-
-// In the component:
-<Form method="post">
-	<input type="hidden" name="intent" value="close" />
-	<button type="submit">Close</button>
-</Form>
-```
-
-### Resource Routes (API Endpoints)
-
-Routes that return non-HTML responses (JSON, iCal, etc.) are **resource routes** — they export a `loader` and/or `action` but no `default` component:
-
-```typescript
-// app/routes/api.health.tsx — JSON health check
-export async function loader() {
-	return Response.json({ status: "ok", timestamp: new Date().toISOString() });
-}
-
-// app/routes/api.calendar.$token.ics.tsx — iCal feed
-export async function loader({ params }: LoaderFunctionArgs) {
-	// ... return new Response(icsContent, { headers: { "Content-Type": "text/calendar" } })
-}
-```
-
-### Accessing Parent Layout Data
-
-Child routes can access parent layout loader data:
-
-```typescript
-const parentData = useRouteLoaderData<typeof groupLayoutLoader>("routes/groups.$groupId");
-const role = parentData?.role;
-```
-
-## Authentication
-
-### Auth Guards
-
-Four levels of protection, used in every loader/action:
-
-```typescript
-// Any authenticated user — redirects to /login
-const user = await requireUser(request);
-
-// Must be a member of the group — throws 404
-const user = await requireGroupMember(request, groupId);
-
-// Must be an admin — throws 403
-const user = await requireGroupAdmin(request, groupId);
-
-// Admin OR member with a specific permission — throws 403
-const user = await requireGroupAdminOrPermission(request, groupId, "membersCanCreateRequests");
-```
-
-- `getOptionalUser(request)` returns `AuthUser | null` (used in root loader for nav)
-- Auth uses `remix-auth` with `FormStrategy` for email/password
-- Google OAuth is a manual implementation (not using remix-auth adapter)
-- Session cookie: `__greenroom_session`, httpOnly, sameSite lax, secure in production, 30-day expiry
-- **No "logged in but unverified" state** — signup doesn't create a session; users must verify email first
-
-### Soft-Delete User Handling
-
-Deleted users have `deletedAt` set. Auth guards and token lookups reject them:
-
-```typescript
-if (!row || row.deletedAt) return null;
-```
-
-Account deletion has a 30-day reactivation window — logging in within 30 days clears `deletedAt`.
-
-## Service Layer
-
-### Pattern
-
-Services live in `app/services/*.server.ts`. They export functions that encapsulate business logic and database queries:
-
-```typescript
-// app/services/events.server.ts
-export async function createEvent(data: CreateEventInput): Promise<Event> {
-	const [event] = await db.insert(events).values({ ... }).returning();
-	getTelemetryClient()?.trackEvent({ name: "EventCreated", properties: { ... } });
-	return event;
-}
-```
-
-Conventions:
-- Import `db` from `../../src/db/index.js` and schema tables from `../../src/db/schema.js`
-- Return typed objects or DB rows
-- Trim user input before writing
-- Track custom events via `getTelemetryClient()?.trackEvent()`
-- Auth guards (`requireUser`, `requireGroupMember`, etc.) live in `app/services/groups.server.ts`
-- Throw `Response` objects for HTTP errors (404, 403), `Error` for unexpected failures
-
-### Fire-and-Forget Pattern
-
-Email notifications and webhooks use fire-and-forget — don't block the user's request:
-
-```typescript
-// void prefix, no await — fire and forget
-void sendAvailabilityRequestNotification({ ... });
-```
-
-Email service gracefully degrades: if `AZURE_COMMUNICATION_CONNECTION_STRING` is not set, it logs instead of throwing.
-
 ## Shared Utilities (`app/lib/`)
 
 | File | Purpose |
@@ -230,137 +86,12 @@ import { formatDate, formatTime, formatDateTime } from "~/lib/date-utils";
 formatDate(event.startTime, user.timezone);
 ```
 
-## Testing Approach
+## UI Component Patterns
 
-### Unit Tests (Vitest)
-
-Test files are co-located with their source: `foo.server.ts` → `foo.server.test.ts`.
-
-#### Mocking Services
-
-Mock dependencies with `vi.mock()` **before** importing the module under test:
-
-```typescript
-vi.mock("~/services/calendar-token.server", () => ({
-	getUserByCalendarToken: vi.fn(),
-}));
-vi.mock("~/services/events.server", () => ({
-	getUserCalendarEvents: vi.fn(),
-}));
-vi.mock("~/services/logger.server", () => ({
-	logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn() },
-}));
-vi.mock("../../src/db/index.js", () => ({ db: {} }));
-
-// Then import:
-import { loader } from "./api.calendar.$token.ics";
-```
-
-#### Testing Route Loaders/Actions
-
-Construct `Request` objects and call loaders/actions directly:
-
-```typescript
-const response = await loader({
-	request: new Request("http://localhost/api/calendar/validtoken.ics"),
-	params: { token: "validtoken" },
-	context: {},
-});
-
-expect(response.status).toBe(200);
-const body = await response.text();
-expect(body).toContain("BEGIN:VCALENDAR");
-```
-
-For actions, use `FormData`:
-
-```typescript
-const formData = new FormData();
-formData.set("intent", "close");
-const response = await action({
-	request: new Request("http://localhost/route", { method: "POST", body: formData }),
-	params: { groupId: "group-1" },
-	context: {},
-});
-```
-
-#### Component Tests
-
-Use jsdom environment + Testing Library + `userEvent`:
-
-```typescript
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-```
-
-#### Test Lifecycle
-
-```typescript
-beforeEach(() => {
-	vi.clearAllMocks();
-});
-```
-
-### Rate Limiting in Tests
-
-The rate limiter uses in-memory state. Reset it between tests:
-
-```typescript
-import { _resetForTests } from "~/services/rate-limit.server";
-beforeEach(() => _resetForTests());
-```
-
-## UI Patterns
-
-### Forms
-
-Standard Remix `<Form>` with intent-based actions:
-
-```tsx
-<Form method="post">
-	<CsrfInput />
-	<input type="hidden" name="intent" value="update-name" />
-	<input name="name" defaultValue={group.name} />
-	<button type="submit" disabled={isSubmitting}>Save</button>
-</Form>
-```
-
-- Always include `<CsrfInput />` for state-changing forms
-- Disable submit buttons during submission using `useNavigation().state`
-
-### Danger Zone
-
-Use the `DangerZone` component for destructive actions (delete group, delete account):
-
-```tsx
-<DangerZone>
-	<DangerZone.Title>Delete Group</DangerZone.Title>
-	<DangerZone.Description>This action cannot be undone.</DangerZone.Description>
-	<Form method="post">
-		<input type="hidden" name="intent" value="delete" />
-		<button type="submit">Delete</button>
-	</Form>
-</DangerZone>
-```
-
-For high-stakes deletions, require the user to type a confirmation string (e.g., their email address) before the submit button is enabled.
-
-### Confirmation Dialogs
-
-For destructive actions that are less severe than full deletion, use `onClick` confirmation:
-
-```tsx
-<button
-	type="submit"
-	onClick={(e) => {
-		if (!confirm("Are you sure you want to regenerate your calendar feed URL?")) {
-			e.preventDefault();
-		}
-	}}
->
-	Regenerate
-</button>
-```
+- **`<CsrfInput />`** — Include in every state-changing `<Form>`. Renders a hidden CSRF token field.
+- **`<DangerZone>`** — Wrapper for destructive actions (delete group, delete account). Compound component: `<DangerZone.Title>`, `<DangerZone.Description>`, then a `<Form>` inside. For high-stakes deletions, require typing a confirmation string before enabling submit.
+- **Confirmation dialogs** — For less severe destructive actions, use `onClick` with `confirm()` and `e.preventDefault()` on cancel.
+- **Submit buttons** — Disable during submission using `useNavigation().state`.
 
 ## Logging
 
@@ -388,6 +119,13 @@ getTelemetryClient()?.trackEvent({ name: "EventCreated", properties: { groupId }
 getTelemetryClient()?.trackException({ exception: error });
 ```
 
+## Session Cookie
+
+- Name: `__greenroom_session`
+- httpOnly, sameSite lax, secure in production
+- 30-day expiry
+- Signed with `SESSION_SECRET` env var
+
 ## Adding a New Feature — Checklist
 
 1. **Schema** — Add tables/columns in `src/db/schema.ts`
@@ -398,3 +136,17 @@ getTelemetryClient()?.trackException({ exception: error });
 6. **Auth** — Use appropriate guard (`requireUser`, `requireGroupMember`, `requireGroupAdmin`, or `requireGroupAdminOrPermission`)
 7. **Tests** — Co-located test file, mock services, test loaders/actions directly
 8. **Quality Gates** — `pnpm run typecheck && pnpm run lint && pnpm test && pnpm run build`
+
+## Specialized Skills
+
+For deeper guidance, see these skills:
+
+| Skill | What It Covers |
+|-------|---------------|
+| `greenroom-architecture` | Remix route structure, loader/action patterns, service layer conventions, intent-based actions, component architecture, UI styling |
+| `greenroom-db` | Drizzle ORM schema reference, table definitions, query patterns (joins, upserts, transactions), JSON columns, indexes, multi-tenancy |
+| `drizzle-migrations` | Migration toolchain internals: snapshot chain, `_journal.json`, `drizzle.config.ts`, `scripts/migrate.mjs`, statement breakpoints |
+| `schema-changes` | Pre-commit checklist for schema changes: finding write sites, NOT NULL pitfalls, migration defaults, FK cascades, LEFT JOIN awareness |
+| `greenroom-testing` | Vitest configuration, testing loaders/actions, mocking services and auth, test file structure, rate limiting tests, environment setup |
+| `greenroom-security` | Auth guard hierarchy, multi-tenancy isolation, rate limiting, CSRF protection, session security, password hashing, OAuth CSRF, invite codes |
+| `ical-feeds` | iCalendar (RFC 5545) feed generation, token-based auth for non-browser clients, subscribable calendar feeds |
