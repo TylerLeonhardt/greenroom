@@ -26,9 +26,11 @@ vi.mock("../../src/db/index.js", () => ({
 
 import { getUserByCalendarToken } from "~/services/calendar-token.server";
 import { getUserCalendarEvents } from "~/services/events.server";
-import { loader } from "./api.calendar.$token.ics";
+import { loader } from "./api.calendar.$token";
 
 describe("GET /api/calendar/:token.ics", () => {
+	const validHexToken = "aabb1122ccdd3344eeff5566aabb1122";
+	const unknownHexToken = "deadbeefdeadbeefdeadbeefdeadbeef";
 	const mockEvents = [
 		{
 			id: "event-1",
@@ -80,8 +82,8 @@ describe("GET /api/calendar/:token.ics", () => {
 		(getUserCalendarEvents as ReturnType<typeof vi.fn>).mockResolvedValue(mockEvents);
 
 		const response = await loader({
-			request: new Request("http://localhost/api/calendar/validtoken.ics"),
-			params: { token: "validtoken" },
+			request: new Request(`http://localhost/api/calendar/${validHexToken}.ics`),
+			params: { token: `${validHexToken}.ics` },
 			context: {},
 		});
 
@@ -101,8 +103,8 @@ describe("GET /api/calendar/:token.ics", () => {
 		(getUserCalendarEvents as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
 		const response = await loader({
-			request: new Request("http://localhost/api/calendar/validtoken.ics"),
-			params: { token: "validtoken" },
+			request: new Request(`http://localhost/api/calendar/${validHexToken}.ics`),
+			params: { token: `${validHexToken}.ics` },
 			context: {},
 		});
 
@@ -117,8 +119,8 @@ describe("GET /api/calendar/:token.ics", () => {
 		(getUserCalendarEvents as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
 		const response = await loader({
-			request: new Request("http://localhost/api/calendar/validtoken.ics"),
-			params: { token: "validtoken" },
+			request: new Request(`http://localhost/api/calendar/${validHexToken}.ics`),
+			params: { token: `${validHexToken}.ics` },
 			context: {},
 		});
 
@@ -133,8 +135,8 @@ describe("GET /api/calendar/:token.ics", () => {
 		(getUserCalendarEvents as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
 		const response = await loader({
-			request: new Request("http://localhost/api/calendar/validtoken.ics"),
-			params: { token: "validtoken" },
+			request: new Request(`http://localhost/api/calendar/${validHexToken}.ics`),
+			params: { token: `${validHexToken}.ics` },
 			context: {},
 		});
 
@@ -149,21 +151,21 @@ describe("GET /api/calendar/:token.ics", () => {
 		(getUserCalendarEvents as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
 		const response = await loader({
-			request: new Request("http://localhost/api/calendar/validtoken.ics"),
-			params: { token: "validtoken" },
+			request: new Request(`http://localhost/api/calendar/${validHexToken}.ics`),
+			params: { token: `${validHexToken}.ics` },
 			context: {},
 		});
 
 		expect(response.headers.get("X-Robots-Tag")).toBe("noindex, nofollow");
 	});
 
-	it("returns 404 for invalid token", async () => {
+	it("returns 404 for unknown token", async () => {
 		(getUserByCalendarToken as ReturnType<typeof vi.fn>).mockResolvedValue(null);
 
 		await expect(
 			loader({
-				request: new Request("http://localhost/api/calendar/badtoken.ics"),
-				params: { token: "badtoken" },
+				request: new Request(`http://localhost/api/calendar/${unknownHexToken}.ics`),
+				params: { token: `${unknownHexToken}.ics` },
 				context: {},
 			}),
 		).rejects.toThrow();
@@ -179,6 +181,26 @@ describe("GET /api/calendar/:token.ics", () => {
 		).rejects.toThrow();
 	});
 
+	it("returns 404 when URL does not end in .ics", async () => {
+		await expect(
+			loader({
+				request: new Request(`http://localhost/api/calendar/${validHexToken}`),
+				params: { token: validHexToken },
+				context: {},
+			}),
+		).rejects.toThrow();
+	});
+
+	it("returns 404 for non-hex token", async () => {
+		await expect(
+			loader({
+				request: new Request("http://localhost/api/calendar/not-a-hex-token.ics"),
+				params: { token: "not-a-hex-token.ics" },
+				context: {},
+			}),
+		).rejects.toThrow();
+	});
+
 	it("includes events from multiple groups", async () => {
 		(getUserByCalendarToken as ReturnType<typeof vi.fn>).mockResolvedValue({
 			id: "user-1",
@@ -187,8 +209,8 @@ describe("GET /api/calendar/:token.ics", () => {
 		(getUserCalendarEvents as ReturnType<typeof vi.fn>).mockResolvedValue(mockEvents);
 
 		const response = await loader({
-			request: new Request("http://localhost/api/calendar/validtoken.ics"),
-			params: { token: "validtoken" },
+			request: new Request(`http://localhost/api/calendar/${validHexToken}.ics`),
+			params: { token: `${validHexToken}.ics` },
 			context: {},
 		});
 
@@ -207,8 +229,8 @@ describe("GET /api/calendar/:token.ics", () => {
 		(getUserCalendarEvents as ReturnType<typeof vi.fn>).mockResolvedValue(mockEvents);
 
 		const response = await loader({
-			request: new Request("http://localhost/api/calendar/validtoken.ics"),
-			params: { token: "validtoken" },
+			request: new Request(`http://localhost/api/calendar/${validHexToken}.ics`),
+			params: { token: `${validHexToken}.ics` },
 			context: {},
 		});
 
@@ -225,8 +247,8 @@ describe("GET /api/calendar/:token.ics", () => {
 		(getUserCalendarEvents as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
 		const response = await loader({
-			request: new Request("http://localhost/api/calendar/validtoken.ics"),
-			params: { token: "validtoken" },
+			request: new Request(`http://localhost/api/calendar/${validHexToken}.ics`),
+			params: { token: `${validHexToken}.ics` },
 			context: {},
 		});
 
