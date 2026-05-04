@@ -457,6 +457,51 @@ export async function getUserUpcomingEvents(
 	return rows;
 }
 
+// --- Calendar feed events (upcoming + recent past, with user's assignment role) ---
+
+export async function getUserCalendarEvents(
+	userId: string,
+): Promise<Array<Event & { groupName: string; userRole: string | null }>> {
+	const thirtyDaysAgo = new Date();
+	thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+	const rows = await db
+		.select({
+			id: events.id,
+			groupId: events.groupId,
+			title: events.title,
+			description: events.description,
+			eventType: events.eventType,
+			startTime: events.startTime,
+			endTime: events.endTime,
+			location: events.location,
+			createdById: events.createdById,
+			createdFromRequestId: events.createdFromRequestId,
+			callTime: events.callTime,
+			timezone: events.timezone,
+			reminderSentAt: events.reminderSentAt,
+			confirmationReminderSentAt: events.confirmationReminderSentAt,
+			createdAt: events.createdAt,
+			updatedAt: events.updatedAt,
+			groupName: groups.name,
+			userRole: sql<string | null>`(
+				SELECT ea.role FROM event_assignments ea
+				WHERE ea.event_id = events.id AND ea.user_id = ${userId}
+				LIMIT 1
+			)`,
+		})
+		.from(events)
+		.innerJoin(groups, eq(events.groupId, groups.id))
+		.innerJoin(
+			groupMemberships,
+			and(eq(groupMemberships.groupId, groups.id), eq(groupMemberships.userId, userId)),
+		)
+		.where(gte(events.startTime, thirtyDaysAgo))
+		.orderBy(events.startTime);
+
+	return rows;
+}
+
 // --- Availability request ownership check ---
 
 export async function getAvailabilityRequestGroupId(requestId: string): Promise<string | null> {
