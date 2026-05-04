@@ -18,8 +18,15 @@ vi.mock("~/services/csrf.server", () => ({
 	validateCsrfToken: vi.fn().mockResolvedValue(undefined),
 }));
 
+// Mock calendar token service
+vi.mock("~/services/calendar-token.server", () => ({
+	getCalendarToken: vi.fn().mockResolvedValue(null),
+	regenerateCalendarToken: vi.fn().mockResolvedValue("new-generated-token-hex"),
+}));
+
 import { action, loader } from "~/routes/settings";
 import { requireUser, updateUserName, updateUserTimezone } from "~/services/auth.server";
+import { getCalendarToken, regenerateCalendarToken } from "~/services/calendar-token.server";
 
 function makeFormData(data: Record<string, string>): FormData {
 	const formData = new FormData();
@@ -46,10 +53,15 @@ describe("settings route", () => {
 			profileImage: null,
 			timezone: "America/New_York",
 		});
+		(getCalendarToken as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+		(regenerateCalendarToken as ReturnType<typeof vi.fn>).mockResolvedValue(
+			"new-generated-token-hex",
+		);
 	});
 
 	describe("loader", () => {
-		it("returns the authenticated user", async () => {
+		it("returns the authenticated user and calendar token", async () => {
+			(getCalendarToken as ReturnType<typeof vi.fn>).mockResolvedValue("existing-token-abc");
 			const request = new Request("http://localhost/settings");
 			const result = await loader({ request, params: {}, context: {} });
 			expect(result).toEqual({
@@ -60,7 +72,15 @@ describe("settings route", () => {
 					profileImage: null,
 					timezone: "America/New_York",
 				},
+				calendarToken: "existing-token-abc",
+				baseUrl: "http://localhost",
 			});
+		});
+
+		it("returns null calendarToken when user has no token", async () => {
+			const request = new Request("http://localhost/settings");
+			const result = await loader({ request, params: {}, context: {} });
+			expect(result.calendarToken).toBeNull();
 		});
 	});
 
@@ -212,6 +232,40 @@ describe("settings route", () => {
 			});
 			expect(result).toEqual({ success: true, message: "Timezone updated!" });
 			expect(updateUserTimezone).toHaveBeenCalledWith("user-1", "UTC");
+		});
+	});
+
+	describe("action — generate-calendar-token", () => {
+		it("generates a new calendar token", async () => {
+			const formData = makeFormData({ intent: "generate-calendar-token" });
+			const result = await action({
+				request: makeRequest(formData),
+				params: {},
+				context: {},
+			});
+			expect(result).toEqual({
+				success: true,
+				message: "Calendar feed URL generated!",
+				calendarToken: "new-generated-token-hex",
+			});
+			expect(regenerateCalendarToken).toHaveBeenCalledWith("user-1");
+		});
+	});
+
+	describe("action — regenerate-calendar-token", () => {
+		it("regenerates the calendar token", async () => {
+			const formData = makeFormData({ intent: "regenerate-calendar-token" });
+			const result = await action({
+				request: makeRequest(formData),
+				params: {},
+				context: {},
+			});
+			expect(result).toEqual({
+				success: true,
+				message: "Calendar feed URL regenerated! Update the URL in your calendar app.",
+				calendarToken: "new-generated-token-hex",
+			});
+			expect(regenerateCalendarToken).toHaveBeenCalledWith("user-1");
 		});
 	});
 

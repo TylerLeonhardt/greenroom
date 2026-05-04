@@ -23,6 +23,7 @@ Read this **before** adding or modifying any database column, table, or constrai
 ## After Schema Changes
 
 - [ ] **Run `pnpm run db:generate`.** Always generate the migration file and review the SQL it produces. Commit the migration with your schema change.
+- [ ] **Check statement breakpoints.** The generated SQL uses `--> statement-breakpoint` comments to separate DDL statements. Drizzle's migrator splits on these markers — do not remove them, or multi-statement migrations will fail.
 - [ ] **Run `pnpm run db:migrate`.** Apply locally and verify no errors.
 - [ ] **Test the full lifecycle manually.** Create, read, update, delete for the affected entity. The test suite alone isn't enough — new columns can break flows that have no test coverage.
 - [ ] **Run the quality gates.** `pnpm run typecheck && pnpm run lint && pnpm run build && pnpm test`

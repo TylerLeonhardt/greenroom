@@ -215,6 +215,8 @@ export const newTable = pgTable(
 3. Review the generated SQL in `drizzle/`
 4. Run migration: `pnpm run db:migrate`
 
+> **⚠️ Snapshot collision risk:** If multiple branches add migrations concurrently, the snapshot chain in `drizzle/meta/` can break (duplicate `idx` values, broken `prevId` → `id` links). After merging branches that both touched `drizzle/`, verify the chain is intact and `db:generate` doesn't produce unexpected output. See the `drizzle-migrations` skill for detection and repair steps.
+
 ### Schema Conventions
 
 - All PKs: `uuid("id").defaultRandom().primaryKey()`

@@ -1,6 +1,6 @@
 {
-  "id": "ccbed80a-ebe5-47e2-a199-5f478b445393",
-  "prevId": "02f0375f-b431-4d20-80a7-e3004248a26e",
+  "id": "53c8c260-ca19-4bee-b10b-788224acdb4e",
+  "prevId": "ccbed80a-ebe5-47e2-a199-5f478b445393",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -251,6 +251,74 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.calendar_tokens": {
+      "name": "calendar_tokens",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token": {
+          "name": "token",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "calendar_tokens_user_id_users_id_fk": {
+          "name": "calendar_tokens_user_id_users_id_fk",
+          "tableFrom": "calendar_tokens",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "calendar_tokens_user_id_unique": {
+          "name": "calendar_tokens_user_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "user_id"
+          ]
+        },
+        "calendar_tokens_token_unique": {
+          "name": "calendar_tokens_token_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

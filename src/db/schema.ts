@@ -210,6 +210,17 @@ export const rsvpChanges = pgTable(
 	],
 );
 
+// Calendar Tokens (for subscribable iCal feeds — token-based auth since calendar apps can't use cookies)
+export const calendarTokens = pgTable("calendar_tokens", {
+	id: uuid("id").defaultRandom().primaryKey(),
+	userId: uuid("user_id")
+		.notNull()
+		.references(() => users.id, { onDelete: "cascade" })
+		.unique(),
+	token: varchar("token", { length: 64 }).notNull().unique(),
+	createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 // Event Assignments
 export const eventAssignments = pgTable(
 	"event_assignments",

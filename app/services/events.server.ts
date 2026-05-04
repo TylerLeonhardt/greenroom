@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
 import { db } from "../../src/db/index.js";
 import {
 	availabilityRequests,
@@ -453,6 +453,54 @@ export async function getUserUpcomingEvents(
 		.where(gte(events.startTime, new Date()))
 		.orderBy(events.startTime)
 		.limit(limit);
+
+	return rows;
+}
+
+// --- Calendar feed events (upcoming + recent past, with user's assignment role) ---
+
+export async function getUserCalendarEvents(
+	userId: string,
+): Promise<Array<Event & { groupName: string; userRole: string | null }>> {
+	const thirtyDaysAgo = new Date();
+	thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+	const sixMonthsOut = new Date();
+	sixMonthsOut.setMonth(sixMonthsOut.getMonth() + 6);
+
+	const rows = await db
+		.select({
+			id: events.id,
+			groupId: events.groupId,
+			title: events.title,
+			description: events.description,
+			eventType: events.eventType,
+			startTime: events.startTime,
+			endTime: events.endTime,
+			location: events.location,
+			createdById: events.createdById,
+			createdFromRequestId: events.createdFromRequestId,
+			callTime: events.callTime,
+			timezone: events.timezone,
+			reminderSentAt: events.reminderSentAt,
+			confirmationReminderSentAt: events.confirmationReminderSentAt,
+			createdAt: events.createdAt,
+			updatedAt: events.updatedAt,
+			groupName: groups.name,
+			userRole: sql<string | null>`(
+				SELECT ea.role FROM event_assignments ea
+				WHERE ea.event_id = events.id AND ea.user_id = ${userId}
+				LIMIT 1
+			)`,
+		})
+		.from(events)
+		.innerJoin(groups, eq(events.groupId, groups.id))
+		.innerJoin(
+			groupMemberships,
+			and(eq(groupMemberships.groupId, groups.id), eq(groupMemberships.userId, userId)),
+		)
+		.where(and(gte(events.startTime, thirtyDaysAgo), lte(events.startTime, sixMonthsOut)))
+		.orderBy(events.startTime);
 
 	return rows;
 }

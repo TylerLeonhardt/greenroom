@@ -1,35 +1,8 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
+import { escapeICalText, foldLine, formatICalDate } from "~/lib/ical-utils";
 import { requireUser } from "~/services/auth.server";
 import { getEventWithAssignments } from "~/services/events.server";
 import { requireGroupMember } from "~/services/groups.server";
-
-function formatICalDate(date: Date): string {
-	return date
-		.toISOString()
-		.replace(/[-:]/g, "")
-		.replace(/\.\d{3}/, "");
-}
-
-function escapeICalText(text: string): string {
-	return text
-		.replace(/\\/g, "\\\\")
-		.replace(/;/g, "\\;")
-		.replace(/,/g, "\\,")
-		.replace(/\n/g, "\\n");
-}
-
-function foldLine(line: string): string {
-	const maxLen = 75;
-	if (line.length <= maxLen) return line;
-	const parts: string[] = [];
-	parts.push(line.slice(0, maxLen));
-	let i = maxLen;
-	while (i < line.length) {
-		parts.push(` ${line.slice(i, i + maxLen - 1)}`);
-		i += maxLen - 1;
-	}
-	return parts.join("\r\n");
-}
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
 	await requireUser(request);
