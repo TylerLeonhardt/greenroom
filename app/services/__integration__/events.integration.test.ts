@@ -788,7 +788,7 @@ describe("events.server integration", () => {
 	// --- getUserCalendarEvents ---
 
 	describe("getUserCalendarEvents", () => {
-		it("returns only events with pending or confirmed assignments", async () => {
+		it("returns events with pending/confirmed assignments and events with no assignment", async () => {
 			const user = await createTestUser();
 			const group = await createTestGroup(user.id);
 			const now = new Date();
@@ -826,8 +826,27 @@ describe("events.server integration", () => {
 			expect(titles).toContain("Confirmed Event");
 			expect(titles).toContain("Pending Event");
 			expect(titles).not.toContain("Declined Event");
-			expect(titles).not.toContain("Unassigned Event");
-			expect(calendarEvents).toHaveLength(2);
+			expect(titles).toContain("Unassigned Event");
+			expect(calendarEvents).toHaveLength(3);
+		});
+
+		it("returns null userRole for events with no assignment", async () => {
+			const user = await createTestUser();
+			const group = await createTestGroup(user.id);
+			const now = new Date();
+
+			await createTestEvent(group.id, user.id, {
+				title: "Rehearsal No Assignment",
+				eventType: "rehearsal",
+				startTime: new Date(now.getTime() + 86400000),
+				endTime: new Date(now.getTime() + 86400000 + 7200000),
+			});
+
+			const calendarEvents = await getUserCalendarEvents(user.id);
+
+			expect(calendarEvents).toHaveLength(1);
+			expect(calendarEvents[0].title).toBe("Rehearsal No Assignment");
+			expect(calendarEvents[0].userRole).toBeNull();
 		});
 
 		it("returns userRole from event_assignments", async () => {
