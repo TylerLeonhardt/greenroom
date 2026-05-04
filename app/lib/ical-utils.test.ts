@@ -203,6 +203,13 @@ describe("generateCalendarFeed", () => {
 		expect(feed).not.toContain("BEGIN:VEVENT");
 	});
 
+	it("separates group name and description with iCal newline", () => {
+		const feed = generateCalendarFeed([baseEvent]);
+		// iCal newline is \n escaped as \\n in the raw text
+		expect(feed).toContain("Group: Team Alpha\\nWeekly practice");
+		expect(feed).not.toContain("Group: Team Alpha\\\\nWeekly practice");
+	});
+
 	it("uses CRLF line endings", () => {
 		const feed = generateCalendarFeed([baseEvent]);
 		expect(feed).toContain("\r\n");

@@ -87,7 +87,7 @@ export function generateCalendarFeed(calendarEvents: CalendarEvent[]): string {
 			descParts.push(event.description);
 		}
 		if (descParts.length > 0) {
-			eventLines.push(foldLine(`DESCRIPTION:${escapeICalText(descParts.join("\\n"))}`));
+			eventLines.push(foldLine(`DESCRIPTION:${escapeICalText(descParts.join("\n"))}`));
 		}
 
 		if (event.location) {

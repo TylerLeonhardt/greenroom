@@ -262,7 +262,14 @@ export default function Settings() {
 							/>
 						</details>
 
-						<Form method="post">
+						<Form
+							method="post"
+							onSubmit={(e) => {
+								if (!confirm("Regenerate your calendar URL? Your current URL will stop working.")) {
+									e.preventDefault();
+								}
+							}}
+						>
 							<CsrfInput />
 							<input type="hidden" name="intent" value="regenerate-calendar-token" />
 							<button

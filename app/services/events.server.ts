@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
 import { db } from "../../src/db/index.js";
 import {
 	availabilityRequests,
@@ -465,6 +465,9 @@ export async function getUserCalendarEvents(
 	const thirtyDaysAgo = new Date();
 	thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
+	const sixMonthsOut = new Date();
+	sixMonthsOut.setMonth(sixMonthsOut.getMonth() + 6);
+
 	const rows = await db
 		.select({
 			id: events.id,
@@ -496,7 +499,7 @@ export async function getUserCalendarEvents(
 			groupMemberships,
 			and(eq(groupMemberships.groupId, groups.id), eq(groupMemberships.userId, userId)),
 		)
-		.where(gte(events.startTime, thirtyDaysAgo))
+		.where(and(gte(events.startTime, thirtyDaysAgo), lte(events.startTime, sixMonthsOut)))
 		.orderBy(events.startTime);
 
 	return rows;
