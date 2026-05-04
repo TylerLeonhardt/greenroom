@@ -110,6 +110,10 @@ export function checkGroupJoinRateLimit(userId: string) {
 	return checkRateLimit(`group-join:${userId}`, 100, ONE_DAY_MS);
 }
 
+export function checkCalendarFeedRateLimit(token: string) {
+	return checkRateLimit(`calendar-feed:${token}`, 30, ONE_HOUR_MS);
+}
+
 /** Visible for testing */
 export function _resetForTests() {
 	windows.clear();
