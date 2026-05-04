@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "../../src/db/index.js";
 import {
 	availabilityRequests,
@@ -495,7 +495,7 @@ export async function getUserCalendarEvents(
 			groupMemberships,
 			and(eq(groupMemberships.groupId, groups.id), eq(groupMemberships.userId, userId)),
 		)
-		.innerJoin(
+		.leftJoin(
 			eventAssignments,
 			and(eq(eventAssignments.eventId, events.id), eq(eventAssignments.userId, userId)),
 		)
@@ -503,7 +503,10 @@ export async function getUserCalendarEvents(
 			and(
 				gte(events.startTime, thirtyDaysAgo),
 				lte(events.startTime, sixMonthsOut),
-				inArray(eventAssignments.status, ["pending", "confirmed"]),
+				or(
+					isNull(eventAssignments.status),
+					inArray(eventAssignments.status, ["pending", "confirmed"]),
+				),
 			),
 		)
 		.orderBy(events.startTime);

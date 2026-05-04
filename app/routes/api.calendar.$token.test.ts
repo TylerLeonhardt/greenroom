@@ -258,9 +258,10 @@ describe("GET /api/calendar/:token.ics", () => {
 		expect(body).not.toContain("BEGIN:VEVENT");
 	});
 
-	it("only includes assigned events (declined events excluded by service)", async () => {
-		// getUserCalendarEvents now filters by assignment status (pending/confirmed).
-		// Declined or unassigned events are never returned by the service layer.
+	it("only includes non-declined events (declined events excluded by service)", async () => {
+		// getUserCalendarEvents includes all group events except those the user
+		// explicitly declined. Events with no assignment are included (LEFT JOIN).
+		// Declined assignments are the only ones filtered out.
 		const assignedEvents = [
 			{
 				id: "event-assigned",
