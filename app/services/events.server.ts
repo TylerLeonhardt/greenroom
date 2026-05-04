@@ -487,11 +487,7 @@ export async function getUserCalendarEvents(
 			createdAt: events.createdAt,
 			updatedAt: events.updatedAt,
 			groupName: groups.name,
-			userRole: sql<string | null>`(
-				SELECT ea.role FROM event_assignments ea
-				WHERE ea.event_id = events.id AND ea.user_id = ${userId}
-				LIMIT 1
-			)`,
+			userRole: eventAssignments.role,
 		})
 		.from(events)
 		.innerJoin(groups, eq(events.groupId, groups.id))
@@ -499,7 +495,17 @@ export async function getUserCalendarEvents(
 			groupMemberships,
 			and(eq(groupMemberships.groupId, groups.id), eq(groupMemberships.userId, userId)),
 		)
-		.where(and(gte(events.startTime, thirtyDaysAgo), lte(events.startTime, sixMonthsOut)))
+		.innerJoin(
+			eventAssignments,
+			and(eq(eventAssignments.eventId, events.id), eq(eventAssignments.userId, userId)),
+		)
+		.where(
+			and(
+				gte(events.startTime, thirtyDaysAgo),
+				lte(events.startTime, sixMonthsOut),
+				inArray(eventAssignments.status, ["pending", "confirmed"]),
+			),
+		)
 		.orderBy(events.startTime);
 
 	return rows;

@@ -257,4 +257,89 @@ describe("GET /api/calendar/:token.ics", () => {
 		expect(body).toContain("END:VCALENDAR");
 		expect(body).not.toContain("BEGIN:VEVENT");
 	});
+
+	it("only includes assigned events (declined events excluded by service)", async () => {
+		// getUserCalendarEvents now filters by assignment status (pending/confirmed).
+		// Declined or unassigned events are never returned by the service layer.
+		const assignedEvents = [
+			{
+				id: "event-assigned",
+				groupId: "group-1",
+				title: "Confirmed Rehearsal",
+				description: null,
+				eventType: "rehearsal",
+				startTime: new Date("2026-03-20T19:00:00Z"),
+				endTime: new Date("2026-03-20T21:00:00Z"),
+				callTime: null,
+				location: null,
+				timezone: "America/Los_Angeles",
+				createdById: "user-2",
+				createdFromRequestId: null,
+				reminderSentAt: null,
+				confirmationReminderSentAt: null,
+				createdAt: new Date("2026-03-01T00:00:00Z"),
+				updatedAt: new Date("2026-03-10T12:00:00Z"),
+				groupName: "Team Alpha",
+				userRole: "Performer",
+			},
+		];
+		(getUserByCalendarToken as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: "user-1",
+			timezone: null,
+		});
+		(getUserCalendarEvents as ReturnType<typeof vi.fn>).mockResolvedValue(assignedEvents);
+
+		const response = await loader({
+			request: new Request(`http://localhost/api/calendar/${validHexToken}.ics`),
+			params: { token: `${validHexToken}.ics` },
+			context: {},
+		});
+
+		const body = await response.text();
+		expect(body).toContain("SUMMARY:Confirmed Rehearsal");
+		// No declined or unassigned events should appear
+		expect(body).not.toContain("Declined");
+	});
+
+	it("handles events with null userRole", async () => {
+		// Some assignments may have no explicit role set
+		const eventsWithNullRole = [
+			{
+				id: "event-no-role",
+				groupId: "group-1",
+				title: "Team Meeting",
+				description: null,
+				eventType: "other",
+				startTime: new Date("2026-03-22T18:00:00Z"),
+				endTime: new Date("2026-03-22T19:00:00Z"),
+				callTime: null,
+				location: null,
+				timezone: "America/Los_Angeles",
+				createdById: "user-2",
+				createdFromRequestId: null,
+				reminderSentAt: null,
+				confirmationReminderSentAt: null,
+				createdAt: new Date("2026-03-01T00:00:00Z"),
+				updatedAt: new Date("2026-03-10T12:00:00Z"),
+				groupName: "Team Alpha",
+				userRole: null,
+			},
+		];
+		(getUserByCalendarToken as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: "user-1",
+			timezone: null,
+		});
+		(getUserCalendarEvents as ReturnType<typeof vi.fn>).mockResolvedValue(eventsWithNullRole);
+
+		const response = await loader({
+			request: new Request(`http://localhost/api/calendar/${validHexToken}.ics`),
+			params: { token: `${validHexToken}.ics` },
+			context: {},
+		});
+
+		const body = await response.text();
+		expect(body).toContain("SUMMARY:Team Meeting");
+		// With null role and no callTime, should use regular startTime
+		expect(body).toContain("DTSTART:20260322T180000Z");
+	});
 });
