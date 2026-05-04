@@ -8,7 +8,7 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "../../../src/db/index.js";
-import { eventAssignments, events, rsvpChanges } from "../../../src/db/schema.js";
+import { eventAssignments, events, groupMemberships, rsvpChanges } from "../../../src/db/schema.js";
 import {
 	assignToEvent,
 	bulkAssignToEvent,
@@ -17,6 +17,7 @@ import {
 	getEventActivityFeed,
 	getEventWithAssignments,
 	getGroupEvents,
+	getUserCalendarEvents,
 	getUserUpcomingEvents,
 	recordRsvpChange,
 	removeAssignment,
@@ -781,6 +782,101 @@ describe("events.server integration", () => {
 			const feed2 = await getEventActivityFeed(event2.id);
 			expect(feed2).toHaveLength(1);
 			expect(feed2[0].newStatus).toBe("declined");
+		});
+	});
+
+	// --- getUserCalendarEvents ---
+
+	describe("getUserCalendarEvents", () => {
+		it("returns only events with pending or confirmed assignments", async () => {
+			const user = await createTestUser();
+			const group = await createTestGroup(user.id);
+			const now = new Date();
+
+			const confirmedEvent = await createTestEvent(group.id, user.id, {
+				title: "Confirmed Event",
+				startTime: new Date(now.getTime() + 86400000),
+				endTime: new Date(now.getTime() + 86400000 + 7200000),
+			});
+			const pendingEvent = await createTestEvent(group.id, user.id, {
+				title: "Pending Event",
+				startTime: new Date(now.getTime() + 2 * 86400000),
+				endTime: new Date(now.getTime() + 2 * 86400000 + 7200000),
+			});
+			const declinedEvent = await createTestEvent(group.id, user.id, {
+				title: "Declined Event",
+				startTime: new Date(now.getTime() + 3 * 86400000),
+				endTime: new Date(now.getTime() + 3 * 86400000 + 7200000),
+			});
+			// Create an event with no assignment for this user
+			await createTestEvent(group.id, user.id, {
+				title: "Unassigned Event",
+				startTime: new Date(now.getTime() + 4 * 86400000),
+				endTime: new Date(now.getTime() + 4 * 86400000 + 7200000),
+			});
+
+			await createTestAssignment(confirmedEvent.id, user.id, { status: "confirmed" });
+			await createTestAssignment(pendingEvent.id, user.id, { status: "pending" });
+			await createTestAssignment(declinedEvent.id, user.id, { status: "declined" });
+			// unassignedEvent has no assignment
+
+			const calendarEvents = await getUserCalendarEvents(user.id);
+			const titles = calendarEvents.map((e) => e.title);
+
+			expect(titles).toContain("Confirmed Event");
+			expect(titles).toContain("Pending Event");
+			expect(titles).not.toContain("Declined Event");
+			expect(titles).not.toContain("Unassigned Event");
+			expect(calendarEvents).toHaveLength(2);
+		});
+
+		it("returns userRole from event_assignments", async () => {
+			const user = await createTestUser();
+			const group = await createTestGroup(user.id);
+			const now = new Date();
+
+			const showEvent = await createTestEvent(group.id, user.id, {
+				title: "Show Night",
+				eventType: "show",
+				startTime: new Date(now.getTime() + 86400000),
+				endTime: new Date(now.getTime() + 86400000 + 7200000),
+				callTime: new Date(now.getTime() + 86400000 - 3600000),
+			});
+			await createTestAssignment(showEvent.id, user.id, {
+				role: "Performer",
+				status: "confirmed",
+			});
+
+			const calendarEvents = await getUserCalendarEvents(user.id);
+
+			expect(calendarEvents).toHaveLength(1);
+			expect(calendarEvents[0].userRole).toBe("Performer");
+		});
+
+		it("excludes events from groups the user is no longer a member of", async () => {
+			const admin = await createTestUser({ name: "Admin" });
+			const member = await createTestUser({ name: "Member" });
+			const group = await createTestGroup(admin.id);
+			await addGroupMember(group.id, member.id);
+			const now = new Date();
+
+			const event = await createTestEvent(group.id, admin.id, {
+				title: "Group Event",
+				startTime: new Date(now.getTime() + 86400000),
+				endTime: new Date(now.getTime() + 86400000 + 7200000),
+			});
+			await createTestAssignment(event.id, member.id, { status: "confirmed" });
+
+			// Verify event appears while member
+			let calendarEvents = await getUserCalendarEvents(member.id);
+			expect(calendarEvents).toHaveLength(1);
+
+			// Remove membership (simulates admin removing the member)
+			await db.delete(groupMemberships).where(eq(groupMemberships.userId, member.id));
+
+			// Event should no longer appear even though assignment still exists
+			calendarEvents = await getUserCalendarEvents(member.id);
+			expect(calendarEvents).toHaveLength(0);
 		});
 	});
 });
