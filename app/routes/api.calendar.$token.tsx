@@ -4,8 +4,19 @@ import { getUserByCalendarToken } from "~/services/calendar-token.server";
 import { getUserCalendarEvents } from "~/services/events.server";
 
 export async function loader({ params }: LoaderFunctionArgs) {
-	const token = params.token;
-	if (!token) {
+	const rawToken = params.token;
+	if (!rawToken) {
+		throw new Response("Not Found", { status: 404 });
+	}
+
+	// The URL is /api/calendar/TOKEN.ics but Remix flat routing captures the
+	// full path segment (including ".ics") in the $token param. Strip the
+	// extension so we can look up the bare hex token.
+	if (!rawToken.endsWith(".ics")) {
+		throw new Response("Not Found", { status: 404 });
+	}
+	const token = rawToken.slice(0, -4);
+	if (!token || !/^[a-f0-9]+$/.test(token)) {
 		throw new Response("Not Found", { status: 404 });
 	}
 
