@@ -788,46 +788,134 @@ describe("events.server integration", () => {
 	// --- getUserCalendarEvents ---
 
 	describe("getUserCalendarEvents", () => {
-		it("returns events with pending/confirmed assignments and events with no assignment", async () => {
+		it("includes event with no assignments at all (open event)", async () => {
 			const user = await createTestUser();
 			const group = await createTestGroup(user.id);
 			const now = new Date();
 
-			const confirmedEvent = await createTestEvent(group.id, user.id, {
-				title: "Confirmed Event",
+			await createTestEvent(group.id, user.id, {
+				title: "Open Rehearsal",
 				startTime: new Date(now.getTime() + 86400000),
 				endTime: new Date(now.getTime() + 86400000 + 7200000),
 			});
-			const pendingEvent = await createTestEvent(group.id, user.id, {
-				title: "Pending Event",
-				startTime: new Date(now.getTime() + 2 * 86400000),
-				endTime: new Date(now.getTime() + 2 * 86400000 + 7200000),
-			});
-			const declinedEvent = await createTestEvent(group.id, user.id, {
-				title: "Declined Event",
-				startTime: new Date(now.getTime() + 3 * 86400000),
-				endTime: new Date(now.getTime() + 3 * 86400000 + 7200000),
-			});
-			// Create an event with no assignment for this user
-			await createTestEvent(group.id, user.id, {
-				title: "Unassigned Event",
-				startTime: new Date(now.getTime() + 4 * 86400000),
-				endTime: new Date(now.getTime() + 4 * 86400000 + 7200000),
-			});
-
-			await createTestAssignment(confirmedEvent.id, user.id, { status: "confirmed" });
-			await createTestAssignment(pendingEvent.id, user.id, { status: "pending" });
-			await createTestAssignment(declinedEvent.id, user.id, { status: "declined" });
-			// unassignedEvent has no assignment
 
 			const calendarEvents = await getUserCalendarEvents(user.id);
-			const titles = calendarEvents.map((e) => e.title);
 
-			expect(titles).toContain("Confirmed Event");
-			expect(titles).toContain("Pending Event");
-			expect(titles).not.toContain("Declined Event");
-			expect(titles).toContain("Unassigned Event");
-			expect(calendarEvents).toHaveLength(3);
+			expect(calendarEvents).toHaveLength(1);
+			expect(calendarEvents[0].title).toBe("Open Rehearsal");
+			expect(calendarEvents[0].userRole).toBeNull();
+		});
+
+		it("includes event where user is assigned with status pending", async () => {
+			const user = await createTestUser();
+			const group = await createTestGroup(user.id);
+			const now = new Date();
+
+			const event = await createTestEvent(group.id, user.id, {
+				title: "Pending Show",
+				startTime: new Date(now.getTime() + 86400000),
+				endTime: new Date(now.getTime() + 86400000 + 7200000),
+			});
+			await createTestAssignment(event.id, user.id, { status: "pending" });
+
+			const calendarEvents = await getUserCalendarEvents(user.id);
+
+			expect(calendarEvents).toHaveLength(1);
+			expect(calendarEvents[0].title).toBe("Pending Show");
+		});
+
+		it("includes event where user is assigned with status confirmed", async () => {
+			const user = await createTestUser();
+			const group = await createTestGroup(user.id);
+			const now = new Date();
+
+			const event = await createTestEvent(group.id, user.id, {
+				title: "Confirmed Show",
+				startTime: new Date(now.getTime() + 86400000),
+				endTime: new Date(now.getTime() + 86400000 + 7200000),
+			});
+			await createTestAssignment(event.id, user.id, {
+				role: "Performer",
+				status: "confirmed",
+			});
+
+			const calendarEvents = await getUserCalendarEvents(user.id);
+
+			expect(calendarEvents).toHaveLength(1);
+			expect(calendarEvents[0].title).toBe("Confirmed Show");
+			expect(calendarEvents[0].userRole).toBe("Performer");
+		});
+
+		it("excludes event where user is assigned with status declined", async () => {
+			const user = await createTestUser();
+			const group = await createTestGroup(user.id);
+			const now = new Date();
+
+			const event = await createTestEvent(group.id, user.id, {
+				title: "Declined Show",
+				startTime: new Date(now.getTime() + 86400000),
+				endTime: new Date(now.getTime() + 86400000 + 7200000),
+			});
+			await createTestAssignment(event.id, user.id, { status: "declined" });
+
+			const calendarEvents = await getUserCalendarEvents(user.id);
+
+			expect(calendarEvents).toHaveLength(0);
+		});
+
+		it("excludes event with assignments when user is NOT assigned", async () => {
+			const admin = await createTestUser({ name: "Admin" });
+			const member = await createTestUser({ name: "Member" });
+			const otherMember = await createTestUser({ name: "Other" });
+			const group = await createTestGroup(admin.id);
+			await addGroupMember(group.id, member.id);
+			await addGroupMember(group.id, otherMember.id);
+			const now = new Date();
+
+			// Event has a cast list but member is not on it
+			const event = await createTestEvent(group.id, admin.id, {
+				title: "Show With Cast",
+				startTime: new Date(now.getTime() + 86400000),
+				endTime: new Date(now.getTime() + 86400000 + 7200000),
+			});
+			await createTestAssignment(event.id, otherMember.id, {
+				role: "Performer",
+				status: "confirmed",
+			});
+
+			const calendarEvents = await getUserCalendarEvents(member.id);
+
+			expect(calendarEvents).toHaveLength(0);
+		});
+
+		it("excludes event with assignments for OTHER users but not this user", async () => {
+			const admin = await createTestUser({ name: "Admin" });
+			const memberA = await createTestUser({ name: "Member A" });
+			const memberB = await createTestUser({ name: "Member B" });
+			const group = await createTestGroup(admin.id);
+			await addGroupMember(group.id, memberA.id);
+			await addGroupMember(group.id, memberB.id);
+			const now = new Date();
+
+			const event = await createTestEvent(group.id, admin.id, {
+				title: "Cast Show",
+				startTime: new Date(now.getTime() + 86400000),
+				endTime: new Date(now.getTime() + 86400000 + 7200000),
+			});
+			// Only memberA is assigned
+			await createTestAssignment(event.id, memberA.id, {
+				role: "Performer",
+				status: "confirmed",
+			});
+
+			// memberA should see it
+			const memberAEvents = await getUserCalendarEvents(memberA.id);
+			expect(memberAEvents).toHaveLength(1);
+			expect(memberAEvents[0].title).toBe("Cast Show");
+
+			// memberB should NOT see it (cast list exists, they're not on it)
+			const memberBEvents = await getUserCalendarEvents(memberB.id);
+			expect(memberBEvents).toHaveLength(0);
 		});
 
 		it("returns null userRole for events with no assignment", async () => {

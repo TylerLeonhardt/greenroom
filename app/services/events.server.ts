@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
 import { db } from "../../src/db/index.js";
 import {
 	availabilityRequests,
@@ -503,10 +503,18 @@ export async function getUserCalendarEvents(
 			and(
 				gte(events.startTime, thirtyDaysAgo),
 				lte(events.startTime, sixMonthsOut),
-				or(
-					isNull(eventAssignments.status),
-					inArray(eventAssignments.status, ["pending", "confirmed"]),
-				),
+				sql`(
+					NOT EXISTS (
+						SELECT 1 FROM event_assignments
+						WHERE event_id = ${events.id}
+					)
+					OR EXISTS (
+						SELECT 1 FROM event_assignments
+						WHERE event_id = ${events.id}
+						AND user_id = ${userId}
+						AND status IN ('pending', 'confirmed')
+					)
+				)`,
 			),
 		)
 		.orderBy(events.startTime);
