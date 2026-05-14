@@ -354,11 +354,18 @@ export default function EventDetail() {
 	const unassignedMembers = members.filter((m) => !assignedUserIds.has(m.id));
 
 	const isShow = event.eventType === "show";
-	const performers = isShow ? assignments.filter((a) => a.role === "Performer") : [];
-	const viewers = isShow ? assignments.filter((a) => a.role === "Viewer") : [];
+	const performers = isShow
+		? assignments.filter((a) => a.role === "Performer" && a.status !== "declined")
+		: [];
+	const viewers = isShow
+		? assignments.filter((a) => a.role === "Viewer" && a.status !== "declined")
+		: [];
 	const otherAssignments = isShow
-		? assignments.filter((a) => a.role !== "Performer" && a.role !== "Viewer")
-		: assignments;
+		? assignments.filter(
+				(a) => a.role !== "Performer" && a.role !== "Viewer" && a.status !== "declined",
+			)
+		: assignments.filter((a) => a.status !== "declined");
+	const activeCastAssignments = assignments.filter((a) => a.status !== "declined");
 	const canSelfRegister = !myAssignment && !isAdmin;
 	const canDelete = isAdmin || event.createdById === userId;
 	const canEdit = isAdmin || event.createdById === userId;
@@ -750,7 +757,7 @@ export default function EventDetail() {
 						<div className="rounded-xl border border-slate-200 bg-white shadow-sm">
 							<div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
 								<h3 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
-									<Users className="h-5 w-5" /> Cast ({assignments.length})
+									<Users className="h-5 w-5" /> Cast ({activeCastAssignments.length})
 								</h3>
 								{isAdmin && unassignedMembers.length > 0 && (
 									<button
@@ -764,7 +771,7 @@ export default function EventDetail() {
 								)}
 							</div>
 
-							{assignments.length === 0 ? (
+							{activeCastAssignments.length === 0 ? (
 								<div className="p-6 text-center text-sm text-slate-500">
 									No one assigned yet.{" "}
 									{isAdmin && (
@@ -779,7 +786,7 @@ export default function EventDetail() {
 								</div>
 							) : (
 								<ul className="divide-y divide-slate-100">
-									{assignments.map((a) => {
+									{activeCastAssignments.map((a) => {
 										const statusCfg = STATUS_CONFIG[a.status] ?? STATUS_CONFIG.pending;
 										return (
 											<li key={a.userId} className="flex items-center justify-between px-6 py-3">
