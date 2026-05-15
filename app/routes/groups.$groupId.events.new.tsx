@@ -176,7 +176,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		// Validate the availability request belongs to this group (IDOR prevention)
 		const requestGroupId = await getAvailabilityRequestGroupId(validFromRequestIdForAssign);
 		if (requestGroupId === groupId) {
-			await autoAssignFromAvailability(event.id, validFromRequestIdForAssign, date, user.id);
+			await autoAssignFromAvailability(event.id, validFromRequestIdForAssign, date);
 		}
 	}
 

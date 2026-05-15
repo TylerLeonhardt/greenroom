@@ -199,12 +199,7 @@ describe("events.new validation", () => {
 		expect(result).toBeInstanceOf(Response);
 		expect((result as Response).status).toBe(302);
 
-		expect(autoAssignFromAvailability).toHaveBeenCalledWith(
-			"event-1",
-			"req-1",
-			"2099-06-15",
-			"user-1", // creator excluded
-		);
+		expect(autoAssignFromAvailability).toHaveBeenCalledWith("event-1", "req-1", "2099-06-15");
 	});
 
 	it("does not auto-assign when not creating from availability request", async () => {
@@ -235,12 +230,7 @@ describe("events.new validation", () => {
 				context: {},
 			});
 			expect(result).toBeInstanceOf(Response);
-			expect(autoAssignFromAvailability).toHaveBeenCalledWith(
-				"event-1",
-				"req-1",
-				"2099-06-15",
-				"user-1",
-			);
+			expect(autoAssignFromAvailability).toHaveBeenCalledWith("event-1", "req-1", "2099-06-15");
 		}
 	});
 
@@ -320,12 +310,7 @@ describe("events.new validation", () => {
 		);
 
 		// Verify auto-assign was also called
-		expect(autoAssignFromAvailability).toHaveBeenCalledWith(
-			"event-1",
-			"req-1",
-			"2099-06-15",
-			"user-1",
-		);
+		expect(autoAssignFromAvailability).toHaveBeenCalledWith("event-1", "req-1", "2099-06-15");
 
 		// Critical: performer assignment must happen BEFORE auto-assign
 		// so that onConflictDoNothing in auto-assign skips already-assigned performers
