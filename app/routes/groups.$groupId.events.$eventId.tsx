@@ -354,16 +354,18 @@ export default function EventDetail() {
 	const unassignedMembers = members.filter((m) => !assignedUserIds.has(m.id));
 
 	const isShow = event.eventType === "show";
-	const performers = isShow ? assignments.filter((a) => a.role === "Performer") : [];
-	const viewers = isShow ? assignments.filter((a) => a.role === "Viewer") : [];
+	const performers = isShow
+		? assignments.filter((a) => a.role === "Performer" && a.status !== "declined")
+		: [];
+	const viewers = isShow
+		? assignments.filter((a) => a.role === "Viewer" && a.status !== "declined")
+		: [];
 	const otherAssignments = isShow
-		? assignments.filter((a) => a.role !== "Performer" && a.role !== "Viewer")
-		: assignments;
-	// Counts exclude declined members; lists still render everyone
-	const activePerformerCount = performers.filter((a) => a.status !== "declined").length;
-	const activeViewerCount = viewers.filter((a) => a.status !== "declined").length;
-	const activeOtherCount = otherAssignments.filter((a) => a.status !== "declined").length;
-	const activeCastCount = assignments.filter((a) => a.status !== "declined").length;
+		? assignments.filter(
+				(a) => a.role !== "Performer" && a.role !== "Viewer" && a.status !== "declined",
+			)
+		: assignments.filter((a) => a.status !== "declined");
+	const activeCastAssignments = assignments.filter((a) => a.status !== "declined");
 	const canSelfRegister = !myAssignment && !isAdmin;
 	const canDelete = isAdmin || event.createdById === userId;
 	const canEdit = isAdmin || event.createdById === userId;
@@ -508,7 +510,7 @@ export default function EventDetail() {
 						<div className="rounded-xl border border-purple-200 bg-white shadow-sm">
 							<div className="flex items-center justify-between border-b border-purple-100 px-6 py-4">
 								<h3 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
-									<Users className="h-5 w-5 text-purple-500" /> Cast ({activePerformerCount})
+									<Users className="h-5 w-5 text-purple-500" /> Cast ({performers.length})
 								</h3>
 								{isAdmin && unassignedMembers.length > 0 && (
 									<button
@@ -680,7 +682,7 @@ export default function EventDetail() {
 						<div className="rounded-xl border border-slate-200 bg-white shadow-sm">
 							<div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
 								<h3 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
-									<Eye className="h-5 w-5 text-slate-400" /> Attending ({activeViewerCount})
+									<Eye className="h-5 w-5 text-slate-400" /> Attending ({viewers.length})
 								</h3>
 							</div>
 							{viewers.length === 0 && !canSelfRegister ? (
@@ -755,7 +757,7 @@ export default function EventDetail() {
 						<div className="rounded-xl border border-slate-200 bg-white shadow-sm">
 							<div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
 								<h3 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
-									<Users className="h-5 w-5" /> Cast ({activeCastCount})
+									<Users className="h-5 w-5" /> Cast ({activeCastAssignments.length})
 								</h3>
 								{isAdmin && unassignedMembers.length > 0 && (
 									<button
@@ -769,7 +771,7 @@ export default function EventDetail() {
 								)}
 							</div>
 
-							{otherAssignments.length === 0 ? (
+							{activeCastAssignments.length === 0 ? (
 								<div className="p-6 text-center text-sm text-slate-500">
 									No one assigned yet.{" "}
 									{isAdmin && (
@@ -784,7 +786,7 @@ export default function EventDetail() {
 								</div>
 							) : (
 								<ul className="divide-y divide-slate-100">
-									{otherAssignments.map((a) => {
+									{activeCastAssignments.map((a) => {
 										const statusCfg = STATUS_CONFIG[a.status] ?? STATUS_CONFIG.pending;
 										return (
 											<li key={a.userId} className="flex items-center justify-between px-6 py-3">
@@ -935,7 +937,7 @@ export default function EventDetail() {
 						<div className="rounded-xl border border-slate-200 bg-white shadow-sm">
 							<div className="border-b border-slate-100 px-6 py-4">
 								<h3 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
-									<Users className="h-5 w-5" /> Other Roles ({activeOtherCount})
+									<Users className="h-5 w-5" /> Other Roles ({otherAssignments.length})
 								</h3>
 							</div>
 							<ul className="divide-y divide-slate-100">
@@ -1087,17 +1089,17 @@ export default function EventDetail() {
 								<>
 									<div className="flex justify-between">
 										<dt className="text-sm text-purple-600">Performers</dt>
-										<dd className="text-sm font-medium text-purple-600">{activePerformerCount}</dd>
+										<dd className="text-sm font-medium text-purple-600">{performers.length}</dd>
 									</div>
 									<div className="flex justify-between">
 										<dt className="text-sm text-slate-500">Viewers</dt>
-										<dd className="text-sm font-medium text-slate-600">{activeViewerCount}</dd>
+										<dd className="text-sm font-medium text-slate-600">{viewers.length}</dd>
 									</div>
 								</>
 							) : (
 								<div className="flex justify-between">
 									<dt className="text-sm text-slate-500">Total Assigned</dt>
-									<dd className="text-sm font-medium text-slate-900">{activeCastCount}</dd>
+									<dd className="text-sm font-medium text-slate-900">{assignments.length}</dd>
 								</div>
 							)}
 							<div className="flex justify-between">

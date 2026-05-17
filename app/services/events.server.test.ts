@@ -1071,7 +1071,7 @@ describe("events.server", () => {
 			const respChain = chainMock(null);
 			respChain.where = vi.fn().mockResolvedValue([
 				{
-					userId: "user-1", // creator — no longer excluded
+					userId: "user-1", // creator — should be excluded
 					responses: { "2026-03-15": "available" },
 				},
 				{
@@ -1106,9 +1106,8 @@ describe("events.server", () => {
 				createdById: "user-1",
 			});
 
-			// Should assign user-1 (available), user-2 (available), and user-3 (maybe), NOT user-4 (not_available)
+			// Should assign user-2 (available) and user-3 (maybe), NOT user-1 (creator) or user-4 (not_available)
 			expect(mockValues).toHaveBeenLastCalledWith([
-				expect.objectContaining({ userId: "user-1" }),
 				expect.objectContaining({ userId: "user-2" }),
 				expect.objectContaining({ userId: "user-3" }),
 			]);
@@ -1156,7 +1155,7 @@ describe("events.server", () => {
 	// autoAssignFromAvailability
 	// ============================================================
 	describe("autoAssignFromAvailability", () => {
-		it("assigns available and maybe members including the creator", async () => {
+		it("assigns available and maybe members, excludes creator", async () => {
 			const respChain = chainMock(null);
 			respChain.where = vi.fn().mockResolvedValue([
 				{ userId: "creator-1", responses: { "2026-03-15": "available" } },
@@ -1174,11 +1173,15 @@ describe("events.server", () => {
 				onConflictDoNothing,
 			});
 
-			const result = await autoAssignFromAvailability("event-1", "req-1", "2026-03-15");
+			const result = await autoAssignFromAvailability(
+				"event-1",
+				"req-1",
+				"2026-03-15",
+				"creator-1",
+			);
 
-			expect(result).toEqual(["creator-1", "user-2", "user-3"]);
+			expect(result).toEqual(["user-2", "user-3"]);
 			expect(mockValues).toHaveBeenLastCalledWith([
-				expect.objectContaining({ eventId: "event-1", userId: "creator-1", status: "pending" }),
 				expect.objectContaining({ eventId: "event-1", userId: "user-2", status: "pending" }),
 				expect.objectContaining({ eventId: "event-1", userId: "user-3", status: "pending" }),
 			]);
@@ -1193,7 +1196,31 @@ describe("events.server", () => {
 			respChain.from = vi.fn().mockReturnValue(respChain);
 			mockSelect.mockReturnValueOnce(respChain);
 
-			const result = await autoAssignFromAvailability("event-1", "req-1", "2026-03-15");
+			const result = await autoAssignFromAvailability(
+				"event-1",
+				"req-1",
+				"2026-03-15",
+				"creator-1",
+			);
+
+			expect(result).toEqual([]);
+			expect(mockInsert).not.toHaveBeenCalled();
+		});
+
+		it("excludes only the specified creator from assignment", async () => {
+			const respChain = chainMock(null);
+			respChain.where = vi
+				.fn()
+				.mockResolvedValue([{ userId: "the-creator", responses: { "2026-03-15": "available" } }]);
+			respChain.from = vi.fn().mockReturnValue(respChain);
+			mockSelect.mockReturnValueOnce(respChain);
+
+			const result = await autoAssignFromAvailability(
+				"event-1",
+				"req-1",
+				"2026-03-15",
+				"the-creator",
+			);
 
 			expect(result).toEqual([]);
 			expect(mockInsert).not.toHaveBeenCalled();
@@ -1205,7 +1232,12 @@ describe("events.server", () => {
 			respChain.from = vi.fn().mockReturnValue(respChain);
 			mockSelect.mockReturnValueOnce(respChain);
 
-			const result = await autoAssignFromAvailability("event-1", "req-1", "2026-03-15");
+			const result = await autoAssignFromAvailability(
+				"event-1",
+				"req-1",
+				"2026-03-15",
+				"creator-1",
+			);
 
 			expect(result).toEqual([]);
 			expect(mockInsert).not.toHaveBeenCalled();
@@ -1232,7 +1264,12 @@ describe("events.server", () => {
 				onConflictDoNothing,
 			});
 
-			const result = await autoAssignFromAvailability("event-1", "req-1", "2026-03-16");
+			const result = await autoAssignFromAvailability(
+				"event-1",
+				"req-1",
+				"2026-03-16",
+				"creator-1",
+			);
 
 			// Only user-3 is available on 2026-03-16
 			expect(result).toEqual(["user-3"]);

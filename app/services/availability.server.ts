@@ -70,7 +70,7 @@ export async function getGroupAvailabilityRequests(
 			and(
 				eq(availabilityRequests.groupId, groupId),
 				eq(availabilityRequests.status, "open"),
-				lt(availabilityRequests.dateRangeEnd, new Date()),
+				lt(availabilityRequests.dateRangeEnd, sql`now() - interval '1 day'`),
 			),
 		);
 

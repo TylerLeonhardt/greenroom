@@ -85,7 +85,7 @@ export async function createEventsFromAvailability(data: {
 				: undefined,
 		});
 
-		await autoAssignFromAvailability(event.id, data.requestId, dateInfo.date);
+		await autoAssignFromAvailability(event.id, data.requestId, dateInfo.date, data.createdById);
 
 		createdEvents.push(event);
 	}
@@ -95,12 +95,13 @@ export async function createEventsFromAvailability(data: {
 
 /**
  * Auto-assign members who said "available" or "maybe" for a specific date
- * to an event as pending cast members.
+ * to an event as pending cast members. Excludes the event creator.
  */
 export async function autoAssignFromAvailability(
 	eventId: string,
 	requestId: string,
 	date: string,
+	excludeUserId: string,
 ): Promise<string[]> {
 	const responses = await db
 		.select({
@@ -112,6 +113,7 @@ export async function autoAssignFromAvailability(
 
 	const eligibleUserIds = responses
 		.filter((r) => {
+			if (r.userId === excludeUserId) return false;
 			const resp = r.responses as Record<string, string>;
 			return resp[date] === "available" || resp[date] === "maybe";
 		})
