@@ -187,6 +187,165 @@ describe("availability.server integration", () => {
 		});
 	});
 
+	// --- getGroupAvailabilityRequests: auto-close ---
+
+	describe("getGroupAvailabilityRequests - auto-close expired requests", () => {
+		it("auto-closes requests where dateRangeEnd is more than 1 day in the past", async () => {
+			const user = await createTestUser();
+			const group = await createTestGroup(user.id);
+
+			const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+			const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+			await createTestAvailabilityRequest(group.id, user.id, {
+				title: "Expired Request",
+				dateRangeStart: tenDaysAgo,
+				dateRangeEnd: threeDaysAgo,
+			});
+
+			const results = await getGroupAvailabilityRequests(group.id);
+			expect(results).toHaveLength(1);
+			expect(results[0].status).toBe("closed");
+		});
+
+		it("does NOT auto-close requests where dateRangeEnd is within the last day", async () => {
+			const user = await createTestUser();
+			const group = await createTestGroup(user.id);
+
+			const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+			const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
+			await createTestAvailabilityRequest(group.id, user.id, {
+				title: "Recent Request",
+				dateRangeStart: twoDaysAgo,
+				dateRangeEnd: twelveHoursAgo,
+			});
+
+			const results = await getGroupAvailabilityRequests(group.id);
+			expect(results).toHaveLength(1);
+			expect(results[0].status).toBe("open");
+		});
+
+		it("does NOT affect already-closed requests", async () => {
+			const user = await createTestUser();
+			const group = await createTestGroup(user.id);
+
+			const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+			const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+			await createTestAvailabilityRequest(group.id, user.id, {
+				title: "Already Closed",
+				dateRangeStart: tenDaysAgo,
+				dateRangeEnd: threeDaysAgo,
+				status: "closed",
+			});
+
+			const results = await getGroupAvailabilityRequests(group.id);
+			expect(results).toHaveLength(1);
+			expect(results[0].status).toBe("closed");
+		});
+
+		it("only auto-closes requests in the specified group", async () => {
+			const user = await createTestUser();
+			const groupA = await createTestGroup(user.id, { name: "Group A" });
+			const groupB = await createTestGroup(user.id, { name: "Group B" });
+
+			const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+			const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+			await createTestAvailabilityRequest(groupA.id, user.id, {
+				title: "Group A Expired",
+				dateRangeStart: tenDaysAgo,
+				dateRangeEnd: threeDaysAgo,
+			});
+			const groupBRequest = await createTestAvailabilityRequest(groupB.id, user.id, {
+				title: "Group B Expired",
+				dateRangeStart: tenDaysAgo,
+				dateRangeEnd: threeDaysAgo,
+			});
+
+			// Call for group A only
+			await getGroupAvailabilityRequests(groupA.id);
+
+			// Verify group B's request is untouched
+			const { db } = await import("../../../src/db/index.js");
+			const { availabilityRequests } = await import("../../../src/db/schema.js");
+			const { eq } = await import("drizzle-orm");
+			const [groupBRow] = await db
+				.select()
+				.from(availabilityRequests)
+				.where(eq(availabilityRequests.id, groupBRequest.id));
+			expect(groupBRow?.status).toBe("open");
+		});
+	});
+
+	// --- getGroupAvailabilityRequests: hasResponded ---
+
+	describe("getGroupAvailabilityRequests - hasResponded field", () => {
+		it("returns hasResponded true when user has submitted a response", async () => {
+			const admin = await createTestUser({ name: "Admin" });
+			const member = await createTestUser({ name: "Member" });
+			const group = await createTestGroup(admin.id);
+			await addGroupMember(group.id, member.id);
+
+			const request = await createTestAvailabilityRequest(group.id, admin.id);
+			await createTestAvailabilityResponse(request.id, member.id, {
+				"2026-04-01": "available",
+			});
+
+			const results = await getGroupAvailabilityRequests(group.id, member.id);
+			expect(results).toHaveLength(1);
+			expect(results[0].hasResponded).toBe(true);
+		});
+
+		it("returns hasResponded false when user has not responded", async () => {
+			const admin = await createTestUser({ name: "Admin" });
+			const member = await createTestUser({ name: "Member" });
+			const group = await createTestGroup(admin.id);
+			await addGroupMember(group.id, member.id);
+
+			await createTestAvailabilityRequest(group.id, admin.id);
+
+			const results = await getGroupAvailabilityRequests(group.id, member.id);
+			expect(results).toHaveLength(1);
+			expect(results[0].hasResponded).toBe(false);
+		});
+
+		it("returns hasResponded false for all requests when no userId provided", async () => {
+			const admin = await createTestUser({ name: "Admin" });
+			const member = await createTestUser({ name: "Member" });
+			const group = await createTestGroup(admin.id);
+			await addGroupMember(group.id, member.id);
+
+			const request = await createTestAvailabilityRequest(group.id, admin.id);
+			await createTestAvailabilityResponse(request.id, member.id, {
+				"2026-04-01": "available",
+			});
+
+			// Call without userId
+			const results = await getGroupAvailabilityRequests(group.id);
+			expect(results).toHaveLength(1);
+			expect(results[0].hasResponded).toBe(false);
+		});
+	});
+
+	// --- getGroupAvailabilityRequests: createdByName fallback ---
+
+	it("returns 'Deleted user' when the creator has been deleted", async () => {
+		const user = await createTestUser({ name: "Soon Deleted" });
+		const group = await createTestGroup(user.id);
+		await createTestAvailabilityRequest(group.id, user.id);
+
+		// Simulate creator deletion (FK ON DELETE SET NULL)
+		const { db } = await import("../../../src/db/index.js");
+		const { availabilityRequests } = await import("../../../src/db/schema.js");
+		const { eq } = await import("drizzle-orm");
+		await db
+			.update(availabilityRequests)
+			.set({ createdById: null })
+			.where(eq(availabilityRequests.groupId, group.id));
+
+		const results = await getGroupAvailabilityRequests(group.id);
+		expect(results).toHaveLength(1);
+		expect(results[0].createdByName).toBe("Deleted user");
+	});
+
 	// --- submitAvailabilityResponse / getUserResponse ---
 
 	describe("submitAvailabilityResponse", () => {
