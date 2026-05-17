@@ -1,4 +1,4 @@
-import { and, count, desc, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, lt, sql } from "drizzle-orm";
 import { db } from "../../src/db/index.js";
 import {
 	availabilityRequests,
@@ -49,15 +49,31 @@ export async function createAvailabilityRequest(data: {
 
 // --- List ---
 
-export async function getGroupAvailabilityRequests(groupId: string): Promise<
+export async function getGroupAvailabilityRequests(
+	groupId: string,
+	userId?: string,
+): Promise<
 	Array<
 		Omit<AvailabilityRequest, "reminderSentAt"> & {
 			responseCount: number;
 			memberCount: number;
 			createdByName: string;
+			hasResponded: boolean;
 		}
 	>
 > {
+	// Auto-close expired requests before querying
+	await db
+		.update(availabilityRequests)
+		.set({ status: "closed" })
+		.where(
+			and(
+				eq(availabilityRequests.groupId, groupId),
+				eq(availabilityRequests.status, "open"),
+				lt(availabilityRequests.dateRangeEnd, new Date()),
+			),
+		);
+
 	const rows = await db
 		.select({
 			id: availabilityRequests.id,
@@ -82,6 +98,13 @@ export async function getGroupAvailabilityRequests(groupId: string): Promise<
 				select count(*) from group_memberships
 				where group_memberships.group_id = ${availabilityRequests.groupId}
 			) as int)`,
+			hasResponded: userId
+				? sql<boolean>`exists(
+					select 1 from availability_responses
+					where availability_responses.request_id = ${availabilityRequests.id}
+					and availability_responses.user_id = ${userId}
+				)`
+				: sql<boolean>`false`,
 		})
 		.from(availabilityRequests)
 		.leftJoin(users, eq(availabilityRequests.createdById, users.id))

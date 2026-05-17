@@ -62,7 +62,7 @@ describe("availability index loader", () => {
 	it("passes groupId to getGroupAvailabilityRequests", async () => {
 		const request = new Request("http://localhost/groups/group-xyz/availability");
 		await loader({ request, params: { groupId: "group-xyz" }, context: {} });
-		expect(getGroupAvailabilityRequests).toHaveBeenCalledWith("group-xyz");
+		expect(getGroupAvailabilityRequests).toHaveBeenCalledWith("group-xyz", "user-1");
 	});
 
 	it("defaults to empty groupId when param is missing", async () => {

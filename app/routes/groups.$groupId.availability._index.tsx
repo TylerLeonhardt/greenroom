@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { Link, useLoaderData, useRouteLoaderData } from "@remix-run/react";
-import { Calendar, Users } from "lucide-react";
+import { Calendar, CheckCircle2, Users } from "lucide-react";
+import { useState } from "react";
 import { EmptyState } from "~/components/empty-state";
 import { formatDateRange, formatTimeRange } from "~/lib/date-utils";
 import { getGroupAvailabilityRequests } from "~/services/availability.server";
@@ -13,8 +14,8 @@ export const meta: MetaFunction = () => {
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
 	const groupId = params.groupId ?? "";
-	await requireGroupMember(request, groupId);
-	const requests = await getGroupAvailabilityRequests(groupId);
+	const user = await requireGroupMember(request, groupId);
+	const requests = await getGroupAvailabilityRequests(groupId, user.id);
 	return { requests };
 }
 
@@ -26,6 +27,10 @@ export default function Availability() {
 	const timezone = parentData?.user?.timezone ?? undefined;
 	const canCreateRequests =
 		role === "admin" || parentData?.group?.membersCanCreateRequests === true;
+
+	const openRequests = requests.filter((r) => r.status === "open");
+	const closedRequests = requests.filter((r) => r.status === "closed");
+	const [showClosed, setShowClosed] = useState(false);
 
 	return (
 		<div>
@@ -58,68 +63,116 @@ export default function Availability() {
 					/>
 				</div>
 			) : (
-				<div className="mt-6 space-y-3">
-					{requests.map((req) => {
-						const progress =
-							req.memberCount > 0 ? Math.round((req.responseCount / req.memberCount) * 100) : 0;
-						return (
-							<Link
-								key={req.id}
-								to={`/groups/${groupId}/availability/${req.id}`}
-								className="block rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-emerald-200 hover:shadow-md"
+				<div className="mt-6 space-y-6">
+					{openRequests.length > 0 && (
+						<div className="space-y-3">
+							{openRequests.map((req) => (
+								<RequestCard key={req.id} req={req} groupId={groupId} timezone={timezone} />
+							))}
+						</div>
+					)}
+
+					{closedRequests.length > 0 && (
+						<div>
+							<button
+								type="button"
+								onClick={() => setShowClosed(!showClosed)}
+								className="mb-3 text-sm font-semibold text-slate-500 hover:text-slate-700"
 							>
-								<div className="flex items-start justify-between gap-4">
-									<div className="min-w-0 flex-1">
-										<div className="flex items-center gap-2">
-											<h3 className="text-base font-semibold text-slate-900 truncate">
-												{req.title}
-											</h3>
-											{req.status === "open" ? (
-												<span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-													Open
-												</span>
-											) : (
-												<span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-													Closed
-												</span>
-											)}
-										</div>
-										<p className="mt-1 text-sm text-slate-500">
-											{formatDateRange(
-												req.dateRangeStart as unknown as string,
-												req.dateRangeEnd as unknown as string,
-												timezone,
-											)}
-											{(req.requestedStartTime || req.requestedEndTime) && (
-												<span className="ml-2 text-xs text-slate-400">
-													· {formatTimeRange(req.requestedStartTime, req.requestedEndTime)}
-												</span>
-											)}
-										</p>
-									</div>
+								Closed Requests ({closedRequests.length}) {showClosed ? "▾" : "▸"}
+							</button>
+							{showClosed && (
+								<div className="space-y-3 opacity-75">
+									{closedRequests.map((req) => (
+										<RequestCard key={req.id} req={req} groupId={groupId} timezone={timezone} />
+									))}
 								</div>
-								<div className="mt-4 flex items-center gap-4">
-									<div className="flex min-w-0 flex-1 items-center gap-2">
-										<Users className="h-4 w-4 flex-shrink-0 text-slate-400" />
-										<span className="text-xs text-slate-500">
-											{req.responseCount}/{req.memberCount} responded
-										</span>
-										<div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200">
-											<div
-												className="h-full rounded-full bg-emerald-500 transition-all"
-												style={{ width: `${progress}%` }}
-											/>
-										</div>
-									</div>
-									<span className="flex-shrink-0 text-xs text-slate-400">
-										by {req.createdByName}
-									</span>
-								</div>
-							</Link>
-						);
-					})}
+							)}
+						</div>
+					)}
 				</div>
 			)}
 		</div>
+	);
+}
+
+function RequestCard({
+	req,
+	groupId,
+	timezone,
+}: {
+	req: {
+		id: string;
+		title: string;
+		status: string;
+		dateRangeStart: unknown;
+		dateRangeEnd: unknown;
+		requestedStartTime: string | null;
+		requestedEndTime: string | null;
+		responseCount: number;
+		memberCount: number;
+		createdByName: string;
+		hasResponded: boolean;
+	};
+	groupId: string | undefined;
+	timezone: string | undefined;
+}) {
+	const progress =
+		req.memberCount > 0 ? Math.round((req.responseCount / req.memberCount) * 100) : 0;
+	return (
+		<Link
+			to={`/groups/${groupId}/availability/${req.id}`}
+			className="block rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-emerald-200 hover:shadow-md"
+		>
+			<div className="flex items-start justify-between gap-4">
+				<div className="min-w-0 flex-1">
+					<div className="flex items-center gap-2">
+						<h3 className="text-base font-semibold text-slate-900 truncate">{req.title}</h3>
+						{req.status === "open" ? (
+							<span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+								Open
+							</span>
+						) : (
+							<span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+								Closed
+							</span>
+						)}
+						{req.hasResponded && (
+							<span className="inline-flex items-center gap-1 text-xs text-emerald-600">
+								<CheckCircle2 className="h-3.5 w-3.5" />
+								Responded
+							</span>
+						)}
+					</div>
+					<p className="mt-1 text-sm text-slate-500">
+						{formatDateRange(
+							req.dateRangeStart as unknown as string,
+							req.dateRangeEnd as unknown as string,
+							timezone,
+						)}
+						{(req.requestedStartTime || req.requestedEndTime) && (
+							<span className="ml-2 text-xs text-slate-400">
+								· {formatTimeRange(req.requestedStartTime, req.requestedEndTime)}
+							</span>
+						)}
+					</p>
+				</div>
+			</div>
+			<div className="mt-4 flex items-center gap-4">
+				<div className="flex min-w-0 flex-1 items-center gap-2">
+					<Users className="h-4 w-4 flex-shrink-0 text-slate-400" />
+					<span className="text-xs text-slate-500">
+						{req.responseCount}/{req.memberCount} responded
+					</span>
+					<div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200">
+						<div
+							className="h-full rounded-full bg-emerald-500 transition-all"
+							style={{ width: `${progress}%` }}
+						/>
+					</div>
+				</div>
+				<span className="flex-shrink-0 text-xs text-slate-400">by {req.createdByName}</span>
+			</div>
+		</Link>
 	);
 }
