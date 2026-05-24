@@ -194,6 +194,32 @@ function anchorToNoonUTC(date: Date): Date {
 }
 
 /**
+ * Determine whether an event is still "upcoming" (its day hasn't ended yet).
+ * An event remains upcoming through the entire calendar day it starts on,
+ * based on the event's own timezone.
+ *
+ * Returns true if the event's start date (in the event's timezone) is today or later.
+ */
+export function isEventUpcoming(
+	startTime: Date | string,
+	timezone?: string | null,
+	now?: Date,
+): boolean {
+	const tz = sanitizeTimezone(timezone ?? undefined) ?? "UTC";
+	const currentTime = now ?? new Date();
+
+	// Get today's date in the event's timezone as YYYY-MM-DD
+	const todayInTz = currentTime.toLocaleDateString("en-CA", { timeZone: tz });
+
+	// Get the event's date in its timezone as YYYY-MM-DD
+	const eventDate = typeof startTime === "string" ? new Date(startTime) : startTime;
+	const eventDateInTz = eventDate.toLocaleDateString("en-CA", { timeZone: tz });
+
+	// Event is upcoming if its date is today or later (lexicographic comparison works for YYYY-MM-DD)
+	return eventDateInTz >= todayInTz;
+}
+
+/**
  * Parse a date-only value safely, anchoring to noon UTC to prevent
  * timezone-induced date shifts.
  *

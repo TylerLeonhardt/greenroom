@@ -1,4 +1,4 @@
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "../../src/db/index.js";
 import {
 	availabilityRequests,
@@ -65,7 +65,12 @@ export async function getDashboardData(userId: string) {
 				groupMemberships,
 				and(eq(groupMemberships.groupId, groups.id), eq(groupMemberships.userId, userId)),
 			)
-			.where(gte(events.startTime, new Date()))
+			.where(
+				sql`(
+					(${events.startTime} AT TIME ZONE COALESCE(${events.timezone}, 'UTC'))::date
+					+ interval '1 day'
+				) AT TIME ZONE COALESCE(${events.timezone}, 'UTC') > now()`,
+			)
 			.orderBy(events.startTime)
 			.limit(5),
 
@@ -112,7 +117,10 @@ export async function getDashboardData(userId: string) {
 				and(
 					eq(eventAssignments.userId, userId),
 					eq(eventAssignments.status, "pending"),
-					gte(events.startTime, new Date()),
+					sql`(
+						(${events.startTime} AT TIME ZONE COALESCE(${events.timezone}, 'UTC'))::date
+						+ interval '1 day'
+					) AT TIME ZONE COALESCE(${events.timezone}, 'UTC') > now()`,
 				),
 			)
 			.groupBy(events.groupId, groups.name)

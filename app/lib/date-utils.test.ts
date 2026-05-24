@@ -11,6 +11,7 @@ import {
 	formatTime,
 	formatTimeRange,
 	getTimezoneAbbreviation,
+	isEventUpcoming,
 	isValidTimezone,
 	localTimeToUTC,
 	parseDateOnly,
@@ -502,6 +503,66 @@ describe("date-utils", () => {
 			const dstDate = new Date("2026-03-15T19:00:00Z");
 			const result = getTimezoneAbbreviation(dstDate, "America/Los_Angeles");
 			expect(result).toBe("PDT");
+		});
+	});
+
+	describe("isEventUpcoming", () => {
+		it("returns true when event is in the future", () => {
+			const tomorrow = new Date("2026-03-05T19:00:00Z");
+			const now = new Date("2026-03-04T12:00:00Z");
+			expect(isEventUpcoming(tomorrow, "UTC", now)).toBe(true);
+		});
+
+		it("returns true when event started earlier today (same day)", () => {
+			// Event started at 2 PM, it's now 11 PM — still the same day
+			const eventStart = new Date("2026-03-04T14:00:00Z");
+			const now = new Date("2026-03-04T23:00:00Z");
+			expect(isEventUpcoming(eventStart, "UTC", now)).toBe(true);
+		});
+
+		it("returns false when event was yesterday", () => {
+			const yesterday = new Date("2026-03-03T19:00:00Z");
+			const now = new Date("2026-03-04T12:00:00Z");
+			expect(isEventUpcoming(yesterday, "UTC", now)).toBe(false);
+		});
+
+		it("returns true at 11:59 PM on event day", () => {
+			const eventStart = new Date("2026-03-04T19:00:00Z");
+			const now = new Date("2026-03-04T23:59:00Z");
+			expect(isEventUpcoming(eventStart, "UTC", now)).toBe(true);
+		});
+
+		it("returns false at midnight the day after event", () => {
+			const eventStart = new Date("2026-03-04T19:00:00Z");
+			const now = new Date("2026-03-05T00:00:01Z");
+			expect(isEventUpcoming(eventStart, "UTC", now)).toBe(false);
+		});
+
+		it("respects event timezone — event today in LA when it's tomorrow in UTC", () => {
+			// 11 PM UTC on March 4 = 3 PM PST on March 4
+			const eventStart = new Date("2026-03-04T19:00:00Z");
+			// Now is 3 AM UTC on March 5 = 7 PM PST on March 4 (still the same day in LA)
+			const now = new Date("2026-03-05T03:00:00Z");
+			expect(isEventUpcoming(eventStart, "America/Los_Angeles", now)).toBe(true);
+		});
+
+		it("event is past in LA timezone when day rolls over there", () => {
+			// Event was at 7 PM PST on March 4 (= March 5 03:00 UTC)
+			const eventStart = new Date("2026-03-05T03:00:00Z");
+			// Now is 9 AM PST on March 5 = 5 PM UTC March 5 — next day in LA
+			const now = new Date("2026-03-05T17:00:00Z");
+			expect(isEventUpcoming(eventStart, "America/Los_Angeles", now)).toBe(false);
+		});
+
+		it("handles string dates", () => {
+			const now = new Date("2026-03-04T23:00:00Z");
+			expect(isEventUpcoming("2026-03-04T19:00:00Z", "UTC", now)).toBe(true);
+		});
+
+		it("falls back to UTC when no timezone provided", () => {
+			const eventStart = new Date("2026-03-04T19:00:00Z");
+			const now = new Date("2026-03-04T23:00:00Z");
+			expect(isEventUpcoming(eventStart, null, now)).toBe(true);
 		});
 	});
 });

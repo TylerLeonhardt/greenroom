@@ -12,7 +12,7 @@ import { CsrfInput } from "~/components/csrf-input";
 import { EmptyState } from "~/components/empty-state";
 import { EventCalendar } from "~/components/event-calendar";
 import { EventCard } from "~/components/event-card";
-import { formatDateLong } from "~/lib/date-utils";
+import { formatDateLong, isEventUpcoming } from "~/lib/date-utils";
 import { getAvailabilityRequest } from "~/services/availability.server";
 import { validateCsrfToken } from "~/services/csrf.server";
 import { confirmAllPendingEventsInGroup, getGroupEvents } from "~/services/events.server";
@@ -29,9 +29,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 	const allEvents = await getGroupEvents(groupId, { userId: user.id });
 
 	// Find pending upcoming events for the banner
-	const now = new Date();
 	const pendingUpcoming = allEvents.filter(
-		(e) => e.userStatus === "pending" && new Date(e.startTime) >= now,
+		(e) => e.userStatus === "pending" && isEventUpcoming(e.startTime, e.timezone),
 	);
 
 	let pendingRequestTitle: string | null = null;
@@ -85,10 +84,9 @@ export default function Events() {
 	const [showPast, setShowPast] = useState(false);
 	const [calendarSelectedDate, setCalendarSelectedDate] = useState<string | null>(null);
 
-	const now = new Date();
 	const filtered = typeFilter === "all" ? events : events.filter((e) => e.eventType === typeFilter);
-	const upcoming = filtered.filter((e) => new Date(e.startTime) >= now);
-	const past = filtered.filter((e) => new Date(e.startTime) < now).reverse();
+	const upcoming = filtered.filter((e) => isEventUpcoming(e.startTime, e.timezone));
+	const past = filtered.filter((e) => !isEventUpcoming(e.startTime, e.timezone)).reverse();
 
 	// Optimistic: hide banner after confirm-all is submitted
 	const isConfirmingAll = confirmAllFetcher.state !== "idle";
