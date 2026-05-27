@@ -71,7 +71,7 @@ import {
 	isGroupAdmin,
 	requireGroupMember,
 } from "~/services/groups.server";
-import { action } from "./groups.$groupId.events.$eventId";
+import { action, computeNoResponseMembers } from "./groups.$groupId.events.$eventId";
 
 describe("event detail action — IDOR prevention", () => {
 	beforeEach(() => {
@@ -867,5 +867,65 @@ describe("event detail action — change role", () => {
 				}),
 			);
 		});
+	});
+});
+
+describe("computeNoResponseMembers", () => {
+	const allMembers = [
+		{ id: "user-1", name: "Admin" },
+		{ id: "user-2", name: "Alice" },
+		{ id: "user-3", name: "Bob" },
+		{ id: "user-4", name: "Charlie" },
+	];
+
+	it("identifies members who didn't respond to the availability request", () => {
+		// user-2 and user-3 responded; user-1 and user-4 did NOT
+		const availabilityData = [
+			{ userId: "user-2", status: "available" },
+			{ userId: "user-3", status: "maybe" },
+		];
+		const assignedUserIds = new Set<string>();
+
+		const result = computeNoResponseMembers(allMembers, availabilityData, assignedUserIds);
+
+		expect(result).toHaveLength(2);
+		expect(result.map((m) => m.userId).sort()).toEqual(["user-1", "user-4"]);
+		expect(result.map((m) => m.userName).sort()).toEqual(["Admin", "Charlie"]);
+	});
+
+	it("returns empty array when all members responded", () => {
+		const availabilityData = [
+			{ userId: "user-1", status: "available" },
+			{ userId: "user-2", status: "available" },
+			{ userId: "user-3", status: "maybe" },
+			{ userId: "user-4", status: "not_available" },
+		];
+		const assignedUserIds = new Set<string>();
+
+		const result = computeNoResponseMembers(allMembers, availabilityData, assignedUserIds);
+
+		expect(result).toHaveLength(0);
+	});
+
+	it("excludes already-assigned members from no-response list", () => {
+		// user-2 is assigned, user-3 responded, user-1 and user-4 neither assigned nor responded
+		const availabilityData = [{ userId: "user-3", status: "available" }];
+		const assignedUserIds = new Set(["user-2"]);
+
+		const result = computeNoResponseMembers(allMembers, availabilityData, assignedUserIds);
+
+		expect(result).toHaveLength(2);
+		expect(result.map((m) => m.userId).sort()).toEqual(["user-1", "user-4"]);
+	});
+
+	it("returns all unassigned members when availability data is empty", () => {
+		const availabilityData: Array<{ userId: string }> = [];
+		const assignedUserIds = new Set(["user-1"]);
+
+		const result = computeNoResponseMembers(allMembers, availabilityData, assignedUserIds);
+
+		// user-1 assigned, user-2/3/4 unassigned and none responded
+		expect(result).toHaveLength(3);
+		expect(result.map((m) => m.userId).sort()).toEqual(["user-2", "user-3", "user-4"]);
 	});
 });

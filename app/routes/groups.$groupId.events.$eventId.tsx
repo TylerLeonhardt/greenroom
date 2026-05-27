@@ -60,6 +60,23 @@ import {
 } from "~/services/groups.server";
 import type { loader as groupLayoutLoader } from "./groups.$groupId";
 
+/**
+ * Computes members who didn't respond to the linked availability request.
+ * Exported for unit testing — this is the client-side logic that powers
+ * the "No Response" section in the Add Members panel.
+ */
+export function computeNoResponseMembers(
+	members: Array<{ id: string; name: string }>,
+	availabilityData: Array<{ userId: string }>,
+	assignedUserIds: Set<string>,
+): Array<{ userId: string; userName: string }> {
+	const unassigned = members.filter((m) => !assignedUserIds.has(m.id));
+	const respondedUserIds = new Set(availabilityData.map((a) => a.userId));
+	return unassigned
+		.filter((m) => !respondedUserIds.has(m.id))
+		.map((m) => ({ userId: m.id, userName: m.name }));
+}
+
 export const meta: MetaFunction = () => {
 	return [{ title: "Event Detail — My Call Time" }];
 };
@@ -395,6 +412,13 @@ export default function EventDetail() {
 	);
 	const hasAvailData = availabilityData.length > 0;
 
+	// Members who didn't respond to the availability request
+	const noResponseUsers = computeNoResponseMembers(
+		unassignedMembers,
+		availabilityData,
+		assignedUserIds,
+	);
+
 	const isMyPerformer = myAssignment?.role === "Performer";
 
 	return (
@@ -626,6 +650,22 @@ export default function EventDetail() {
 															onToggle={toggleUser}
 															colorScheme="red"
 															dimmed
+														/>
+													</div>
+												)}
+												{noResponseUsers.length > 0 && (
+													<div>
+														<h4 className="mb-1.5 text-xs font-semibold text-slate-500">
+															❓ No Response
+														</h4>
+														<UserChipSelector
+															users={noResponseUsers.map((u) => ({
+																id: u.userId,
+																name: u.userName,
+															}))}
+															selectedIds={selectedUserIds}
+															onToggle={toggleUser}
+															colorScheme="slate"
 														/>
 													</div>
 												)}
@@ -875,6 +915,22 @@ export default function EventDetail() {
 															onToggle={toggleUser}
 															colorScheme="red"
 															dimmed
+														/>
+													</div>
+												)}
+												{noResponseUsers.length > 0 && (
+													<div>
+														<h4 className="mb-1.5 text-xs font-semibold text-slate-500">
+															❓ No Response
+														</h4>
+														<UserChipSelector
+															users={noResponseUsers.map((u) => ({
+																id: u.userId,
+																name: u.userName,
+															}))}
+															selectedIds={selectedUserIds}
+															onToggle={toggleUser}
+															colorScheme="slate"
 														/>
 													</div>
 												)}
