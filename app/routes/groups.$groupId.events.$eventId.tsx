@@ -395,6 +395,12 @@ export default function EventDetail() {
 	);
 	const hasAvailData = availabilityData.length > 0;
 
+	// Members who didn't respond to the availability request
+	const respondedUserIds = new Set(availabilityData.map((a) => a.userId));
+	const noResponseUsers = unassignedMembers
+		.filter((m) => !respondedUserIds.has(m.id))
+		.map((m) => ({ userId: m.id, userName: m.name }));
+
 	const isMyPerformer = myAssignment?.role === "Performer";
 
 	return (
@@ -626,6 +632,22 @@ export default function EventDetail() {
 															onToggle={toggleUser}
 															colorScheme="red"
 															dimmed
+														/>
+													</div>
+												)}
+												{noResponseUsers.length > 0 && (
+													<div>
+														<h4 className="mb-1.5 text-xs font-semibold text-slate-500">
+															❓ No Response
+														</h4>
+														<UserChipSelector
+															users={noResponseUsers.map((u) => ({
+																id: u.userId,
+																name: u.userName,
+															}))}
+															selectedIds={selectedUserIds}
+															onToggle={toggleUser}
+															colorScheme="slate"
 														/>
 													</div>
 												)}
@@ -875,6 +897,22 @@ export default function EventDetail() {
 															onToggle={toggleUser}
 															colorScheme="red"
 															dimmed
+														/>
+													</div>
+												)}
+												{noResponseUsers.length > 0 && (
+													<div>
+														<h4 className="mb-1.5 text-xs font-semibold text-slate-500">
+															❓ No Response
+														</h4>
+														<UserChipSelector
+															users={noResponseUsers.map((u) => ({
+																id: u.userId,
+																name: u.userName,
+															}))}
+															selectedIds={selectedUserIds}
+															onToggle={toggleUser}
+															colorScheme="slate"
 														/>
 													</div>
 												)}
