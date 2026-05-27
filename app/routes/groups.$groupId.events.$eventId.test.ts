@@ -61,7 +61,11 @@ import {
 	assignToEvent,
 	bulkAssignToEvent,
 	deleteEvent,
+	getAvailabilityForEventDate,
+	getAvailabilityRequestGroupId,
+	getEventActivityFeed,
 	getEventWithAssignments,
+	getGroupEventSummaries,
 	updateAssignmentRole,
 	updateAssignmentStatus,
 } from "~/services/events.server";
@@ -71,7 +75,7 @@ import {
 	isGroupAdmin,
 	requireGroupMember,
 } from "~/services/groups.server";
-import { action } from "./groups.$groupId.events.$eventId";
+import { action, loader } from "./groups.$groupId.events.$eventId";
 
 describe("event detail action — IDOR prevention", () => {
 	beforeEach(() => {
@@ -867,5 +871,157 @@ describe("event detail action — change role", () => {
 				}),
 			);
 		});
+	});
+});
+
+describe("event detail loader — availability & no-response members", () => {
+	const mockShowEvent = {
+		id: "event-1",
+		groupId: "g1",
+		title: "Friday Show",
+		eventType: "show",
+		startTime: "2026-03-15T19:00:00.000Z",
+		endTime: "2026-03-15T21:00:00.000Z",
+		callTime: null,
+		location: "Main Theater",
+		createdFromRequestId: "req-1",
+		createdById: "user-1",
+	};
+
+	const allMembers = [
+		{ id: "user-1", name: "Admin", email: "admin@example.com", profileImage: null, role: "admin" },
+		{ id: "user-2", name: "Alice", email: "alice@example.com", profileImage: null, role: "member" },
+		{ id: "user-3", name: "Bob", email: "bob@example.com", profileImage: null, role: "member" },
+		{
+			id: "user-4",
+			name: "Charlie",
+			email: "charlie@example.com",
+			profileImage: null,
+			role: "member",
+		},
+	];
+
+	function makeLoaderRequest() {
+		return new Request("http://localhost/groups/g1/events/event-1");
+	}
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		(requireGroupMember as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: "user-1",
+			email: "admin@example.com",
+			name: "Admin",
+			profileImage: null,
+			timezone: "America/New_York",
+		});
+		(isGroupAdmin as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+		(getGroupEventSummaries as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+		(getEventActivityFeed as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+	});
+
+	it("returns availability data with non-responding members inferrable when some members didn't respond", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: mockShowEvent,
+			assignments: [],
+		});
+		(getGroupWithMembers as ReturnType<typeof vi.fn>).mockResolvedValue({
+			group: { id: "g1", name: "Test Group" },
+			members: allMembers,
+		});
+		(getAvailabilityRequestGroupId as ReturnType<typeof vi.fn>).mockResolvedValue("g1");
+		// Only user-2 and user-3 responded; user-1 and user-4 did NOT respond
+		(getAvailabilityForEventDate as ReturnType<typeof vi.fn>).mockResolvedValue([
+			{ userId: "user-2", userName: "Alice", status: "available" },
+			{ userId: "user-3", userName: "Bob", status: "maybe" },
+		]);
+
+		const result = await loader({
+			request: makeLoaderRequest(),
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		expect(result.availabilityData).toHaveLength(2);
+		expect(result.members).toHaveLength(4);
+
+		// Verify the component can compute "no response" members:
+		// noResponseUsers = members not in assignments AND not in availabilityData
+		const assignedIds = new Set(result.assignments.map((a: { userId: string }) => a.userId));
+		const unassigned = result.members.filter((m: { id: string }) => !assignedIds.has(m.id));
+		const respondedIds = new Set(result.availabilityData.map((a: { userId: string }) => a.userId));
+		const noResponseMembers = unassigned.filter((m: { id: string }) => !respondedIds.has(m.id));
+
+		expect(noResponseMembers).toHaveLength(2);
+		expect(noResponseMembers.map((m: { id: string }) => m.id).sort()).toEqual(["user-1", "user-4"]);
+	});
+
+	it("returns no non-responding members when all members responded", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: mockShowEvent,
+			assignments: [],
+		});
+		(getGroupWithMembers as ReturnType<typeof vi.fn>).mockResolvedValue({
+			group: { id: "g1", name: "Test Group" },
+			members: allMembers,
+		});
+		(getAvailabilityRequestGroupId as ReturnType<typeof vi.fn>).mockResolvedValue("g1");
+		// All 4 members responded
+		(getAvailabilityForEventDate as ReturnType<typeof vi.fn>).mockResolvedValue([
+			{ userId: "user-1", userName: "Admin", status: "available" },
+			{ userId: "user-2", userName: "Alice", status: "available" },
+			{ userId: "user-3", userName: "Bob", status: "maybe" },
+			{ userId: "user-4", userName: "Charlie", status: "not_available" },
+		]);
+
+		const result = await loader({
+			request: makeLoaderRequest(),
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		expect(result.availabilityData).toHaveLength(4);
+
+		// Component logic: all members responded → noResponseUsers is empty
+		const assignedIds = new Set(result.assignments.map((a: { userId: string }) => a.userId));
+		const unassigned = result.members.filter((m: { id: string }) => !assignedIds.has(m.id));
+		const respondedIds = new Set(result.availabilityData.map((a: { userId: string }) => a.userId));
+		const noResponseMembers = unassigned.filter((m: { id: string }) => !respondedIds.has(m.id));
+
+		expect(noResponseMembers).toHaveLength(0);
+	});
+
+	it("returns empty availability data when no availability request is linked", async () => {
+		const eventWithoutRequest = {
+			...mockShowEvent,
+			createdFromRequestId: null,
+		};
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: eventWithoutRequest,
+			assignments: [
+				{ userId: "user-2", userName: "Alice", role: "Performer", status: "confirmed" },
+			],
+		});
+		(getGroupWithMembers as ReturnType<typeof vi.fn>).mockResolvedValue({
+			group: { id: "g1", name: "Test Group" },
+			members: allMembers,
+		});
+
+		const result = await loader({
+			request: makeLoaderRequest(),
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		// No availability request linked → availabilityData is empty
+		expect(result.availabilityData).toHaveLength(0);
+
+		// getAvailabilityForEventDate should NOT have been called
+		expect(getAvailabilityForEventDate).not.toHaveBeenCalled();
+
+		// Component would use the fallback generic member list (not grouped availability view)
+		// since hasAvailData = false, unassignedMembers would be rendered directly
+		const assignedIds = new Set(result.assignments.map((a: { userId: string }) => a.userId));
+		const unassigned = result.members.filter((m: { id: string }) => !assignedIds.has(m.id));
+		expect(unassigned).toHaveLength(3); // user-1, user-3, user-4 (user-2 is assigned)
 	});
 });
