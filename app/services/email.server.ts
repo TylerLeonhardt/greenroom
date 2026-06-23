@@ -7,13 +7,6 @@ import { getTelemetryClient } from "./telemetry.server.js";
 
 // --- Error Classification ---
 
-const SUPPRESSION_PATTERNS = [
-	"AllRecipientsSuppressed",
-	"Suppressed",
-	"suppression list",
-	"suppressed",
-];
-
 const CLOCK_SKEW_PATTERN =
 	"time difference between the originating client and the server is greater than the allowed margin";
 
@@ -22,13 +15,15 @@ export type EmailErrorKind = "suppressed" | "clock_skew" | "transient" | "perman
 export function classifyEmailError(error: unknown): EmailErrorKind {
 	const message = error instanceof Error ? error.message : String(error);
 
-	if (SUPPRESSION_PATTERNS.some((p) => message.includes(p))) {
+	// Case-insensitive match covers "Suppressed", "suppression list",
+	// "AllRecipientsSuppressed", etc.
+	if (message.toLowerCase().includes("suppress")) {
 		return "suppressed";
 	}
 	if (message.includes(CLOCK_SKEW_PATTERN)) {
 		return "clock_skew";
 	}
-	// Network errors, timeouts, and clock skew are transient
+	// Network errors and timeouts are transient
 	if (
 		message.includes("ECONNRESET") ||
 		message.includes("ETIMEDOUT") ||
@@ -149,14 +144,19 @@ export async function sendEmail(options: {
 				break; // Don't retry permanent errors
 			}
 
-			// Transient or clock_skew — retry with exponential backoff
+			// Clock skew is effectively permanent: the drift is typically far larger
+			// than the allowed margin (minutes, not seconds), so retries after 1s/2s
+			// are guaranteed to fail and only add dead latency. Fail fast instead.
 			if (errorKind === "clock_skew") {
 				logger.warn(
-					{ attempt: attempt + 1, maxRetries: MAX_RETRIES + 1 },
-					"Clock skew detected — Azure SDK rejected request due to time difference. Retrying...",
+					{ to: recipients, subject: options.subject },
+					"Clock skew detected — server time drift exceeds Azure's allowed margin. " +
+						"Not retrying; fix host clock sync (NTP).",
 				);
+				break;
 			}
 
+			// Transient — retry with exponential backoff
 			if (attempt < MAX_RETRIES) {
 				const delay = RETRY_BASE_DELAY_MS * 2 ** attempt;
 				logger.info(

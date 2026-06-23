@@ -1,6 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const { beginSendMock } = vi.hoisted(() => ({ beginSendMock: vi.fn() }));
 
 // Must mock before importing the module under test
+vi.mock("@azure/communication-email", () => ({
+	EmailClient: vi.fn().mockImplementation(() => ({
+		beginSend: beginSendMock,
+	})),
+}));
+
 vi.mock("./logger.server.js", () => ({
 	logger: {
 		info: vi.fn(),
@@ -140,5 +148,89 @@ describe("sendEmail with telemetry", () => {
 		expect(classifyEmailError(new Error("ECONNRESET"))).toBe("transient");
 		expect(classifyEmailError(new Error("AllRecipientsSuppressed"))).toBe("suppressed");
 		expect(classifyEmailError(new Error("Unknown"))).toBe("permanent");
+	});
+});
+
+describe("sendEmail retry loop (Azure SDK mocked)", () => {
+	const CONNECTION_STRING = "endpoint=https://test.communication.azure.com/;accesskey=fake";
+	const CLOCK_SKEW_MESSAGE =
+		"time difference between the originating client and the server is greater than the allowed margin";
+
+	// Re-import the module fresh each test so the internal emailClient singleton
+	// is reset and getEmailClient() reconstructs the (mocked) client.
+	async function freshSendEmail() {
+		vi.resetModules();
+		const mod = await import("./email.server.js");
+		return mod.sendEmail;
+	}
+
+	function successPoller() {
+		return { pollUntilDone: vi.fn().mockResolvedValue(undefined) };
+	}
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		beginSendMock.mockReset();
+		process.env.AZURE_COMMUNICATION_CONNECTION_STRING = CONNECTION_STRING;
+		vi.useFakeTimers();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+		delete process.env.AZURE_COMMUNICATION_CONNECTION_STRING;
+	});
+
+	it("retries a transient error and succeeds on the next attempt", async () => {
+		beginSendMock
+			.mockRejectedValueOnce(new Error("ECONNRESET"))
+			.mockResolvedValueOnce(successPoller());
+
+		const sendEmail = await freshSendEmail();
+		const promise = sendEmail({ to: "test@example.com", subject: "Test", html: "<p>Hi</p>" });
+		await vi.runAllTimersAsync();
+		const result = await promise;
+
+		expect(result.success).toBe(true);
+		expect(beginSendMock).toHaveBeenCalledTimes(2);
+	});
+
+	it("does NOT retry a suppression error — breaks immediately", async () => {
+		beginSendMock.mockRejectedValue(new Error("EmailDroppedAllRecipientsSuppressed"));
+
+		const sendEmail = await freshSendEmail();
+		const promise = sendEmail({ to: "test@example.com", subject: "Test", html: "<p>Hi</p>" });
+		await vi.runAllTimersAsync();
+		const result = await promise;
+
+		expect(result.success).toBe(false);
+		expect(result.errorKind).toBe("suppressed");
+		expect(beginSendMock).toHaveBeenCalledTimes(1);
+	});
+
+	it("does NOT retry a clock_skew error — breaks immediately", async () => {
+		beginSendMock.mockRejectedValue(new Error(CLOCK_SKEW_MESSAGE));
+
+		const sendEmail = await freshSendEmail();
+		const promise = sendEmail({ to: "test@example.com", subject: "Test", html: "<p>Hi</p>" });
+		await vi.runAllTimersAsync();
+		const result = await promise;
+
+		expect(result.success).toBe(false);
+		expect(result.errorKind).toBe("clock_skew");
+		expect(beginSendMock).toHaveBeenCalledTimes(1);
+	});
+
+	it("exhausts max retries on persistent transient errors and returns transient errorKind", async () => {
+		beginSendMock.mockRejectedValue(new Error("ETIMEDOUT"));
+
+		const sendEmail = await freshSendEmail();
+		const promise = sendEmail({ to: "test@example.com", subject: "Test", html: "<p>Hi</p>" });
+		await vi.runAllTimersAsync();
+		const result = await promise;
+
+		expect(result.success).toBe(false);
+		expect(result.errorKind).toBe("transient");
+		// initial attempt + MAX_RETRIES (2) = 3 calls
+		expect(beginSendMock).toHaveBeenCalledTimes(3);
 	});
 });

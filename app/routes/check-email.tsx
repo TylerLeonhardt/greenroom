@@ -54,10 +54,17 @@ export async function action({ request }: ActionFunctionArgs) {
 		verificationUrl: `${appUrl}/verify-email?token=${token}`,
 	});
 
-	if (!emailResult.success && emailResult.errorKind === "suppressed") {
+	if (!emailResult.success) {
+		if (emailResult.errorKind === "suppressed") {
+			return {
+				error:
+					"We couldn't deliver an email to this address. Your email provider may be blocking our messages. Please try a different email address.",
+			};
+		}
+		// Permanent, clock_skew, or transient failure — don't claim success.
 		return {
 			error:
-				"We couldn't deliver an email to this address. Your email provider may be blocking our messages. Please try a different email address.",
+				"Something went wrong sending your verification email. Please try again in a moment or contact support if the problem persists.",
 		};
 	}
 

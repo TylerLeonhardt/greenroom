@@ -176,7 +176,7 @@ describe("check-email route", () => {
 			expect((result as { error: string }).error).toContain("couldn't deliver");
 		});
 
-		it("returns success on transient email failure (user can retry later)", async () => {
+		it("returns error on transient email failure (does not falsely claim success)", async () => {
 			(sendVerificationEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
 				success: false,
 				error: "ECONNRESET",
@@ -190,9 +190,30 @@ describe("check-email route", () => {
 				body: formData,
 			});
 
-			// For transient failures, we still return success — the user can try again
+			// Any send failure must surface an error — never report success when the
+			// email wasn't delivered.
 			const result = await action({ request, params: {}, context: {} });
-			expect(result).toEqual({ success: true });
+			expect(result).toHaveProperty("error");
+			expect((result as { error: string }).error).toContain("Something went wrong");
+		});
+
+		it("returns error on permanent email failure", async () => {
+			(sendVerificationEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
+				success: false,
+				error: "Invalid email format",
+				errorKind: "permanent",
+			});
+
+			const formData = new FormData();
+			formData.set("email", "user@example.com");
+			const request = new Request("http://localhost/check-email", {
+				method: "POST",
+				body: formData,
+			});
+
+			const result = await action({ request, params: {}, context: {} });
+			expect(result).toHaveProperty("error");
+			expect((result as { error: string }).error).toContain("Something went wrong");
 		});
 	});
 });
