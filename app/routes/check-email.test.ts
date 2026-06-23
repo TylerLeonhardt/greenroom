@@ -8,7 +8,7 @@ vi.mock("~/services/auth.server", () => ({
 
 // Mock email service
 vi.mock("~/services/email.server", () => ({
-	sendVerificationEmail: vi.fn(),
+	sendVerificationEmail: vi.fn().mockResolvedValue({ success: true }),
 }));
 
 // Mock rate limiting
@@ -155,6 +155,44 @@ describe("check-email route", () => {
 			expect(result).toBeInstanceOf(Response);
 			expect((result as Response).status).toBe(302);
 			expect((result as Response).headers.get("Location")).toBe("/signup");
+		});
+
+		it("returns error when verification email is suppressed", async () => {
+			(sendVerificationEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
+				success: false,
+				error: "Email could not be delivered — address is on a suppression list.",
+				errorKind: "suppressed",
+			});
+
+			const formData = new FormData();
+			formData.set("email", "user@example.com");
+			const request = new Request("http://localhost/check-email", {
+				method: "POST",
+				body: formData,
+			});
+
+			const result = await action({ request, params: {}, context: {} });
+			expect(result).toHaveProperty("error");
+			expect((result as { error: string }).error).toContain("couldn't deliver");
+		});
+
+		it("returns success on transient email failure (user can retry later)", async () => {
+			(sendVerificationEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
+				success: false,
+				error: "ECONNRESET",
+				errorKind: "transient",
+			});
+
+			const formData = new FormData();
+			formData.set("email", "user@example.com");
+			const request = new Request("http://localhost/check-email", {
+				method: "POST",
+				body: formData,
+			});
+
+			// For transient failures, we still return success — the user can try again
+			const result = await action({ request, params: {}, context: {} });
+			expect(result).toEqual({ success: true });
 		});
 	});
 });
