@@ -81,11 +81,27 @@ export async function action({ request }: ActionFunctionArgs) {
 		// Generate verification token and send email
 		const appUrl = process.env.APP_URL ?? "http://localhost:5173";
 		const token = await generateVerificationToken(user.id);
-		await sendVerificationEmail({
+		const emailResult = await sendVerificationEmail({
 			email: user.email,
 			name: user.name,
 			verificationUrl: `${appUrl}/verify-email?token=${token}`,
 		});
+
+		if (!emailResult.success) {
+			if (emailResult.errorKind === "suppressed") {
+				return {
+					errors: {
+						form: "We couldn't deliver a verification email to this address. Your email provider may be blocking our messages. Please try signing up with a different email address, or contact support if the problem persists.",
+					},
+				};
+			}
+			// For transient failures, still redirect — the user can resend from check-email
+			logger.warn(
+				{ email: user.email, error: emailResult.error, errorKind: emailResult.errorKind },
+				"Verification email failed during signup, redirecting to check-email for retry",
+			);
+		}
+
 		return redirect(`/check-email?email=${encodeURIComponent(user.email)}`);
 	} catch (error) {
 		if (error instanceof Response) throw error;

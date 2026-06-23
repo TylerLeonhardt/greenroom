@@ -9,7 +9,7 @@ vi.mock("~/services/auth.server", () => ({
 
 // Mock email service
 vi.mock("~/services/email.server", () => ({
-	sendVerificationEmail: vi.fn(),
+	sendVerificationEmail: vi.fn().mockResolvedValue({ success: true }),
 }));
 
 // Mock rate limiting
@@ -244,6 +244,71 @@ describe("signup route", () => {
 			expect(result).toHaveProperty("errors");
 			expect((result as { errors: Record<string, string> }).errors.password).toBe(
 				"Password must be 128 characters or less.",
+			);
+		});
+
+		it("returns error when verification email is suppressed", async () => {
+			const user = {
+				id: "new-user",
+				email: "suppressed@example.com",
+				name: "Suppressed User",
+				profileImage: null,
+			};
+			(registerUser as ReturnType<typeof vi.fn>).mockResolvedValue({ user, isNew: true });
+			(sendVerificationEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
+				success: false,
+				error: "Email could not be delivered — address is on a suppression list.",
+				errorKind: "suppressed",
+			});
+
+			const formData = new FormData();
+			formData.set("name", "Suppressed User");
+			formData.set("email", "suppressed@example.com");
+			formData.set("password", "securepassword");
+			formData.set("confirmPassword", "securepassword");
+
+			const request = new Request("http://localhost/signup", {
+				method: "POST",
+				body: formData,
+			});
+
+			const result = await action({ request, params: {}, context: {} });
+			expect(result).not.toBeInstanceOf(Response);
+			const data = result as { errors: Record<string, string> };
+			expect(data.errors.form).toContain("couldn't deliver");
+			expect(data.errors.form).toContain("different email address");
+		});
+
+		it("redirects to check-email on transient email failure (user can resend)", async () => {
+			const user = {
+				id: "new-user",
+				email: "new@example.com",
+				name: "New User",
+				profileImage: null,
+			};
+			(registerUser as ReturnType<typeof vi.fn>).mockResolvedValue({ user, isNew: true });
+			(sendVerificationEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
+				success: false,
+				error: "ECONNRESET",
+				errorKind: "transient",
+			});
+
+			const formData = new FormData();
+			formData.set("name", "New User");
+			formData.set("email", "new@example.com");
+			formData.set("password", "securepassword");
+			formData.set("confirmPassword", "securepassword");
+
+			const request = new Request("http://localhost/signup", {
+				method: "POST",
+				body: formData,
+			});
+
+			const result = await action({ request, params: {}, context: {} });
+			expect(result).toBeInstanceOf(Response);
+			expect((result as Response).status).toBe(302);
+			expect((result as Response).headers.get("Location")).toBe(
+				"/check-email?email=new%40example.com",
 			);
 		});
 	});

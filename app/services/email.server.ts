@@ -5,6 +5,39 @@ import { logger } from "./logger.server.js";
 import { mergeWithDefaults } from "./notification-utils.server.js";
 import { getTelemetryClient } from "./telemetry.server.js";
 
+// --- Error Classification ---
+
+const CLOCK_SKEW_PATTERN =
+	"time difference between the originating client and the server is greater than the allowed margin";
+
+export type EmailErrorKind = "suppressed" | "clock_skew" | "transient" | "permanent";
+
+export function classifyEmailError(error: unknown): EmailErrorKind {
+	const message = error instanceof Error ? error.message : String(error);
+
+	// Case-insensitive match covers "Suppressed", "suppression list",
+	// "AllRecipientsSuppressed", etc.
+	if (message.toLowerCase().includes("suppress")) {
+		return "suppressed";
+	}
+	if (message.includes(CLOCK_SKEW_PATTERN)) {
+		return "clock_skew";
+	}
+	// Network errors and timeouts are transient
+	if (
+		message.includes("ECONNRESET") ||
+		message.includes("ETIMEDOUT") ||
+		message.includes("ENOTFOUND") ||
+		message.includes("socket hang up") ||
+		message.includes("network") ||
+		message.includes("503") ||
+		message.includes("429")
+	) {
+		return "transient";
+	}
+	return "permanent";
+}
+
 // --- Core Email Sender ---
 
 let emailClient: EmailClient | null = null;
@@ -23,12 +56,19 @@ function getEmailClient(): EmailClient | null {
 	return emailClient;
 }
 
+const MAX_RETRIES = 2;
+const RETRY_BASE_DELAY_MS = 1000;
+
+async function sleep(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function sendEmail(options: {
 	to: string | string[];
 	subject: string;
 	html: string;
 	text?: string;
-}): Promise<{ success: boolean; error?: string }> {
+}): Promise<{ success: boolean; error?: string; errorKind?: EmailErrorKind }> {
 	const client = getEmailClient();
 	const recipients = Array.isArray(options.to) ? options.to : [options.to];
 
@@ -40,59 +80,121 @@ export async function sendEmail(options: {
 		return { success: true };
 	}
 
-	try {
-		const poller = await client.beginSend({
-			senderAddress,
-			content: {
-				subject: options.subject,
-				html: options.html,
-				plainText: options.text,
-			},
-			recipients: {
-				to: recipients.map((email) => ({ address: email })),
-			},
-		});
-		await poller.pollUntilDone();
-		logger.info(
-			{ recipientCount: recipients.length, subject: options.subject },
-			"Email sent successfully",
-		);
+	let lastError: unknown;
 
-		getTelemetryClient()?.trackEvent({
-			name: "EmailSent",
-			properties: {
-				success: "true",
-				recipientCount: String(recipients.length),
-				subject: options.subject,
-			},
-		});
+	for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+		try {
+			const poller = await client.beginSend({
+				senderAddress,
+				content: {
+					subject: options.subject,
+					html: options.html,
+					plainText: options.text,
+				},
+				recipients: {
+					to: recipients.map((email) => ({ address: email })),
+				},
+			});
+			await poller.pollUntilDone();
+			logger.info(
+				{ recipientCount: recipients.length, subject: options.subject },
+				"Email sent successfully",
+			);
 
-		return { success: true };
-	} catch (error) {
-		const message = error instanceof Error ? error.message : "Unknown email error";
-		logger.error({ err: error, to: recipients }, "Failed to send email");
-
-		const telemetry = getTelemetryClient();
-		if (telemetry) {
-			telemetry.trackEvent({
+			getTelemetryClient()?.trackEvent({
 				name: "EmailSent",
 				properties: {
-					success: "false",
+					success: "true",
 					recipientCount: String(recipients.length),
 					subject: options.subject,
 				},
 			});
-			telemetry.trackException({
-				exception: error instanceof Error ? error : new Error(message),
-				properties: {
-					emailSubject: options.subject,
-					recipientCount: String(recipients.length),
-				},
-			});
-		}
 
-		return { success: false, error: message };
+			return { success: true };
+		} catch (error) {
+			lastError = error;
+			const errorKind = classifyEmailError(error);
+
+			// Never retry permanent or suppression errors
+			if (errorKind === "suppressed") {
+				logger.warn(
+					{ to: recipients, subject: options.subject },
+					"Email suppressed — recipient(s) on Azure suppression list",
+				);
+
+				const telemetry = getTelemetryClient();
+				if (telemetry) {
+					telemetry.trackEvent({
+						name: "email.suppressed",
+						properties: {
+							recipients: recipients.join(", "),
+							subject: options.subject,
+						},
+					});
+				}
+
+				return {
+					success: false,
+					error: "Email could not be delivered — address is on a suppression list.",
+					errorKind: "suppressed",
+				};
+			}
+
+			if (errorKind === "permanent") {
+				break; // Don't retry permanent errors
+			}
+
+			// Clock skew is effectively permanent: the drift is typically far larger
+			// than the allowed margin (minutes, not seconds), so retries after 1s/2s
+			// are guaranteed to fail and only add dead latency. Fail fast instead.
+			if (errorKind === "clock_skew") {
+				logger.warn(
+					{ to: recipients, subject: options.subject },
+					"Clock skew detected — server time drift exceeds Azure's allowed margin. " +
+						"Not retrying; fix host clock sync (NTP).",
+				);
+				break;
+			}
+
+			// Transient — retry with exponential backoff
+			if (attempt < MAX_RETRIES) {
+				const delay = RETRY_BASE_DELAY_MS * 2 ** attempt;
+				logger.info(
+					{ attempt: attempt + 1, delay, errorKind, to: recipients },
+					"Retrying email send after transient error",
+				);
+				await sleep(delay);
+			}
+		}
 	}
+
+	// All retries exhausted or permanent error
+	const message = lastError instanceof Error ? lastError.message : "Unknown email error";
+	const errorKind = classifyEmailError(lastError);
+	logger.error({ err: lastError, to: recipients, errorKind }, "Failed to send email");
+
+	const telemetry = getTelemetryClient();
+	if (telemetry) {
+		telemetry.trackEvent({
+			name: "EmailSent",
+			properties: {
+				success: "false",
+				recipientCount: String(recipients.length),
+				subject: options.subject,
+				errorKind,
+			},
+		});
+		telemetry.trackException({
+			exception: lastError instanceof Error ? lastError : new Error(message),
+			properties: {
+				emailSubject: options.subject,
+				recipientCount: String(recipients.length),
+				errorKind,
+			},
+		});
+	}
+
+	return { success: false, error: message, errorKind };
 }
 
 // --- Email Templates ---
@@ -139,7 +241,7 @@ export async function sendVerificationEmail(options: {
 	email: string;
 	name: string;
 	verificationUrl: string;
-}): Promise<void> {
+}): Promise<{ success: boolean; error?: string; errorKind?: EmailErrorKind }> {
 	const html = emailLayout(`
 <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0f172a;">Verify Your Email</h2>
 <p style="color:#475569;margin:0 0 20px;">Hi ${escapeHtml(options.name)}, thanks for signing up! Please verify your email address to get started.</p>
@@ -170,6 +272,8 @@ ${ctaButton(options.verificationUrl, "Verify Email Address")}
 		{ to: options.email, success: result.success, error: result.error },
 		"Verification email result",
 	);
+
+	return result;
 }
 
 export async function sendAvailabilityRequestNotification(options: {
