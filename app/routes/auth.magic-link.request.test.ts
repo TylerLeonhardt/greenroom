@@ -16,6 +16,7 @@ vi.mock("~/services/logger.server", () => ({
 	logger: { error: vi.fn(), warn: vi.fn() },
 }));
 vi.mock("~/services/magic-link.server", () => ({
+	cleanupExpiredMagicLinks: vi.fn().mockResolvedValue(0),
 	issueLoginMagicLink: vi.fn().mockResolvedValue({
 		rawToken: "a".repeat(43),
 		expiresAt: new Date(),
@@ -33,7 +34,7 @@ import { getUserByEmail } from "~/services/auth.server";
 import { performDummyHashComparison } from "~/services/auth-timing.server";
 import { validateCsrfToken } from "~/services/csrf.server";
 import { sendMagicLinkEmail } from "~/services/email.server";
-import { issueLoginMagicLink } from "~/services/magic-link.server";
+import { cleanupExpiredMagicLinks, issueLoginMagicLink } from "~/services/magic-link.server";
 import { checkLoginRateLimit, checkRateLimit } from "~/services/rate-limit.server";
 
 function makeRequest(email = "user@example.com") {
@@ -50,9 +51,20 @@ describe("magic-link request route", () => {
 		(checkLoginRateLimit as ReturnType<typeof vi.fn>).mockReturnValue({ limited: false });
 		(checkRateLimit as ReturnType<typeof vi.fn>).mockReturnValue({ limited: false });
 		(validateCsrfToken as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+		(issueLoginMagicLink as ReturnType<typeof vi.fn>).mockResolvedValue({
+			rawToken: "a".repeat(43),
+			expiresAt: new Date(),
+		});
+		(sendMagicLinkEmail as ReturnType<typeof vi.fn>).mockResolvedValue({ success: true });
+		(cleanupExpiredMagicLinks as ReturnType<typeof vi.fn>).mockResolvedValue(0);
 	});
 
-	it("returns the same generic response for known and unknown emails", async () => {
+	it("returns the same response without awaiting email delivery for known and unknown emails", async () => {
+		let resolveEmail: ((value: { success: true }) => void) | undefined;
+		const pendingEmail = new Promise<{ success: true }>((resolve) => {
+			resolveEmail = resolve;
+		});
+		(sendMagicLinkEmail as ReturnType<typeof vi.fn>).mockReturnValue(pendingEmail);
 		(getUserByEmail as ReturnType<typeof vi.fn>)
 			.mockResolvedValueOnce({
 				id: "user-1",
@@ -75,6 +87,50 @@ describe("magic-link request route", () => {
 		expect(performDummyHashComparison).toHaveBeenCalledTimes(2);
 		expect(issueLoginMagicLink).toHaveBeenCalledTimes(1);
 		expect(sendMagicLinkEmail).toHaveBeenCalledTimes(1);
+		expect(cleanupExpiredMagicLinks).toHaveBeenCalledTimes(1);
+
+		resolveEmail?.({ success: true });
+	});
+
+	it("does not fail the request when expired-token cleanup fails", async () => {
+		(getUserByEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: "user-1",
+			email: "user@example.com",
+			name: "User",
+			emailVerified: true,
+			deletedAt: null,
+		});
+		(cleanupExpiredMagicLinks as ReturnType<typeof vi.fn>).mockRejectedValue(
+			new Error("cleanup failed"),
+		);
+
+		const response = await action({ request: makeRequest(), params: {}, context: {} });
+
+		expect(response).toEqual({ success: true, message: MAGIC_LINK_GENERIC_RESPONSE });
+		await vi.waitFor(() => {
+			expect(cleanupExpiredMagicLinks).toHaveBeenCalledTimes(1);
+		});
+	});
+
+	it("returns without awaiting token persistence", async () => {
+		let resolveIssue: ((value: { rawToken: string; expiresAt: Date }) => void) | undefined;
+		const pendingIssue = new Promise<{ rawToken: string; expiresAt: Date }>((resolve) => {
+			resolveIssue = resolve;
+		});
+		(issueLoginMagicLink as ReturnType<typeof vi.fn>).mockReturnValue(pendingIssue);
+		(getUserByEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: "user-1",
+			email: "user@example.com",
+			name: "User",
+			emailVerified: true,
+			deletedAt: null,
+		});
+
+		const response = await action({ request: makeRequest(), params: {}, context: {} });
+
+		expect(response).toEqual({ success: true, message: MAGIC_LINK_GENERIC_RESPONSE });
+		expect(sendMagicLinkEmail).not.toHaveBeenCalled();
+		resolveIssue?.({ rawToken: "a".repeat(43), expiresAt: new Date() });
 	});
 
 	it("requires CSRF validation", async () => {

@@ -7,7 +7,11 @@ import { performDummyHashComparison } from "~/services/auth-timing.server";
 import { validateCsrfToken } from "~/services/csrf.server";
 import { sendMagicLinkEmail } from "~/services/email.server";
 import { logger } from "~/services/logger.server";
-import { issueLoginMagicLink, validateMagicLinkRedirectPath } from "~/services/magic-link.server";
+import {
+	cleanupExpiredMagicLinks,
+	issueLoginMagicLink,
+	validateMagicLinkRedirectPath,
+} from "~/services/magic-link.server";
 import { checkLoginRateLimit, checkRateLimit, getClientIp } from "~/services/rate-limit.server";
 
 export const meta: MetaFunction = () => {
@@ -65,31 +69,40 @@ export async function action({ request }: ActionFunctionArgs) {
 
 	const user = await getUserByEmail(email);
 	if (user?.emailVerified && !user.deletedAt) {
-		try {
-			const redirectPath = validateMagicLinkRedirectPath(
-				typeof formData.get("redirectTo") === "string"
-					? (formData.get("redirectTo") as string)
-					: null,
-			);
-			const { rawToken } = await issueLoginMagicLink({
-				userId: user.id,
-				redirectPath,
+		const redirectPath = validateMagicLinkRedirectPath(
+			typeof formData.get("redirectTo") === "string"
+				? (formData.get("redirectTo") as string)
+				: null,
+		);
+		void issueLoginMagicLink({
+			userId: user.id,
+			redirectPath,
+		})
+			.then(({ rawToken }) => {
+				const appUrl = process.env.APP_URL ?? "http://localhost:5173";
+				void sendMagicLinkEmail({
+					email: user.email,
+					name: user.name,
+					magicLinkUrl: `${appUrl}/auth/magic-link/consume?token=${encodeURIComponent(rawToken)}`,
+				})
+					.then((emailResult) => {
+						if (!emailResult.success) {
+							logger.warn(
+								{ userId: user.id, errorKind: emailResult.errorKind },
+								"Magic-link email delivery failed",
+							);
+						}
+					})
+					.catch((error) => {
+						logger.warn({ err: error, userId: user.id }, "Magic-link email delivery rejected");
+					});
+				void cleanupExpiredMagicLinks().catch((error) => {
+					logger.warn({ err: error }, "Failed to clean up expired magic links");
+				});
+			})
+			.catch((error) => {
+				logger.error({ err: error, userId: user.id }, "Failed to issue magic-link login");
 			});
-			const appUrl = process.env.APP_URL ?? "http://localhost:5173";
-			const emailResult = await sendMagicLinkEmail({
-				email: user.email,
-				name: user.name,
-				magicLinkUrl: `${appUrl}/auth/magic-link/consume?token=${encodeURIComponent(rawToken)}`,
-			});
-			if (!emailResult.success) {
-				logger.warn(
-					{ userId: user.id, errorKind: emailResult.errorKind },
-					"Magic-link email delivery failed",
-				);
-			}
-		} catch (error) {
-			logger.error({ err: error, userId: user.id }, "Failed to issue magic-link login");
-		}
 	}
 
 	return { success: true, message: MAGIC_LINK_GENERIC_RESPONSE };

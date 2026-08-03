@@ -28,6 +28,7 @@ vi.mock("~/services/logger.server", () => ({
 	logger: { error: vi.fn(), warn: vi.fn() },
 }));
 vi.mock("~/services/magic-link.server", () => ({
+	cleanupExpiredMagicLinks: vi.fn().mockResolvedValue(0),
 	issueLoginMagicLink: vi.fn().mockResolvedValue({
 		rawToken: acceptance.rawToken,
 		expiresAt: new Date(Date.now() + 600_000),
@@ -81,6 +82,9 @@ describe("passwordless magic-link acceptance", () => {
 		});
 		expect(requestResponse).toMatchObject({ success: true });
 
+		await vi.waitFor(() => {
+			expect(sendMagicLinkEmail).toHaveBeenCalledTimes(1);
+		});
 		const sentEmail = (sendMagicLinkEmail as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
 		expect(sentEmail.magicLinkUrl).toContain(acceptance.rawToken);
 
