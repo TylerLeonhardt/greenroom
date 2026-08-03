@@ -25,6 +25,7 @@ export const assignmentStatusEnum = pgEnum("assignment_status", [
 	"confirmed",
 	"declined",
 ]);
+export const magicLinkPurposeEnum = pgEnum("magic_link_purpose", ["login", "verify_email"]);
 
 // Users
 export const users = pgTable(
@@ -48,6 +49,28 @@ export const users = pgTable(
 		index("users_email_idx").on(table.email),
 		index("users_google_id_idx").on(table.googleId),
 		index("users_email_verification_token_idx").on(table.emailVerificationToken),
+	],
+);
+
+// Magic Link Tokens
+export const magicLinkTokens = pgTable(
+	"magic_link_tokens",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		userId: uuid("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+		purpose: magicLinkPurposeEnum("purpose").notNull(),
+		redirectPath: varchar("redirect_path", { length: 500 }).default("/dashboard").notNull(),
+		expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+		consumedAt: timestamp("consumed_at", { withTimezone: true }),
+		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+	},
+	(table) => [
+		uniqueIndex("magic_link_tokens_token_hash_idx").on(table.tokenHash),
+		index("magic_link_tokens_user_created_at_idx").on(table.userId, table.createdAt),
+		index("magic_link_tokens_expires_at_idx").on(table.expiresAt),
 	],
 );
 

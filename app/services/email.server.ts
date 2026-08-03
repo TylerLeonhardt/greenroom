@@ -276,6 +276,26 @@ ${ctaButton(options.verificationUrl, "Verify Email Address")}
 	return result;
 }
 
+export async function sendMagicLinkEmail(options: {
+	email: string;
+	name: string;
+	magicLinkUrl: string;
+}): Promise<{ success: boolean; error?: string; errorKind?: EmailErrorKind }> {
+	const html = emailLayout(`
+<h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0f172a;">Sign in to My Call Time</h2>
+<p style="color:#475569;margin:0 0 20px;">Hi ${escapeHtml(options.name)}, use this secure link to sign in to your account.</p>
+${ctaButton(options.magicLinkUrl, "Sign In to My Call Time")}
+<p style="color:#64748b;font-size:13px;margin:0;">This link expires in 10 minutes and can only be used once. If you didn't request it, you can safely ignore this email.</p>`);
+	const text = `Hi ${options.name},\n\nUse this secure link to sign in to My Call Time:\n\n${options.magicLinkUrl}\n\nThis link expires in 10 minutes and can only be used once. If you didn't request it, you can safely ignore this email.`;
+
+	return sendEmail({
+		to: options.email,
+		subject: "Your sign-in link - My Call Time",
+		html,
+		text,
+	});
+}
+
 export async function sendAvailabilityRequestNotification(options: {
 	requestId: string;
 	requestTitle: string;
