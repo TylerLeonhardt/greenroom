@@ -55,6 +55,7 @@ describe("magic-link consume route", () => {
 		expect((response as Response).status).toBe(302);
 		expect((response as Response).headers.get("Location")).toBe("/auth/magic-link/consume");
 		expect((response as Response).headers.get("Set-Cookie")).toContain("__magic_link_handoff=");
+		expect((response as Response).headers.get("Set-Cookie")).toContain("Path=/auth/magic-link");
 		expect(consumeLoginMagicLink).not.toHaveBeenCalled();
 		expect(createUserSession).not.toHaveBeenCalled();
 	});

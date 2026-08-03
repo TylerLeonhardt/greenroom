@@ -22,11 +22,12 @@ import { createUserSession } from "~/services/session.server";
 
 export const meta: MetaFunction = () => [
 	{ title: "Continue Sign-In — My Call Time" },
-	{ name: "referrer", content: "no-referrer" },
+	{ name: "referrer", content: "same-origin" },
 ];
 
-export const headers: HeadersFunction = () => ({
-	"Referrer-Policy": "no-referrer",
+export const headers: HeadersFunction = ({ actionHeaders, loaderHeaders }) => ({
+	"Referrer-Policy":
+		actionHeaders.get("Referrer-Policy") ?? loaderHeaders.get("Referrer-Policy") ?? "same-origin",
 });
 
 const CONSUME_PATH = "/auth/magic-link/consume";
@@ -50,7 +51,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 	const handoff = await parseMagicLinkHandoff(request);
 	const hasToken = typeof handoff === "string" && isValidMagicLinkToken(handoff);
-	return Response.json({ hasToken }, { headers: { "Referrer-Policy": "no-referrer" } });
+	return Response.json({ hasToken }, { headers: { "Referrer-Policy": "same-origin" } });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -65,7 +66,7 @@ export async function action({ request }: ActionFunctionArgs) {
 			{
 				status: 400,
 				headers: {
-					"Referrer-Policy": "no-referrer",
+					"Referrer-Policy": "same-origin",
 					"Set-Cookie": clearCookie,
 				},
 			},
@@ -79,7 +80,7 @@ export async function action({ request }: ActionFunctionArgs) {
 			{
 				status: 400,
 				headers: {
-					"Referrer-Policy": "no-referrer",
+					"Referrer-Policy": "same-origin",
 					"Set-Cookie": clearCookie,
 				},
 			},
@@ -88,7 +89,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
 	const response = await createUserSession(consumed.userId, consumed.redirectPath);
 	response.headers.append("Set-Cookie", clearCookie);
-	response.headers.set("Referrer-Policy", "no-referrer");
+	response.headers.set("Referrer-Policy", "same-origin");
 	return response;
 }
 

@@ -542,6 +542,27 @@ Any test calling these (directly or indirectly) needs timezone-controlled fixtur
 
 My Call Time has the `playwright-cli` skill (`.github/skills/playwright-cli/`) for browser automation.
 
+### Auth Cookie and Redirect Flows
+
+Mock-only route tests are not sufficient for authentication flows that cross redirects, use
+HttpOnly cookies, or atomically consume database-backed tokens. A production magic-link bug passed
+mocked tests because they manually supplied a cookie to the action and did not exercise the
+browser's cookie path rules for Remix `.data` requests. Mocked database results also cannot catch
+`expires_at` serialization or issue/consume hash mismatches.
+
+For these flows, require a real `GET -> redirect -> POST` test that:
+
+1. Uses the actual `Set-Cookie` header from the GET response.
+2. Follows the redirect with browser-compatible cookie path handling.
+3. Posts to the URL Remix uses in the browser, including its `.data` suffix.
+4. Exercises the real Postgres consume/update and verifies the authenticated redirect.
+5. Includes a Playwright test when the flow is user-facing.
+
+Token service integration tests must issue through the production service, inspect the stored row
+to confirm `expires_at > now()` and the stored hash matches the raw token, then consume that same
+token through the production service. Do not replace this with separately seeded issue and consume
+fixtures, because symmetric serialization and hashing defects would remain invisible.
+
 ### Accessible Locators
 
 - Give controls on the same page unique, user-friendly accessible names. Two fields labelled

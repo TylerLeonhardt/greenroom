@@ -1,7 +1,21 @@
 import { expect, test } from "@playwright/test";
+import { issueTestMagicLink } from "./helpers/seed";
 import { ADMIN_STATE, loadTestData } from "./helpers/test-data";
 
 const td = loadTestData();
+
+function magicLinkUserId(projectName: string): string {
+	switch (projectName) {
+		case "Desktop Chrome":
+			return td.admin.id;
+		case "Mobile Safari":
+			return td.member.id;
+		case "Mobile Chrome":
+			return td.solo.id;
+		default:
+			throw new Error(`No magic-link test user for ${projectName}`);
+	}
+}
 
 test.describe("Signup", () => {
 	test("shows validation errors for empty form", async ({ page }) => {
@@ -42,6 +56,17 @@ test.describe("Signup", () => {
 });
 
 test.describe("Login", () => {
+	test("fresh magic link signs in through the clean continue page", async ({ page }, testInfo) => {
+		const rawToken = await issueTestMagicLink(magicLinkUserId(testInfo.project.name));
+
+		await page.goto(`/auth/magic-link/consume?token=${rawToken}`);
+		await expect(page).toHaveURL(/\/auth\/magic-link\/consume$/);
+		await page.getByRole("button", { name: "Continue to My Call Time" }).click();
+
+		await expect(page).toHaveURL(/\/dashboard/);
+		await expect(page.getByText(/welcome back/i)).toBeVisible();
+	});
+
 	test("login with valid credentials redirects to dashboard", async ({ page }) => {
 		await page.goto("/login");
 		const passwordForm = page.getByRole("form", { name: "Sign in with password" });

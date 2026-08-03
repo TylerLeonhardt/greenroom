@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "../../../src/db/index.js";
 import { magicLinkTokens } from "../../../src/db/schema.js";
@@ -15,11 +15,17 @@ beforeEach(async () => {
 });
 
 describe("magic-link service integration", () => {
-	it("stores only the token hash, never the raw token", async () => {
+	it("issues a future-dated token whose exact hash can be consumed", async () => {
 		const user = await createTestUser();
 		const issued = await issueLoginMagicLink({ userId: user.id });
 		const [stored] = await db
-			.select()
+			.select({
+				tokenHash: magicLinkTokens.tokenHash,
+				purpose: magicLinkTokens.purpose,
+				redirectPath: magicLinkTokens.redirectPath,
+				expiresAt: magicLinkTokens.expiresAt,
+				stillValid: sql<boolean>`${magicLinkTokens.expiresAt} > now()`,
+			})
 			.from(magicLinkTokens)
 			.where(eq(magicLinkTokens.userId, user.id));
 
@@ -27,6 +33,12 @@ describe("magic-link service integration", () => {
 		expect(JSON.stringify(stored)).not.toContain(issued.rawToken);
 		expect(stored?.purpose).toBe("login");
 		expect(stored?.redirectPath).toBe("/dashboard");
+		expect(stored?.expiresAt.getTime()).toBeGreaterThan(Date.now());
+		expect(stored?.stillValid).toBe(true);
+		expect(await consumeLoginMagicLink(hashMagicLinkToken(issued.rawToken))).toEqual({
+			userId: user.id,
+			redirectPath: "/dashboard",
+		});
 	});
 
 	it("allows exactly one of two simultaneous consumes to succeed", async () => {

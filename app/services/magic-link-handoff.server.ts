@@ -6,12 +6,12 @@ if (!sessionSecret) {
 }
 
 const HANDOFF_COOKIE_MAX_AGE_SECONDS = 5 * 60;
-const CONSUME_PATH = "/auth/magic-link/consume";
+const MAGIC_LINK_PATH = "/auth/magic-link";
 
 export const magicLinkHandoffCookie = createCookie("__magic_link_handoff", {
 	httpOnly: true,
 	maxAge: HANDOFF_COOKIE_MAX_AGE_SECONDS,
-	path: CONSUME_PATH,
+	path: MAGIC_LINK_PATH,
 	sameSite: "lax",
 	secrets: [sessionSecret],
 	secure: process.env.NODE_ENV === "production",
