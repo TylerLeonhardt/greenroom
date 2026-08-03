@@ -38,6 +38,24 @@ function getPool(): pg.Pool {
 	});
 }
 
+export async function issueTestMagicLink(userId: string): Promise<string> {
+	const pool = getPool();
+	const rawToken = crypto.randomBytes(32).toString("base64url");
+	const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+
+	try {
+		await pool.query(
+			`INSERT INTO magic_link_tokens
+				(user_id, token_hash, purpose, redirect_path, expires_at)
+			VALUES ($1, $2, 'login', '/dashboard', now() + interval '10 minutes')`,
+			[userId, tokenHash],
+		);
+		return rawToken;
+	} finally {
+		await pool.end();
+	}
+}
+
 /**
  * Generate a unique 8-character invite code from the allowed character set.
  * Uses the same character set as the app (no ambiguous I/O/0/1).

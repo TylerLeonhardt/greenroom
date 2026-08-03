@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const EXPLORER_PORT = 5337;
 const APP_PORT = 5176;
+const APP_BASE_URL = process.env.E2E_BASE_URL || `http://localhost:${APP_PORT}`;
 
 export default defineConfig({
 	testDir: "./e2e",
@@ -16,7 +17,7 @@ export default defineConfig({
 	workers: process.env.CI ? 1 : undefined,
 	reporter: process.env.CI ? [["github"], ["html"]] : "html",
 	use: {
-		baseURL: process.env.E2E_BASE_URL || `http://localhost:${APP_PORT}`,
+		baseURL: APP_BASE_URL,
 		screenshot: "only-on-failure",
 		trace: "on-first-retry",
 	},
@@ -82,6 +83,10 @@ export default defineConfig({
 			port: APP_PORT,
 			reuseExistingServer: !process.env.CI,
 			timeout: 60_000,
+			env: {
+				...process.env,
+				APP_URL: APP_BASE_URL,
+			},
 		},
 		{
 			command: `pnpm vite dev --config vite.explorer.config.ts --port ${EXPLORER_PORT}`,
