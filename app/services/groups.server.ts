@@ -356,6 +356,19 @@ export async function requireGroupAdmin(request: Request, groupId: string) {
 	return user;
 }
 
+export async function groupMemberHasPermission(
+	userId: string,
+	groupId: string,
+	permission: "membersCanCreateRequests" | "membersCanCreateEvents",
+): Promise<boolean> {
+	const role = await getUserRole(userId, groupId);
+	if (role === "admin") return true;
+	if (role !== "member") return false;
+
+	const group = await getGroupById(groupId);
+	return group?.[permission] === true;
+}
+
 /**
  * Require that the user is either a group admin OR a member with the specified permission enabled.
  * Use this instead of requireGroupAdmin for actions that can optionally be opened to members.

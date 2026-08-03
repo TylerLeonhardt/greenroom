@@ -27,7 +27,8 @@ import {
 import {
 	getGroupMembersWithPreferences,
 	getGroupWithMembers,
-	requireGroupAdminOrPermission,
+	groupMemberHasPermission,
+	requireGroupMember,
 } from "~/services/groups.server";
 import { checkEventCreateRateLimit } from "~/services/rate-limit.server";
 import { sendBatchEventsCreatedWebhook } from "~/services/webhook.server";
@@ -43,11 +44,19 @@ export const meta: MetaFunction = () => {
 export async function loader({ request, params }: LoaderFunctionArgs) {
 	const groupId = params.groupId ?? "";
 	const requestId = params.requestId ?? "";
-	const user = await requireGroupAdminOrPermission(request, groupId, "membersCanCreateEvents");
+	const user = await requireGroupMember(request, groupId);
 
 	const availRequest = await getAvailabilityRequest(requestId);
 	if (!availRequest || availRequest.groupId !== groupId) {
 		throw new Response("Not Found", { status: 404 });
+	}
+	const hasGroupPermission = await groupMemberHasPermission(
+		user.id,
+		groupId,
+		"membersCanCreateEvents",
+	);
+	if (!hasGroupPermission && availRequest.createdById !== user.id) {
+		throw new Response("Forbidden", { status: 403 });
 	}
 
 	const url = new URL(request.url);
@@ -70,15 +79,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 export async function action({ request, params }: ActionFunctionArgs) {
 	const groupId = params.groupId ?? "";
 	const requestId = params.requestId ?? "";
-	const user = await requireGroupAdminOrPermission(request, groupId, "membersCanCreateEvents");
-
-	const rateCheck = checkEventCreateRateLimit(user.id);
-	if (rateCheck.limited) {
-		return Response.json(
-			{ error: "You've created too many events today. Please try again later." },
-			{ status: 429, headers: { "Retry-After": String(rateCheck.retryAfter) } },
-		);
-	}
+	const user = await requireGroupMember(request, groupId);
 
 	const formData = await request.formData();
 	await validateCsrfToken(request, formData);
@@ -98,6 +99,22 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	const availRequest = await getAvailabilityRequest(requestId);
 	if (!availRequest || availRequest.groupId !== groupId) {
 		throw new Response("Not Found", { status: 404 });
+	}
+	const hasGroupPermission = await groupMemberHasPermission(
+		user.id,
+		groupId,
+		"membersCanCreateEvents",
+	);
+	if (!hasGroupPermission && availRequest.createdById !== user.id) {
+		throw new Response("Forbidden", { status: 403 });
+	}
+
+	const rateCheck = checkEventCreateRateLimit(user.id);
+	if (rateCheck.limited) {
+		return Response.json(
+			{ error: "You've created too many events today. Please try again later." },
+			{ status: 429, headers: { "Retry-After": String(rateCheck.retryAfter) } },
+		);
 	}
 
 	if (typeof title !== "string" || !title.trim()) {

@@ -30,6 +30,10 @@ setup("seed and authenticate", async ({ page }) => {
 			solo: { id: solo.user.id, email: solo.user.email, name: solo.user.name },
 			group: { id: data.group.id, name: data.group.name, inviteCode: data.group.inviteCode },
 			availabilityRequest: data.availabilityRequest,
+			creatorAvailabilityRequest: data.creatorAvailabilityRequest,
+			eventPermissionGroup: data.eventPermissionGroup,
+			permissionAvailabilityRequest: data.permissionAvailabilityRequest,
+			permissionCreatorAvailabilityRequest: data.permissionCreatorAvailabilityRequest,
 		}),
 	);
 

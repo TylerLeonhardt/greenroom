@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import { ADMIN_STATE, loadTestData, MEMBER_STATE } from "./helpers/test-data";
 
 const td = loadTestData();
@@ -9,8 +9,11 @@ test.describe("Availability Request List", () => {
 	test("shows availability requests for the group", async ({ page }) => {
 		await page.goto(`/groups/${td.group.id}/availability`);
 
-		await expect(page.getByText(td.availabilityRequest.title)).toBeVisible();
-		await expect(page.getByText(/open/i)).toBeVisible();
+		const requestCard = page.getByRole("link", {
+			name: new RegExp(td.availabilityRequest.title),
+		});
+		await expect(requestCard).toBeVisible();
+		await expect(requestCard.getByText("Open", { exact: true })).toBeVisible();
 	});
 });
 
@@ -73,6 +76,65 @@ test.describe("View Availability Results", () => {
 
 		// Should see the "Close Request" button (admin-only)
 		await expect(page.getByRole("button", { name: /close request/i })).toBeVisible();
+	});
+});
+
+test.describe("Create Events From Availability Results", () => {
+	test.use({ storageState: MEMBER_STATE });
+
+	async function createEventsFromResults(
+		page: Page,
+		request: { id: string; dates: string[] },
+		title: string,
+	) {
+		await page.goto(
+			`/groups/${td.eventPermissionGroup.id}/availability/${request.id}?view=results`,
+		);
+
+		await expect(page.getByRole("button", { name: "Select Top 5" })).toBeVisible();
+		await page.goto(
+			`/groups/${td.eventPermissionGroup.id}/availability/${request.id}/batch?dates=${request.dates.slice(0, 5).join(",")}`,
+		);
+
+		await expect(page.getByRole("heading", { name: "Create 5 Events" })).toBeVisible();
+		await page.locator("#title").fill(title);
+		await page.getByRole("button", { name: /Review Events/ }).click();
+		await page.getByRole("button", { name: "Create 5 Events", exact: true }).click();
+
+		await page.waitForURL(/batchSuccess=true/);
+		await expect(page.getByText(/Successfully created/)).toBeVisible();
+		await page.getByRole("link", { name: "View Events" }).click();
+		await expect(page.getByText(title, { exact: true })).toHaveCount(5);
+	}
+
+	test("non-admin creator with membersCanCreateEvents sees the affordance and persists events", async ({
+		page,
+	}, testInfo) => {
+		await createEventsFromResults(
+			page,
+			td.permissionCreatorAvailabilityRequest,
+			`Permission Creator ${testInfo.project.name} Retry ${testInfo.retry}`,
+		);
+	});
+
+	test("non-owner member with membersCanCreateEvents sees the affordance and persists events", async ({
+		page,
+	}, testInfo) => {
+		await createEventsFromResults(
+			page,
+			td.permissionAvailabilityRequest,
+			`Permission Non-Owner ${testInfo.project.name} Retry ${testInfo.retry}`,
+		);
+	});
+
+	test("unrelated non-admin cannot create events from another user's request", async ({ page }) => {
+		const date = td.availabilityRequest.dates[0];
+		const response = await page.goto(
+			`/groups/${td.group.id}/events/new?fromRequest=${td.availabilityRequest.id}&date=${date}`,
+		);
+
+		expect(response?.status()).toBe(403);
+		await expect(page.getByRole("heading", { name: "Error 403" })).toBeVisible();
 	});
 });
 
