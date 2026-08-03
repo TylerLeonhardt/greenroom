@@ -69,6 +69,58 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
 ---
 
+## Resource-Owner Access: Admin OR Creator
+
+Some actions are not purely "admin-only" — the **creator of a resource** should have full
+control over it even if they are only a plain group member. In My Call Time this applies to
+**events**: the person who created an event can edit it, delete it, **and manage its
+participants/roles** — the same as a group admin.
+
+There is no `requireGroupAdmin`-style helper for this because ownership depends on the loaded
+resource (its `createdById`), not just the group. Compute a `canManage` flag once and reuse it
+for the loader, the UI, and every mutating intent in the action:
+
+```typescript
+// loader — decide access after loading the resource
+const admin = await isGroupAdmin(user.id, groupId);
+const data = await getEventWithAssignments(eventId);
+if (!data || data.event.groupId !== groupId) throw new Response("Not Found", { status: 404 });
+
+// Admins AND the creator can manage participants/roles on this event.
+const canManage = admin || data.event.createdById === user.id;
+
+// Only load management data (member list, availability) when the user can manage,
+// so the UI can render the "Add Performers" panel / participant menus.
+if (canManage) {
+  /* load members, availability suggestions, etc. */
+}
+return { ...data, isAdmin: admin, canManage };
+```
+
+```typescript
+// action — gate the mutating intents on canManage, NOT isAdmin
+const admin = await isGroupAdmin(user.id, groupId);
+const canManage = admin || eventData.event.createdById === user.id;
+if (!canManage) throw new Response("Forbidden", { status: 403 });
+// intents: "assign", "change-role", "remove-assignment"
+```
+
+**Gotchas / checklist when you touch owner-scoped actions:**
+
+- The check has **three coupled sites** — the action guard, the loader data-loading branch, and
+  the JSX gate (`{canManage && ...}`). If you only fix the action, the creator gets a 403-free
+  request but never sees the button; if you only fix the UI, they see the button and get a 403.
+  Keep all three in sync.
+- Always keep the group-scope/IDOR check (`resource.groupId === params.groupId`) **before** the
+  ownership check — a creator of an event in another group must still 404.
+- Mirror the existing `canEdit` / `canDelete` pattern (`isAdmin || resource.createdById === userId`)
+  rather than inventing a new rule.
+- Regression bug this prevents: [#205](https://github.com/TylerLeonhardt/greenroom/issues/205) —
+  the event creator couldn't add performers or change roles because the action gated `assign` /
+  `change-role` on `isGroupAdmin` alone.
+
+---
+
 ## Multi-Tenancy Isolation
 
 My Call Time enforces data isolation at the application layer, not through PostgreSQL Row-Level Security. This means every query must explicitly filter by group.

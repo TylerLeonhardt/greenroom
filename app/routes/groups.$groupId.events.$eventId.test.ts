@@ -62,6 +62,7 @@ import {
 	bulkAssignToEvent,
 	deleteEvent,
 	getEventWithAssignments,
+	removeAssignment,
 	updateAssignmentRole,
 	updateAssignmentStatus,
 } from "~/services/events.server";
@@ -71,7 +72,7 @@ import {
 	isGroupAdmin,
 	requireGroupMember,
 } from "~/services/groups.server";
-import { action, computeNoResponseMembers } from "./groups.$groupId.events.$eventId";
+import { action, computeNoResponseMembers, loader } from "./groups.$groupId.events.$eventId";
 
 describe("event detail action — IDOR prevention", () => {
 	beforeEach(() => {
@@ -867,6 +868,202 @@ describe("event detail action — change role", () => {
 				}),
 			);
 		});
+	});
+});
+
+describe("event detail — event creator manages participants", () => {
+	// Non-admin group member who created the event.
+	const CREATOR_ID = "user-1";
+
+	const creatorShowEvent = {
+		id: "event-1",
+		groupId: "g1",
+		title: "Creator's Show",
+		description: null,
+		eventType: "show",
+		startTime: "2026-03-15T19:00:00.000Z",
+		endTime: "2026-03-15T21:00:00.000Z",
+		location: null,
+		createdById: CREATOR_ID,
+		createdFromRequestId: null,
+		callTime: null,
+		timezone: "UTC",
+		createdByName: "Test User",
+	};
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		// The signed-in user is a plain member (NOT an admin) who created the event.
+		(requireGroupMember as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: CREATOR_ID,
+			email: "test@example.com",
+			name: "Test User",
+			profileImage: null,
+			timezone: "UTC",
+		});
+		(isGroupAdmin as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+		(getGroupWithMembers as ReturnType<typeof vi.fn>).mockResolvedValue({
+			group: { id: "g1", name: "Test Group" },
+			members: [
+				{ id: CREATOR_ID, name: "Test User", email: "test@example.com", role: "member" },
+				{ id: "user-2", name: "New Performer", email: "new@example.com", role: "member" },
+			],
+		});
+		(getGroupMembersWithPreferences as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+	});
+
+	// --- Loader: creator sees the management affordances ---
+
+	it("loader exposes management controls (canManage + members) to the non-admin creator", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: creatorShowEvent,
+			assignments: [],
+		});
+
+		const request = new Request("http://localhost/groups/g1/events/event-1");
+		const data = await loader({
+			request,
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		expect(data.isAdmin).toBe(false);
+		expect(data.canManage).toBe(true);
+		// Members must be loaded so the "Add Performers" panel can render.
+		expect(data.members.length).toBeGreaterThan(0);
+	});
+
+	it("loader does NOT expose management controls to a non-admin, non-creator member", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: { ...creatorShowEvent, createdById: "someone-else" },
+			assignments: [],
+		});
+
+		const request = new Request("http://localhost/groups/g1/events/event-1");
+		const data = await loader({
+			request,
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		expect(data.canManage).toBe(false);
+		expect(data.members).toEqual([]);
+	});
+
+	// --- Action: creator can add a performer (acceptance) ---
+
+	it("lets the non-admin creator add a performer to their own event", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: creatorShowEvent,
+			assignments: [],
+		});
+
+		const formData = new FormData();
+		formData.set("intent", "assign");
+		formData.append("userIds", "user-2");
+		formData.set("role", "Performer");
+
+		const request = new Request("http://localhost/groups/g1/events/event-1", {
+			method: "POST",
+			body: formData,
+		});
+
+		const result = await action({
+			request,
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ success: true });
+		expect(bulkAssignToEvent).toHaveBeenCalledWith("event-1", ["user-2"], "Performer");
+	});
+
+	// --- Action: creator can change a role (acceptance) ---
+
+	it("lets the non-admin creator change a participant's role on their own event", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: creatorShowEvent,
+			assignments: [
+				{ userId: "user-2", userName: "New Performer", role: "Viewer", status: "confirmed" },
+			],
+		});
+
+		const formData = new FormData();
+		formData.set("intent", "change-role");
+		formData.set("userId", "user-2");
+		formData.set("newRole", "Performer");
+
+		const request = new Request("http://localhost/groups/g1/events/event-1", {
+			method: "POST",
+			body: formData,
+		});
+
+		const result = await action({
+			request,
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ success: true });
+		expect(updateAssignmentRole).toHaveBeenCalledWith("event-1", "user-2", "Performer");
+	});
+
+	it("lets the non-admin creator remove an assignment on their own event", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: creatorShowEvent,
+			assignments: [
+				{ userId: "user-2", userName: "New Performer", role: "Performer", status: "confirmed" },
+			],
+		});
+
+		const formData = new FormData();
+		formData.set("intent", "remove-assignment");
+		formData.set("userId", "user-2");
+
+		const request = new Request("http://localhost/groups/g1/events/event-1", {
+			method: "POST",
+			body: formData,
+		});
+
+		const result = await action({
+			request,
+			params: { groupId: "g1", eventId: "event-1" },
+			context: {},
+		});
+
+		expect(result).toEqual({ success: true });
+		expect(removeAssignment).toHaveBeenCalledWith("event-1", "user-2");
+	});
+
+	it("still rejects a non-admin, non-creator member from adding a performer (403)", async () => {
+		(getEventWithAssignments as ReturnType<typeof vi.fn>).mockResolvedValue({
+			event: { ...creatorShowEvent, createdById: "someone-else" },
+			assignments: [],
+		});
+
+		const formData = new FormData();
+		formData.set("intent", "assign");
+		formData.append("userIds", "user-2");
+		formData.set("role", "Performer");
+
+		const request = new Request("http://localhost/groups/g1/events/event-1", {
+			method: "POST",
+			body: formData,
+		});
+
+		try {
+			await action({
+				request,
+				params: { groupId: "g1", eventId: "event-1" },
+				context: {},
+			});
+			expect.fail("Should have thrown 403");
+		} catch (response) {
+			expect(response).toBeInstanceOf(Response);
+			expect((response as Response).status).toBe(403);
+		}
+
+		expect(bulkAssignToEvent).not.toHaveBeenCalled();
 	});
 });
 
