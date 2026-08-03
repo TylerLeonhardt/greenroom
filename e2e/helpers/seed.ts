@@ -29,6 +29,9 @@ export interface TestData {
 	group: TestGroup;
 	availabilityRequest: TestAvailabilityRequest;
 	creatorAvailabilityRequest: TestAvailabilityRequest;
+	eventPermissionGroup: TestGroup;
+	permissionAvailabilityRequest: TestAvailabilityRequest;
+	permissionCreatorAvailabilityRequest: TestAvailabilityRequest;
 	cleanup: () => Promise<void>;
 }
 
@@ -87,7 +90,13 @@ export async function seedTestData(prefix: string): Promise<TestData> {
 	const membershipMemberId = crypto.randomUUID();
 	const availabilityRequestId = crypto.randomUUID();
 	const creatorAvailabilityRequestId = crypto.randomUUID();
+	const eventPermissionGroupId = crypto.randomUUID();
+	const eventPermissionMembershipAdminId = crypto.randomUUID();
+	const eventPermissionMembershipMemberId = crypto.randomUUID();
+	const permissionAvailabilityRequestId = crypto.randomUUID();
+	const permissionCreatorAvailabilityRequestId = crypto.randomUUID();
 	const inviteCode = generateTestInviteCode();
+	const eventPermissionInviteCode = generateTestInviteCode();
 
 	const passwordHash = bcrypt.hashSync(TEST_PASSWORD, 10);
 
@@ -110,6 +119,11 @@ export async function seedTestData(prefix: string): Promise<TestData> {
 		name: `Test Group ${prefix}`,
 		inviteCode,
 	};
+	const eventPermissionGroup: TestGroup = {
+		id: eventPermissionGroupId,
+		name: `Event Permission Group ${prefix}`,
+		inviteCode: eventPermissionInviteCode,
+	};
 
 	// Generate future dates for availability request
 	const requestDates: string[] = [];
@@ -126,6 +140,16 @@ export async function seedTestData(prefix: string): Promise<TestData> {
 	const creatorAvailabilityRequest: TestAvailabilityRequest = {
 		id: creatorAvailabilityRequestId,
 		title: `E2E Member Availability ${prefix}`,
+		dates: requestDates,
+	};
+	const permissionAvailabilityRequest: TestAvailabilityRequest = {
+		id: permissionAvailabilityRequestId,
+		title: `E2E Permission Availability ${prefix}`,
+		dates: requestDates,
+	};
+	const permissionCreatorAvailabilityRequest: TestAvailabilityRequest = {
+		id: permissionCreatorAvailabilityRequestId,
+		title: `E2E Permission Member Availability ${prefix}`,
 		dates: requestDates,
 	};
 
@@ -197,6 +221,11 @@ export async function seedTestData(prefix: string): Promise<TestData> {
 		 VALUES ($1, $2, $3, $4, NOW(), NOW())`,
 		[groupId, group.name, inviteCode, adminId],
 	);
+	await pool.query(
+		`INSERT INTO groups (id, name, invite_code, created_by_id, members_can_create_events, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, true, NOW(), NOW())`,
+		[eventPermissionGroupId, eventPermissionGroup.name, eventPermissionInviteCode, adminId],
+	);
 
 	// Insert memberships
 	await pool.query(
@@ -208,6 +237,17 @@ export async function seedTestData(prefix: string): Promise<TestData> {
 		`INSERT INTO group_memberships (id, group_id, user_id, role, joined_at)
 		 VALUES ($1, $2, $3, 'member', NOW())`,
 		[membershipMemberId, groupId, memberId],
+	);
+	await pool.query(
+		`INSERT INTO group_memberships (id, group_id, user_id, role, joined_at)
+		 VALUES ($1, $2, $3, 'admin', NOW()), ($4, $2, $5, 'member', NOW())`,
+		[
+			eventPermissionMembershipAdminId,
+			eventPermissionGroupId,
+			adminId,
+			eventPermissionMembershipMemberId,
+			memberId,
+		],
 	);
 
 	// Insert availability request
@@ -237,6 +277,24 @@ export async function seedTestData(prefix: string): Promise<TestData> {
 			memberId,
 		],
 	);
+	await pool.query(
+		`INSERT INTO availability_requests (id, group_id, title, date_range_start, date_range_end, requested_dates, status, created_by_id, created_at)
+		 VALUES
+			($1, $2, $3, $4, $5, $6, 'open', $7, NOW()),
+			($8, $2, $9, $4, $5, $6, 'open', $10, NOW())`,
+		[
+			permissionAvailabilityRequestId,
+			eventPermissionGroupId,
+			permissionAvailabilityRequest.title,
+			`${requestDates[0]}T00:00:00Z`,
+			`${requestDates[requestDates.length - 1]}T00:00:00Z`,
+			JSON.stringify(requestDates),
+			adminId,
+			permissionCreatorAvailabilityRequestId,
+			permissionCreatorAvailabilityRequest.title,
+			memberId,
+		],
+	);
 
 	// Close the seeding pool — cleanup will create its own if needed
 	await pool.end();
@@ -247,27 +305,49 @@ export async function seedTestData(prefix: string): Promise<TestData> {
 			// Clean up in reverse dependency order
 			await cleanupPool.query(
 				`DELETE FROM availability_responses WHERE request_id IN (
-					SELECT id FROM availability_requests WHERE group_id = $1
+					SELECT id FROM availability_requests WHERE group_id IN ($1, $2)
 				)`,
-				[groupId],
+				[groupId, eventPermissionGroupId],
 			);
 			await cleanupPool.query(
 				`DELETE FROM event_assignments WHERE event_id IN (
-					SELECT id FROM events WHERE group_id = $1
+					SELECT id FROM events WHERE group_id IN ($1, $2)
 				)`,
-				[groupId],
+				[groupId, eventPermissionGroupId],
 			);
-			await cleanupPool.query(`DELETE FROM events WHERE group_id = $1`, [groupId]);
-			await cleanupPool.query(`DELETE FROM availability_requests WHERE group_id = $1`, [groupId]);
-			await cleanupPool.query(`DELETE FROM group_memberships WHERE group_id = $1`, [groupId]);
-			await cleanupPool.query(`DELETE FROM groups WHERE id = $1`, [groupId]);
+			await cleanupPool.query(`DELETE FROM events WHERE group_id IN ($1, $2)`, [
+				groupId,
+				eventPermissionGroupId,
+			]);
+			await cleanupPool.query(`DELETE FROM availability_requests WHERE group_id IN ($1, $2)`, [
+				groupId,
+				eventPermissionGroupId,
+			]);
+			await cleanupPool.query(`DELETE FROM group_memberships WHERE group_id IN ($1, $2)`, [
+				groupId,
+				eventPermissionGroupId,
+			]);
+			await cleanupPool.query(`DELETE FROM groups WHERE id IN ($1, $2)`, [
+				groupId,
+				eventPermissionGroupId,
+			]);
 			await cleanupPool.query(`DELETE FROM users WHERE id IN ($1, $2)`, [adminId, memberId]);
 		} finally {
 			await cleanupPool.end();
 		}
 	};
 
-	return { admin, member, group, availabilityRequest, creatorAvailabilityRequest, cleanup };
+	return {
+		admin,
+		member,
+		group,
+		availabilityRequest,
+		creatorAvailabilityRequest,
+		eventPermissionGroup,
+		permissionAvailabilityRequest,
+		permissionCreatorAvailabilityRequest,
+		cleanup,
+	};
 }
 
 /**

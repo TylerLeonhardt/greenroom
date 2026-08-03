@@ -31,6 +31,9 @@ setup("seed and authenticate", async ({ page }) => {
 			group: { id: data.group.id, name: data.group.name, inviteCode: data.group.inviteCode },
 			availabilityRequest: data.availabilityRequest,
 			creatorAvailabilityRequest: data.creatorAvailabilityRequest,
+			eventPermissionGroup: data.eventPermissionGroup,
+			permissionAvailabilityRequest: data.permissionAvailabilityRequest,
+			permissionCreatorAvailabilityRequest: data.permissionCreatorAvailabilityRequest,
 		}),
 	);
 

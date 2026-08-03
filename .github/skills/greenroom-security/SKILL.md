@@ -113,6 +113,9 @@ if (!canManage) throw new Response("Forbidden", { status: 403 });
 
 **Gotchas / checklist when you touch owner-scoped actions:**
 
+- UI affordance gates must honor the same permission model as the server: **admin OR configured
+  member permission OR resource owner**. Never gate UI on `isAdmin` alone when the server allows
+  more, or authorized members will be silently blocked from actions the server accepts.
 - The check has **three coupled sites** — the action guard, the loader data-loading branch, and
   the JSX gate (`{canManage && ...}`). If you only fix the action, the creator gets a 403-free
   request but never sees the button; if you only fix the UI, they see the button and get a 403.

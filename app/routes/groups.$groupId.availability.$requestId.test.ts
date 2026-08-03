@@ -905,7 +905,7 @@ describe("availability request loader", () => {
 		expect(result.canCreateEventsFromRequest).toBe(true);
 	});
 
-	it("allows admins and configured members to access event creation controls", async () => {
+	it("allows a non-owner member with membersCanCreateEvents to access event creation controls", async () => {
 		(getAvailabilityRequest as ReturnType<typeof vi.fn>).mockResolvedValue({
 			...mockAvailRequest,
 			createdById: "other-user",
@@ -919,6 +919,7 @@ describe("availability request loader", () => {
 		});
 
 		expect(result.canCreateEventsFromRequest).toBe(true);
+		expect(groupMemberHasPermission).toHaveBeenCalledWith("user-1", "g1", "membersCanCreateEvents");
 	});
 
 	it("hides event creation controls from an unrelated member", async () => {

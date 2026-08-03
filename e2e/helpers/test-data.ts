@@ -11,6 +11,9 @@ export interface SharedTestData {
 	group: { id: string; name: string; inviteCode: string };
 	availabilityRequest: { id: string; title: string; dates: string[] };
 	creatorAvailabilityRequest: { id: string; title: string; dates: string[] };
+	eventPermissionGroup: { id: string; name: string; inviteCode: string };
+	permissionAvailabilityRequest: { id: string; title: string; dates: string[] };
+	permissionCreatorAvailabilityRequest: { id: string; title: string; dates: string[] };
 }
 
 /**
@@ -32,6 +35,9 @@ export function loadTestData(): SharedTestData {
 			group: { id: "", name: "", inviteCode: "" },
 			availabilityRequest: { id: "", title: "", dates: [] },
 			creatorAvailabilityRequest: { id: "", title: "", dates: [] },
+			eventPermissionGroup: { id: "", name: "", inviteCode: "" },
+			permissionAvailabilityRequest: { id: "", title: "", dates: [] },
+			permissionCreatorAvailabilityRequest: { id: "", title: "", dates: [] },
 		};
 	}
 	const raw = fs.readFileSync(path, "utf-8");

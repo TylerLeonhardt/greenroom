@@ -323,7 +323,9 @@ export default function AvailabilityRequestDetail() {
 	const [notes, setNotes] = useState<Record<string, string>>(
 		(userNotes as Record<string, string>) ?? {},
 	);
-	const [view, setView] = useState<"respond" | "results">("respond");
+	const [view, setView] = useState<"respond" | "results">(
+		searchParams.get("view") === "results" ? "results" : "respond",
+	);
 	const isClosed = availRequest.status === "closed";
 	const timeRange = formatTimeRange(availRequest.requestedStartTime, availRequest.requestedEndTime);
 	const hasTimeRange = timeRange !== "All day";
