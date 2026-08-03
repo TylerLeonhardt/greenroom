@@ -50,9 +50,10 @@ test.describe("Mobile Forms (unauthenticated)", () => {
 
 		await page.goto("/login");
 
-		await expect(page.getByLabel("Email")).toBeVisible();
-		await expect(page.getByLabel("Password")).toBeVisible();
-		await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+		const passwordForm = page.getByRole("form", { name: "Sign in with password" });
+		await expect(passwordForm.getByLabel("Email", { exact: true })).toBeVisible();
+		await expect(passwordForm.getByLabel("Password", { exact: true })).toBeVisible();
+		await expect(passwordForm.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
 	});
 
 	test("signup form is usable on mobile viewport", async ({ page, isMobile }) => {

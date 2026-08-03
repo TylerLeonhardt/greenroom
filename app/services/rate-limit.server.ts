@@ -57,7 +57,7 @@ export function checkRateLimit(
 	return { limited: false };
 }
 
-function getClientIp(request: Request): string {
+export function getClientIp(request: Request): string {
 	const forwarded = request.headers.get("x-forwarded-for");
 	if (forwarded) {
 		const ip = forwarded.split(",")[0].trim();

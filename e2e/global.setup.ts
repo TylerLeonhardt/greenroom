@@ -43,9 +43,10 @@ setup("seed and authenticate", async ({ page }) => {
 		const p = await context.newPage();
 		await p.goto("/login");
 		await p.waitForLoadState("networkidle");
-		await p.getByLabel("Email").fill(email);
-		await p.getByLabel("Password").fill(password);
-		await p.getByRole("button", { name: "Sign in" }).click();
+		const passwordForm = p.getByRole("form", { name: "Sign in with password" });
+		await passwordForm.getByLabel("Email", { exact: true }).fill(email);
+		await passwordForm.getByLabel("Password", { exact: true }).fill(password);
+		await passwordForm.getByRole("button", { name: "Sign in", exact: true }).click();
 		await p.waitForURL("**/dashboard", { timeout: 15_000 });
 		await context.storageState({ path: statePath });
 		await context.close();

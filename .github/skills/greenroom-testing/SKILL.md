@@ -542,6 +542,15 @@ Any test calling these (directly or indirectly) needs timezone-controlled fixtur
 
 My Call Time has the `playwright-cli` skill (`.github/skills/playwright-cli/`) for browser automation.
 
+### Accessible Locators
+
+- Give controls on the same page unique, user-friendly accessible names. Two fields labelled
+  `Email` are ambiguous to assistive technology and cause Playwright strict-mode failures.
+- Scope locators to a named form or region when a page has multiple workflows, then use an exact
+  label: `page.getByRole("form", { name: "Sign in with password" }).getByLabel("Email", { exact: true })`.
+- Fix ambiguous labels or regions in the UI instead of using `.first()`, `.nth()`, or a broad CSS
+  selector to silence the test.
+
 ### Login Flow
 
 ```typescript
@@ -549,9 +558,10 @@ My Call Time has the `playwright-cli` skill (`.github/skills/playwright-cli/`) f
 await page.goto("http://localhost:5173/login");
 
 // Fill in credentials
-await page.fill('input[name="email"]', "test@example.com");
-await page.fill('input[name="password"]', "password123");
-await page.click('button[type="submit"]');
+const passwordForm = page.getByRole("form", { name: "Sign in with password" });
+await passwordForm.getByLabel("Email", { exact: true }).fill("test@example.com");
+await passwordForm.getByLabel("Password", { exact: true }).fill("password123");
+await passwordForm.getByRole("button", { name: "Sign in", exact: true }).click();
 
 // Verify redirect to dashboard
 await page.waitForURL("**/dashboard");

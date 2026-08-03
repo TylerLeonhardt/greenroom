@@ -6,6 +6,7 @@ import { Authenticator } from "remix-auth";
 import { FormStrategy } from "remix-auth-form";
 import { db } from "../../src/db/index.js";
 import { users } from "../../src/db/schema.js";
+import { comparePasswordWithHash } from "./auth-timing.server.js";
 import { destroyUserSession, getSession, getUserId, sessionStorage } from "./session.server.js";
 import { trackEvent } from "./telemetry.server.js";
 
@@ -33,9 +34,6 @@ function toAuthUser(user: UserRecord): AuthUser {
 
 export const authenticator = new Authenticator<AuthUser>();
 
-// Dummy hash for constant-time comparison when user doesn't exist
-const DUMMY_HASH = "$2a$12$000000000000000000000uGPOBOBOBOBOBOBOBOBOBOBOBOBOBOBO";
-
 authenticator.use(
 	new FormStrategy(async ({ form }) => {
 		const email = form.get("email");
@@ -52,8 +50,7 @@ authenticator.use(
 		const user = await getUserByEmail(email);
 
 		// Always run bcrypt to prevent timing-based user enumeration
-		const hashToCompare = user?.passwordHash ?? DUMMY_HASH;
-		const isValid = await bcrypt.compare(password, hashToCompare);
+		const isValid = await comparePasswordWithHash(password, user?.passwordHash);
 
 		if (!user || !user.passwordHash || !isValid) {
 			throw new Error("Invalid email or password.");

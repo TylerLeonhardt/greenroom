@@ -87,7 +87,10 @@ export default function Login() {
 	const { verified } = useLoaderData<typeof loader>();
 	const actionData = useActionData<typeof action>();
 	const navigation = useNavigation();
-	const isSubmitting = navigation.state === "submitting";
+	const isPasswordSubmitting =
+		navigation.state === "submitting" && navigation.formAction === "/login";
+	const isMagicLinkSubmitting =
+		navigation.state === "submitting" && navigation.formAction === "/auth/magic-link/request";
 
 	return (
 		<div className="flex min-h-[calc(100vh-8rem)] flex-col items-center justify-center py-12">
@@ -117,11 +120,53 @@ export default function Login() {
 							<div className="w-full border-t border-slate-200" />
 						</div>
 						<div className="relative flex justify-center text-sm">
-							<span className="bg-white px-2 text-slate-500">or continue with email</span>
+							<span className="bg-white px-2 text-slate-500">or use a sign-in link</span>
 						</div>
 					</div>
 
-					<Form method="post" className="space-y-4">
+					<Form
+						method="post"
+						action="/auth/magic-link/request"
+						aria-label="Sign in with email link"
+						className="space-y-4"
+					>
+						<CsrfInput />
+						<div>
+							<label
+								htmlFor="magic-link-email"
+								className="block text-sm font-medium text-slate-700"
+							>
+								Email for sign-in link
+							</label>
+							<input
+								id="magic-link-email"
+								name="email"
+								type="email"
+								autoComplete="email"
+								required
+								className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+								placeholder="you@example.com"
+							/>
+						</div>
+						<button
+							type="submit"
+							disabled={isMagicLinkSubmitting}
+							className="w-full rounded-lg border border-emerald-600 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50"
+						>
+							{isMagicLinkSubmitting ? "Sending…" : "Email me a sign-in link"}
+						</button>
+					</Form>
+
+					<div className="relative my-6">
+						<div className="absolute inset-0 flex items-center">
+							<div className="w-full border-t border-slate-200" />
+						</div>
+						<div className="relative flex justify-center text-sm">
+							<span className="bg-white px-2 text-slate-500">or sign in with password</span>
+						</div>
+					</div>
+
+					<Form method="post" aria-label="Sign in with password" className="space-y-4">
 						<CsrfInput />
 						<div>
 							<label htmlFor="email" className="block text-sm font-medium text-slate-700">
@@ -155,10 +200,10 @@ export default function Login() {
 
 						<button
 							type="submit"
-							disabled={isSubmitting}
+							disabled={isPasswordSubmitting}
 							className="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:ring-offset-2 disabled:opacity-50"
 						>
-							{isSubmitting ? "Signing in…" : "Sign in"}
+							{isPasswordSubmitting ? "Signing in…" : "Sign in"}
 						</button>
 					</Form>
 				</div>
