@@ -117,6 +117,8 @@ function NavBar() {
 					onClick={() => setMobileOpen(!mobileOpen)}
 					className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 sm:hidden"
 					aria-label="Toggle menu"
+					aria-controls="mobile-navigation"
+					aria-expanded={mobileOpen}
 				>
 					{mobileOpen ? (
 						<X className="pointer-events-none h-5 w-5" />
@@ -128,7 +130,11 @@ function NavBar() {
 
 			{/* Mobile menu */}
 			{mobileOpen && (
-				<div className="border-t border-slate-100 bg-white px-4 pb-4 pt-2 sm:hidden">
+				<div
+					id="mobile-navigation"
+					aria-label="Mobile navigation"
+					className="border-t border-slate-100 bg-white px-4 pb-4 pt-2 sm:hidden"
+				>
 					{user ? (
 						<div className="space-y-1">
 							<div className="mb-2 flex items-center gap-3 border-b border-slate-100 pb-3">

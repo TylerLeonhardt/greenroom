@@ -24,11 +24,18 @@ test.describe("Hamburger Menu", () => {
 
 		// Open menu
 		await page.getByRole("button", { name: /toggle menu/i }).click();
+		const mobileNavigation = page.locator('[aria-label="Mobile navigation"]');
 
 		// Nav links should be visible in the mobile menu
-		await expect(page.getByRole("link", { name: "Dashboard" })).toBeVisible();
-		await expect(page.getByRole("link", { name: "Groups" })).toBeVisible();
-		await expect(page.getByRole("link", { name: "Settings" })).toBeVisible();
+		await expect(
+			mobileNavigation.getByRole("link", { name: "Dashboard", exact: true }),
+		).toBeVisible();
+		await expect(
+			mobileNavigation.getByRole("link", { name: "Groups", exact: true }),
+		).toBeVisible();
+		await expect(
+			mobileNavigation.getByRole("link", { name: "Settings", exact: true }),
+		).toBeVisible();
 	});
 
 	test("navigation links work from hamburger menu", async ({ page, isMobile }) => {
@@ -39,7 +46,8 @@ test.describe("Hamburger Menu", () => {
 
 		// Open menu and navigate to Groups
 		await page.getByRole("button", { name: /toggle menu/i }).click();
-		await page.getByRole("link", { name: "Groups" }).click();
+		const mobileNavigation = page.locator('[aria-label="Mobile navigation"]');
+		await mobileNavigation.getByRole("link", { name: "Groups", exact: true }).click();
 		await expect(page).toHaveURL(/\/groups/);
 	});
 });
