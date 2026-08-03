@@ -28,6 +28,7 @@ export interface TestData {
 	member: TestUser;
 	group: TestGroup;
 	availabilityRequest: TestAvailabilityRequest;
+	creatorAvailabilityRequest: TestAvailabilityRequest;
 	cleanup: () => Promise<void>;
 }
 
@@ -85,6 +86,7 @@ export async function seedTestData(prefix: string): Promise<TestData> {
 	const membershipAdminId = crypto.randomUUID();
 	const membershipMemberId = crypto.randomUUID();
 	const availabilityRequestId = crypto.randomUUID();
+	const creatorAvailabilityRequestId = crypto.randomUUID();
 	const inviteCode = generateTestInviteCode();
 
 	const passwordHash = bcrypt.hashSync(TEST_PASSWORD, 10);
@@ -119,6 +121,11 @@ export async function seedTestData(prefix: string): Promise<TestData> {
 	const availabilityRequest: TestAvailabilityRequest = {
 		id: availabilityRequestId,
 		title: `E2E Availability ${prefix}`,
+		dates: requestDates,
+	};
+	const creatorAvailabilityRequest: TestAvailabilityRequest = {
+		id: creatorAvailabilityRequestId,
+		title: `E2E Member Availability ${prefix}`,
 		dates: requestDates,
 	};
 
@@ -217,6 +224,19 @@ export async function seedTestData(prefix: string): Promise<TestData> {
 			adminId,
 		],
 	);
+	await pool.query(
+		`INSERT INTO availability_requests (id, group_id, title, date_range_start, date_range_end, requested_dates, status, created_by_id, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, 'open', $7, NOW())`,
+		[
+			creatorAvailabilityRequestId,
+			groupId,
+			creatorAvailabilityRequest.title,
+			`${requestDates[0]}T00:00:00Z`,
+			`${requestDates[requestDates.length - 1]}T00:00:00Z`,
+			JSON.stringify(requestDates),
+			memberId,
+		],
+	);
 
 	// Close the seeding pool — cleanup will create its own if needed
 	await pool.end();
@@ -247,7 +267,7 @@ export async function seedTestData(prefix: string): Promise<TestData> {
 		}
 	};
 
-	return { admin, member, group, availabilityRequest, cleanup };
+	return { admin, member, group, availabilityRequest, creatorAvailabilityRequest, cleanup };
 }
 
 /**

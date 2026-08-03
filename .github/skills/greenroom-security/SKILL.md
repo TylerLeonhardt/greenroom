@@ -76,6 +76,12 @@ control over it even if they are only a plain group member. In My Call Time this
 **events**: the person who created an event can edit it, delete it, **and manage its
 participants/roles** — the same as a group admin.
 
+It also applies when deriving events from an **availability request**. A request creator may
+create single or batch events from that request even when `membersCanCreateEvents` is disabled.
+Load the request, verify `request.groupId === groupId`, then authorize when the user is the request
+creator or `groupMemberHasPermission(..., "membersCanCreateEvents")` returns true. Never persist a
+client-supplied `createdFromRequestId` before that group-scope and ownership check.
+
 There is no `requireGroupAdmin`-style helper for this because ownership depends on the loaded
 resource (its `createdById`), not just the group. Compute a `canManage` flag once and reuse it
 for the loader, the UI, and every mutating intent in the action:

@@ -17,13 +17,14 @@ vi.mock("~/services/auth.server", () => ({
 }));
 
 vi.mock("~/services/groups.server", () => ({
-	requireGroupAdminOrPermission: vi.fn().mockResolvedValue({
+	requireGroupMember: vi.fn().mockResolvedValue({
 		id: "user-1",
 		email: "test@example.com",
 		name: "Test User",
 		profileImage: null,
 		timezone: "America/New_York",
 	}),
+	groupMemberHasPermission: vi.fn().mockResolvedValue(true),
 	getGroupWithMembers: vi.fn().mockResolvedValue({
 		group: { id: "g1", name: "Test Group" },
 		members: [{ id: "user-1", name: "Test User", email: "test@example.com" }],
@@ -36,7 +37,6 @@ vi.mock("~/services/events.server", () => ({
 	bulkAssignToEvent: vi.fn(),
 	autoAssignFromAvailability: vi.fn().mockResolvedValue([]),
 	getAvailabilityForEventDate: vi.fn().mockResolvedValue([]),
-	getAvailabilityRequestGroupId: vi.fn().mockResolvedValue("g1"),
 }));
 
 vi.mock("~/services/availability.server", () => ({
@@ -54,12 +54,13 @@ vi.mock("~/services/csrf.server", () => ({
 }));
 
 import { action } from "~/routes/groups.$groupId.events.new";
+import { getAvailabilityRequest } from "~/services/availability.server";
 import {
 	autoAssignFromAvailability,
 	bulkAssignToEvent,
-	getAvailabilityRequestGroupId,
+	createEvent,
 } from "~/services/events.server";
-import { getGroupWithMembers } from "~/services/groups.server";
+import { getGroupWithMembers, groupMemberHasPermission } from "~/services/groups.server";
 
 function makeRequest(fields: Record<string, string | string[]>) {
 	const formData = new FormData();
@@ -90,6 +91,8 @@ const validEvent = {
 describe("events.new validation", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		vi.mocked(groupMemberHasPermission).mockResolvedValue(true);
+		vi.mocked(getAvailabilityRequest).mockResolvedValue(null);
 	});
 
 	it("returns error when title is empty", async () => {
@@ -187,7 +190,25 @@ describe("events.new validation", () => {
 		expect((result as Response).status).toBe(302);
 	});
 
+	it("rejects an ordinary member from creating an unrelated event", async () => {
+		vi.mocked(groupMemberHasPermission).mockResolvedValue(false);
+
+		await expect(
+			action({
+				request: makeRequest(validEvent),
+				params: { groupId: "g1" },
+				context: {},
+			}),
+		).rejects.toMatchObject({ status: 403 });
+		expect(createEvent).not.toHaveBeenCalled();
+	});
+
 	it("auto-assigns available/maybe members when creating from availability request", async () => {
+		vi.mocked(getAvailabilityRequest).mockResolvedValue({
+			id: "req-1",
+			groupId: "g1",
+			createdById: "user-1",
+		} as never);
 		const result = await action({
 			request: makeRequest({
 				...validEvent,
@@ -215,7 +236,11 @@ describe("events.new validation", () => {
 	it("auto-assigns for all event types when from availability", async () => {
 		for (const eventType of ["rehearsal", "show", "other"]) {
 			vi.clearAllMocks();
-			vi.mocked(getAvailabilityRequestGroupId).mockResolvedValue("g1");
+			vi.mocked(getAvailabilityRequest).mockResolvedValue({
+				id: "req-1",
+				groupId: "g1",
+				createdById: "user-1",
+			} as never);
 			const fields: Record<string, string> = {
 				...validEvent,
 				eventType,
@@ -234,34 +259,76 @@ describe("events.new validation", () => {
 		}
 	});
 
-	it("does not auto-assign when availability request belongs to a different group", async () => {
-		vi.mocked(getAvailabilityRequestGroupId).mockResolvedValue("other-group");
-		const result = await action({
-			request: makeRequest({
-				...validEvent,
-				fromRequestId: "req-from-other-group",
+	it("rejects an availability request that belongs to a different group", async () => {
+		vi.mocked(getAvailabilityRequest).mockResolvedValue({
+			id: "req-from-other-group",
+			groupId: "other-group",
+			createdById: "user-1",
+		} as never);
+
+		await expect(
+			action({
+				request: makeRequest({
+					...validEvent,
+					fromRequestId: "req-from-other-group",
+				}),
+				params: { groupId: "g1" },
+				context: {},
 			}),
-			params: { groupId: "g1" },
-			context: {},
-		});
-		expect(result).toBeInstanceOf(Response);
-		expect((result as Response).status).toBe(302);
-		expect(autoAssignFromAvailability).not.toHaveBeenCalled();
+		).rejects.toMatchObject({ status: 404 });
+		expect(createEvent).not.toHaveBeenCalled();
 	});
 
-	it("does not auto-assign when availability request does not exist", async () => {
-		vi.mocked(getAvailabilityRequestGroupId).mockResolvedValue(null);
-		const result = await action({
-			request: makeRequest({
-				...validEvent,
-				fromRequestId: "nonexistent-req",
+	it("rejects an availability request that does not exist", async () => {
+		await expect(
+			action({
+				request: makeRequest({
+					...validEvent,
+					fromRequestId: "nonexistent-req",
+				}),
+				params: { groupId: "g1" },
+				context: {},
 			}),
+		).rejects.toMatchObject({ status: 404 });
+		expect(createEvent).not.toHaveBeenCalled();
+	});
+
+	it("allows a non-admin creator to create an event from their availability request", async () => {
+		vi.mocked(groupMemberHasPermission).mockResolvedValue(false);
+		vi.mocked(getAvailabilityRequest).mockResolvedValue({
+			id: "req-1",
+			groupId: "g1",
+			createdById: "user-1",
+		} as never);
+
+		const result = await action({
+			request: makeRequest({ ...validEvent, fromRequestId: "req-1" }),
 			params: { groupId: "g1" },
 			context: {},
 		});
+
 		expect(result).toBeInstanceOf(Response);
-		expect((result as Response).status).toBe(302);
-		expect(autoAssignFromAvailability).not.toHaveBeenCalled();
+		expect(createEvent).toHaveBeenCalledWith(
+			expect.objectContaining({ createdById: "user-1", createdFromRequestId: "req-1" }),
+		);
+	});
+
+	it("rejects an unrelated non-admin from creating an event from the request", async () => {
+		vi.mocked(groupMemberHasPermission).mockResolvedValue(false);
+		vi.mocked(getAvailabilityRequest).mockResolvedValue({
+			id: "req-1",
+			groupId: "g1",
+			createdById: "other-user",
+		} as never);
+
+		await expect(
+			action({
+				request: makeRequest({ ...validEvent, fromRequestId: "req-1" }),
+				params: { groupId: "g1" },
+				context: {},
+			}),
+		).rejects.toMatchObject({ status: 403 });
+		expect(createEvent).not.toHaveBeenCalled();
 	});
 
 	it("assigns selected performers with Performer role before auto-assign when creating show from availability", async () => {
@@ -274,7 +341,11 @@ describe("events.new validation", () => {
 			callOrder.push("autoAssignFromAvailability");
 			return [];
 		});
-		vi.mocked(getAvailabilityRequestGroupId).mockResolvedValue("g1");
+		vi.mocked(getAvailabilityRequest).mockResolvedValue({
+			id: "req-1",
+			groupId: "g1",
+			createdById: "user-1",
+		} as never);
 
 		// Mock group with all the performers as members
 		vi.mocked(getGroupWithMembers).mockResolvedValue({

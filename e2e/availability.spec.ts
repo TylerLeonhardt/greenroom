@@ -9,8 +9,11 @@ test.describe("Availability Request List", () => {
 	test("shows availability requests for the group", async ({ page }) => {
 		await page.goto(`/groups/${td.group.id}/availability`);
 
-		await expect(page.getByText(td.availabilityRequest.title)).toBeVisible();
-		await expect(page.getByText(/open/i)).toBeVisible();
+		const requestCard = page.getByRole("link", {
+			name: new RegExp(td.availabilityRequest.title),
+		});
+		await expect(requestCard).toBeVisible();
+		await expect(requestCard.getByText("Open", { exact: true })).toBeVisible();
 	});
 });
 
@@ -73,6 +76,39 @@ test.describe("View Availability Results", () => {
 
 		// Should see the "Close Request" button (admin-only)
 		await expect(page.getByRole("button", { name: /close request/i })).toBeVisible();
+	});
+});
+
+test.describe("Create Events From Owned Availability Request", () => {
+	test.use({ storageState: MEMBER_STATE });
+
+	test("non-admin creator can batch-create events from their request", async ({ page }) => {
+		const ownedRequest = td.creatorAvailabilityRequest;
+		await page.goto(
+			`/groups/${td.group.id}/availability/${ownedRequest.id}/batch?dates=${ownedRequest.dates.join(",")}`,
+		);
+
+		await expect(
+			page.getByRole("heading", { name: `Create ${ownedRequest.dates.length} Events` }),
+		).toBeVisible();
+		await page.locator("#title").fill("Member-Created Rehearsals");
+		await page.getByRole("button", { name: /Review Events/ }).click();
+		await page
+			.getByRole("button", { name: `Create ${ownedRequest.dates.length} Events`, exact: true })
+			.click();
+
+		await page.waitForURL(/batchSuccess=true/);
+		await expect(page.getByText(/Successfully created/)).toBeVisible();
+	});
+
+	test("unrelated non-admin cannot create events from another user's request", async ({ page }) => {
+		const date = td.availabilityRequest.dates[0];
+		const response = await page.goto(
+			`/groups/${td.group.id}/events/new?fromRequest=${td.availabilityRequest.id}&date=${date}`,
+		);
+
+		expect(response?.status()).toBe(403);
+		await expect(page.getByRole("heading", { name: "Error 403" })).toBeVisible();
 	});
 });
 

@@ -41,7 +41,12 @@ import {
 } from "~/services/availability.server";
 import { validateCsrfToken } from "~/services/csrf.server";
 import { sendAvailabilityReminderNotification } from "~/services/email.server";
-import { getGroupById, isGroupAdmin, requireGroupMember } from "~/services/groups.server";
+import {
+	getGroupById,
+	groupMemberHasPermission,
+	isGroupAdmin,
+	requireGroupMember,
+} from "~/services/groups.server";
 import {
 	checkAvailabilityResponseRateLimit,
 	checkReminderRateLimit,
@@ -76,6 +81,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
 	// Fetch reminderSentAt separately — gracefully returns null if migration 0012 hasn't run
 	const reminderSentAt = await getReminderSentAt(requestId);
+	const canCreateEventsFromRequest =
+		availRequest.createdById === user.id ||
+		(await groupMemberHasPermission(user.id, groupId, "membersCanCreateEvents"));
 
 	return {
 		availRequest,
@@ -86,6 +94,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 		user,
 		nonRespondentCount,
 		reminderSentAt,
+		canCreateEventsFromRequest,
 	};
 }
 
@@ -294,6 +303,7 @@ export default function AvailabilityRequestDetail() {
 		user,
 		nonRespondentCount,
 		reminderSentAt,
+		canCreateEventsFromRequest,
 	} = useLoaderData<typeof loader>();
 	const parentData = useRouteLoaderData<typeof groupLayoutLoader>("routes/groups.$groupId");
 	const timezone = parentData?.user?.timezone ?? undefined;
@@ -520,7 +530,7 @@ export default function AvailabilityRequestDetail() {
 							requestId={availRequest.id}
 							timeRange={hasTimeRange ? timeRange : null}
 							timezone={timezone}
-							batchMode={isAdmin}
+							batchMode={canCreateEventsFromRequest}
 							onBatchCreate={(dates) => {
 								navigate(
 									`/groups/${availRequest.groupId}/availability/${availRequest.id}/batch?dates=${dates.join(",")}`,

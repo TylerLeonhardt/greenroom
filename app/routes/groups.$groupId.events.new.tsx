@@ -31,12 +31,12 @@ import {
 	bulkAssignToEvent,
 	createEvent,
 	getAvailabilityForEventDate,
-	getAvailabilityRequestGroupId,
 } from "~/services/events.server";
 import {
 	getGroupMembersWithPreferences,
 	getGroupWithMembers,
-	requireGroupAdminOrPermission,
+	groupMemberHasPermission,
+	requireGroupMember,
 } from "~/services/groups.server";
 import { checkEventCreateRateLimit } from "~/services/rate-limit.server";
 import { sendEventCreatedWebhook } from "~/services/webhook.server";
@@ -48,7 +48,7 @@ export const meta: MetaFunction = () => {
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
 	const groupId = params.groupId ?? "";
-	const user = await requireGroupAdminOrPermission(request, groupId, "membersCanCreateEvents");
+	const user = await requireGroupMember(request, groupId);
 
 	const url = new URL(request.url);
 	const fromRequestId = url.searchParams.get("fromRequest");
@@ -58,12 +58,23 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 	let availabilityData: Array<{ userId: string; userName: string; status: string }> = [];
 	if (fromRequestId) {
 		const req = await getAvailabilityRequest(fromRequestId);
-		if (req && req.groupId === groupId) {
-			fromRequest = { id: req.id, title: req.title };
-			if (prefillDate) {
-				availabilityData = await getAvailabilityForEventDate(fromRequestId, prefillDate);
-			}
+		if (!req || req.groupId !== groupId) {
+			throw new Response("Not Found", { status: 404 });
 		}
+		const hasGroupPermission = await groupMemberHasPermission(
+			user.id,
+			groupId,
+			"membersCanCreateEvents",
+		);
+		if (!hasGroupPermission && req.createdById !== user.id) {
+			throw new Response("Forbidden", { status: 403 });
+		}
+		fromRequest = { id: req.id, title: req.title };
+		if (prefillDate) {
+			availabilityData = await getAvailabilityForEventDate(fromRequestId, prefillDate);
+		}
+	} else if (!(await groupMemberHasPermission(user.id, groupId, "membersCanCreateEvents"))) {
+		throw new Response("Forbidden", { status: 403 });
 	}
 
 	const groupData = await getGroupWithMembers(groupId);
@@ -74,15 +85,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
 export async function action({ request, params }: ActionFunctionArgs) {
 	const groupId = params.groupId ?? "";
-	const user = await requireGroupAdminOrPermission(request, groupId, "membersCanCreateEvents");
-
-	const rateCheck = checkEventCreateRateLimit(user.id);
-	if (rateCheck.limited) {
-		return Response.json(
-			{ error: "You've created too many events today. Please try again later." },
-			{ status: 429, headers: { "Retry-After": String(rateCheck.retryAfter) } },
-		);
-	}
+	const user = await requireGroupMember(request, groupId);
 
 	const formData = await request.formData();
 	await validateCsrfToken(request, formData);
@@ -100,6 +103,33 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	const formTimezone = formData.get("timezone");
 	const timezone =
 		typeof formTimezone === "string" && formTimezone ? formTimezone : (user.timezone ?? undefined);
+
+	let validatedFromRequestId: string | undefined;
+	if (typeof fromRequestId === "string" && fromRequestId) {
+		const availabilityRequest = await getAvailabilityRequest(fromRequestId);
+		if (!availabilityRequest || availabilityRequest.groupId !== groupId) {
+			throw new Response("Not Found", { status: 404 });
+		}
+		const hasGroupPermission = await groupMemberHasPermission(
+			user.id,
+			groupId,
+			"membersCanCreateEvents",
+		);
+		if (!hasGroupPermission && availabilityRequest.createdById !== user.id) {
+			throw new Response("Forbidden", { status: 403 });
+		}
+		validatedFromRequestId = availabilityRequest.id;
+	} else if (!(await groupMemberHasPermission(user.id, groupId, "membersCanCreateEvents"))) {
+		throw new Response("Forbidden", { status: 403 });
+	}
+
+	const rateCheck = checkEventCreateRateLimit(user.id);
+	if (rateCheck.limited) {
+		return Response.json(
+			{ error: "You've created too many events today. Please try again later." },
+			{ status: 429, headers: { "Retry-After": String(rateCheck.retryAfter) } },
+		);
+	}
 
 	if (typeof title !== "string" || !title.trim()) {
 		return { error: "Title is required." };
@@ -145,8 +175,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		endTime: localTimeToUTC(date, endTime, timezone),
 		location: typeof location === "string" ? location.trim() || undefined : undefined,
 		createdById: user.id,
-		createdFromRequestId:
-			typeof fromRequestId === "string" && fromRequestId ? fromRequestId : undefined,
+		createdFromRequestId: validatedFromRequestId,
 		callTime: hasCallTime ? localTimeToUTC(date, callTime.trim(), timezone) : undefined,
 		timezone,
 	});
@@ -170,22 +199,15 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
 	// Auto-assign available/maybe members when creating from an availability request
 	// (onConflictDoNothing skips members already assigned as Performers above)
-	const validFromRequestIdForAssign =
-		typeof fromRequestId === "string" && fromRequestId ? fromRequestId : null;
-	if (validFromRequestIdForAssign && typeof date === "string") {
-		// Validate the availability request belongs to this group (IDOR prevention)
-		const requestGroupId = await getAvailabilityRequestGroupId(validFromRequestIdForAssign);
-		if (requestGroupId === groupId) {
-			await autoAssignFromAvailability(event.id, validFromRequestIdForAssign, date);
-		}
+	if (validatedFromRequestId && typeof date === "string") {
+		await autoAssignFromAvailability(event.id, validatedFromRequestId, date);
 	}
 
 	// Fire-and-forget email notifications
 	const appUrl = process.env.APP_URL ?? "http://localhost:5173";
 	const eventUrl = `${appUrl}/groups/${groupId}/events/${event.id}`;
 	const preferencesUrl = `${appUrl}/groups/${groupId}/notifications`;
-	const validFromRequestId =
-		typeof fromRequestId === "string" && fromRequestId ? fromRequestId : null;
+	const validFromRequestId = validatedFromRequestId ?? null;
 
 	void (async () => {
 		const [groupData, membersWithPrefs] = await Promise.all([

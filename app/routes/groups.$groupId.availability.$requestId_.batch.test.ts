@@ -9,12 +9,13 @@ beforeEach(() => {
 // --- Mocks (before imports) ---
 
 vi.mock("~/services/groups.server", () => ({
-	requireGroupAdminOrPermission: vi.fn().mockResolvedValue({
+	requireGroupMember: vi.fn().mockResolvedValue({
 		id: "user-1",
 		email: "test@test.com",
 		name: "Test User",
 		timezone: "UTC",
 	}),
+	groupMemberHasPermission: vi.fn().mockResolvedValue(true),
 	getGroupWithMembers: vi.fn().mockResolvedValue(null),
 	getGroupMembersWithPreferences: vi.fn().mockResolvedValue([]),
 }));
@@ -65,7 +66,7 @@ import {
 import { getAvailabilityRequest } from "~/services/availability.server";
 import { validateCsrfToken } from "~/services/csrf.server";
 import { createEventsFromAvailability } from "~/services/events.server";
-import { requireGroupAdminOrPermission } from "~/services/groups.server";
+import { groupMemberHasPermission, requireGroupMember } from "~/services/groups.server";
 
 // --- Helpers ---
 
@@ -110,7 +111,9 @@ describe("batch route action", () => {
 			title: "March Schedule",
 			status: "open",
 			requestedDates: ["2026-03-15", "2026-03-16"],
+			createdById: "user-1",
 		});
+		vi.mocked(groupMemberHasPermission).mockResolvedValue(true);
 		(createEventsFromAvailability as ReturnType<typeof vi.fn>).mockResolvedValue([
 			{
 				id: "ev-1",
@@ -125,7 +128,7 @@ describe("batch route action", () => {
 		]);
 	});
 
-	it("requires authentication via requireGroupAdminOrPermission", async () => {
+	it("requires group membership", async () => {
 		const formData = createFormData(validFormData);
 		try {
 			await action(actionArgs(formData));
@@ -133,11 +136,34 @@ describe("batch route action", () => {
 			// redirect expected
 		}
 
-		expect(requireGroupAdminOrPermission).toHaveBeenCalledWith(
-			expect.any(Request),
-			"g1",
-			"membersCanCreateEvents",
+		expect(requireGroupMember).toHaveBeenCalledWith(expect.any(Request), "g1");
+	});
+
+	it("allows a non-admin creator to batch-create events from their request", async () => {
+		vi.mocked(groupMemberHasPermission).mockResolvedValue(false);
+
+		await action(actionArgs(createFormData(validFormData)));
+
+		expect(createEventsFromAvailability).toHaveBeenCalledWith(
+			expect.objectContaining({ requestId: "req-1", createdById: "user-1" }),
 		);
+	});
+
+	it("rejects an unrelated non-admin from batch-creating events", async () => {
+		vi.mocked(groupMemberHasPermission).mockResolvedValue(false);
+		vi.mocked(getAvailabilityRequest).mockResolvedValue({
+			id: "req-1",
+			groupId: "g1",
+			title: "March Schedule",
+			status: "open",
+			requestedDates: ["2026-03-15", "2026-03-16"],
+			createdById: "other-user",
+		} as never);
+
+		await expect(action(actionArgs(createFormData(validFormData)))).rejects.toMatchObject({
+			status: 403,
+		});
+		expect(createEventsFromAvailability).not.toHaveBeenCalled();
 	});
 
 	it("validates CSRF token", async () => {

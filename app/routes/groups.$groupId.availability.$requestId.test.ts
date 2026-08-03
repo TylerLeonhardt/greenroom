@@ -19,6 +19,7 @@ vi.mock("~/services/groups.server", () => ({
 		profileImage: null,
 	}),
 	isGroupAdmin: vi.fn().mockResolvedValue(false),
+	groupMemberHasPermission: vi.fn().mockResolvedValue(false),
 	getGroupById: vi.fn(),
 }));
 
@@ -68,7 +69,12 @@ import {
 	updateReminderSentAt,
 } from "~/services/availability.server";
 import { sendAvailabilityReminderNotification } from "~/services/email.server";
-import { getGroupById, isGroupAdmin, requireGroupMember } from "~/services/groups.server";
+import {
+	getGroupById,
+	groupMemberHasPermission,
+	isGroupAdmin,
+	requireGroupMember,
+} from "~/services/groups.server";
 import { checkReminderRateLimit } from "~/services/rate-limit.server";
 import { sendAvailabilityReminderWebhook } from "~/services/webhook.server";
 
@@ -871,6 +877,7 @@ describe("availability request loader", () => {
 			profileImage: null,
 		});
 		(isGroupAdmin as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+		(groupMemberHasPermission as ReturnType<typeof vi.fn>).mockResolvedValue(false);
 		(getAvailabilityRequest as ReturnType<typeof vi.fn>).mockResolvedValue(mockAvailRequest);
 		(getUserResponse as ReturnType<typeof vi.fn>).mockResolvedValue(null);
 		(getReminderSentAt as ReturnType<typeof vi.fn>).mockResolvedValue(null);
@@ -886,6 +893,47 @@ describe("availability request loader", () => {
 
 		expect(result.availRequest).toEqual(mockAvailRequest);
 		expect(result.reminderSentAt).toBeNull();
+	});
+
+	it("allows the request creator to access event creation controls", async () => {
+		const result = await loader({
+			request: new Request("http://localhost/groups/g1/availability/r1"),
+			params: { groupId: "g1", requestId: "r1" },
+			context: {},
+		});
+
+		expect(result.canCreateEventsFromRequest).toBe(true);
+	});
+
+	it("allows admins and configured members to access event creation controls", async () => {
+		(getAvailabilityRequest as ReturnType<typeof vi.fn>).mockResolvedValue({
+			...mockAvailRequest,
+			createdById: "other-user",
+		});
+		(groupMemberHasPermission as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+
+		const result = await loader({
+			request: new Request("http://localhost/groups/g1/availability/r1"),
+			params: { groupId: "g1", requestId: "r1" },
+			context: {},
+		});
+
+		expect(result.canCreateEventsFromRequest).toBe(true);
+	});
+
+	it("hides event creation controls from an unrelated member", async () => {
+		(getAvailabilityRequest as ReturnType<typeof vi.fn>).mockResolvedValue({
+			...mockAvailRequest,
+			createdById: "other-user",
+		});
+
+		const result = await loader({
+			request: new Request("http://localhost/groups/g1/availability/r1"),
+			params: { groupId: "g1", requestId: "r1" },
+			context: {},
+		});
+
+		expect(result.canCreateEventsFromRequest).toBe(false);
 	});
 
 	it("returns reminderSentAt when available", async () => {
