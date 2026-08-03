@@ -92,6 +92,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 		throw new Response("Not Found", { status: 404 });
 	}
 
+	// Admins and the event's creator can manage participants/roles on this event.
+	const canManage = admin || data.event.createdById === user.id;
+
 	const siblingEvents = await getGroupEventSummaries(groupId, eventId);
 
 	let members: Array<{
@@ -102,7 +105,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 		role: string;
 	}> = [];
 	let availabilityData: Array<{ userId: string; userName: string; status: string }> = [];
-	if (admin) {
+	if (canManage) {
 		const groupData = await getGroupWithMembers(groupId);
 		members = groupData?.members ?? [];
 
@@ -125,6 +128,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 		event: data.event,
 		assignments: data.assignments,
 		isAdmin: admin,
+		canManage,
 		userId: user.id,
 		members,
 		availabilityData,
@@ -195,9 +199,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		return redirect(`/groups/${groupId}/events`);
 	}
 
-	// Admin-only actions
+	// Participant-management actions (assign, change-role, remove-assignment):
+	// allowed for group admins OR the event's creator.
 	const admin = await isGroupAdmin(user.id, groupId);
-	if (!admin) throw new Response("Forbidden", { status: 403 });
+	const canManage = admin || eventData.event.createdById === user.id;
+	if (!canManage) throw new Response("Forbidden", { status: 403 });
 
 	if (intent === "assign") {
 		const userIds = formData.getAll("userIds");
@@ -347,6 +353,7 @@ export default function EventDetail() {
 		event,
 		assignments,
 		isAdmin,
+		canManage,
 		userId,
 		members,
 		availabilityData,
@@ -381,7 +388,7 @@ export default function EventDetail() {
 	const activeViewerCount = viewers.filter((a) => a.status !== "declined").length;
 	const activeOtherCount = otherAssignments.filter((a) => a.status !== "declined").length;
 	const activeCastCount = assignments.filter((a) => a.status !== "declined").length;
-	const canSelfRegister = !myAssignment && !isAdmin;
+	const canSelfRegister = !myAssignment && !canManage;
 	const canDelete = isAdmin || event.createdById === userId;
 	const canEdit = isAdmin || event.createdById === userId;
 	const confirmedCount = assignments.filter((a) => a.status === "confirmed").length;
@@ -534,7 +541,7 @@ export default function EventDetail() {
 								<h3 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
 									<Users className="h-5 w-5 text-purple-500" /> Cast ({activePerformerCount})
 								</h3>
-								{isAdmin && unassignedMembers.length > 0 && (
+								{canManage && unassignedMembers.length > 0 && (
 									<button
 										type="button"
 										onClick={() => setShowAddMembers(!showAddMembers)}
@@ -549,7 +556,7 @@ export default function EventDetail() {
 							{performers.length === 0 ? (
 								<div className="p-6 text-center text-sm text-slate-500">
 									No performers assigned yet.{" "}
-									{isAdmin && (
+									{canManage && (
 										<button
 											type="button"
 											onClick={() => setShowAddMembers(true)}
@@ -572,7 +579,7 @@ export default function EventDetail() {
 													>
 														{statusCfg.label}
 													</span>
-													{isAdmin && (
+													{canManage && (
 														<ParticipantMenu
 															userId={a.userId}
 															currentRole={a.role}
@@ -588,7 +595,7 @@ export default function EventDetail() {
 							)}
 
 							{/* Add Members Panel */}
-							{showAddMembers && isAdmin && (
+							{showAddMembers && canManage && (
 								<div className="border-t border-purple-200 bg-purple-50/50 p-6">
 									<Form
 										method="post"
@@ -703,7 +710,7 @@ export default function EventDetail() {
 					)}
 
 					{/* Notify on role change toggle (admin only) */}
-					{isAdmin && assignments.length > 0 && (
+					{canManage && assignments.length > 0 && (
 						<label className="flex items-center gap-2 text-xs text-slate-500">
 							<input
 								type="checkbox"
@@ -743,7 +750,7 @@ export default function EventDetail() {
 															>
 																{statusCfg.label}
 															</span>
-															{isAdmin && (
+															{canManage && (
 																<ParticipantMenu
 																	userId={a.userId}
 																	currentRole={a.role}
@@ -797,7 +804,7 @@ export default function EventDetail() {
 								<h3 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
 									<Users className="h-5 w-5" /> Cast ({activeCastCount})
 								</h3>
-								{isAdmin && unassignedMembers.length > 0 && (
+								{canManage && unassignedMembers.length > 0 && (
 									<button
 										type="button"
 										onClick={() => setShowAddMembers(!showAddMembers)}
@@ -812,7 +819,7 @@ export default function EventDetail() {
 							{otherAssignments.length === 0 ? (
 								<div className="p-6 text-center text-sm text-slate-500">
 									No one assigned yet.{" "}
-									{isAdmin && (
+									{canManage && (
 										<button
 											type="button"
 											onClick={() => setShowAddMembers(true)}
@@ -830,7 +837,7 @@ export default function EventDetail() {
 											<li key={a.userId} className="flex items-center justify-between px-6 py-3">
 												<div className="flex items-center gap-2">
 													<span className="text-sm font-medium text-slate-900">{a.userName}</span>
-													{!isAdmin && <RoleBadge role={a.role} />}
+													{!canManage && <RoleBadge role={a.role} />}
 												</div>
 												<div className="flex items-center gap-2">
 													<span
@@ -838,7 +845,7 @@ export default function EventDetail() {
 													>
 														{statusCfg.label}
 													</span>
-													{isAdmin && (
+													{canManage && (
 														<ParticipantMenu
 															userId={a.userId}
 															currentRole={a.role}
@@ -854,7 +861,7 @@ export default function EventDetail() {
 							)}
 
 							{/* Add Members Panel (non-show) */}
-							{showAddMembers && isAdmin && (
+							{showAddMembers && canManage && (
 								<div className="border-t border-slate-200 bg-slate-50 p-6">
 									<Form
 										method="post"
@@ -1001,7 +1008,7 @@ export default function EventDetail() {
 										<li key={a.userId} className="flex items-center justify-between px-6 py-3">
 											<div className="flex items-center gap-2">
 												<span className="text-sm font-medium text-slate-900">{a.userName}</span>
-												{!isAdmin && <RoleBadge role={a.role} />}
+												{!canManage && <RoleBadge role={a.role} />}
 											</div>
 											<div className="flex items-center gap-2">
 												<span
@@ -1009,7 +1016,7 @@ export default function EventDetail() {
 												>
 													{statusCfg.label}
 												</span>
-												{isAdmin && (
+												{canManage && (
 													<ParticipantMenu
 														userId={a.userId}
 														currentRole={a.role}
