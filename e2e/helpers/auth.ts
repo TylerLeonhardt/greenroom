@@ -7,8 +7,9 @@ import type { TestUser } from "./seed";
  */
 export async function loginAs(page: Page, user: TestUser): Promise<void> {
 	await page.goto("/login");
-	await page.getByLabel("Email").fill(user.email);
-	await page.getByLabel("Password").fill(user.password);
-	await page.getByRole("button", { name: "Sign in" }).click();
+	const passwordForm = page.getByRole("form", { name: "Sign in with password" });
+	await passwordForm.getByLabel("Email", { exact: true }).fill(user.email);
+	await passwordForm.getByLabel("Password", { exact: true }).fill(user.password);
+	await passwordForm.getByRole("button", { name: "Sign in", exact: true }).click();
 	await page.waitForURL("**/dashboard");
 }

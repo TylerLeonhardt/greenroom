@@ -44,9 +44,10 @@ test.describe("Signup", () => {
 test.describe("Login", () => {
 	test("login with valid credentials redirects to dashboard", async ({ page }) => {
 		await page.goto("/login");
-		await page.getByLabel("Email").fill(td.admin.email);
-		await page.getByLabel("Password").fill("TestPassword123!");
-		await page.getByRole("button", { name: "Sign in" }).click();
+		const passwordForm = page.getByRole("form", { name: "Sign in with password" });
+		await passwordForm.getByLabel("Email", { exact: true }).fill(td.admin.email);
+		await passwordForm.getByLabel("Password", { exact: true }).fill("TestPassword123!");
+		await passwordForm.getByRole("button", { name: "Sign in", exact: true }).click();
 
 		await expect(page).toHaveURL(/\/dashboard/);
 		await expect(page.getByText(/welcome back/i)).toBeVisible();
@@ -54,9 +55,10 @@ test.describe("Login", () => {
 
 	test("login with wrong password shows error", async ({ page }) => {
 		await page.goto("/login");
-		await page.getByLabel("Email").fill(td.admin.email);
-		await page.getByLabel("Password").fill("WrongPassword999!");
-		await page.getByRole("button", { name: "Sign in" }).click();
+		const passwordForm = page.getByRole("form", { name: "Sign in with password" });
+		await passwordForm.getByLabel("Email", { exact: true }).fill(td.admin.email);
+		await passwordForm.getByLabel("Password", { exact: true }).fill("WrongPassword999!");
+		await passwordForm.getByRole("button", { name: "Sign in", exact: true }).click();
 
 		// Should stay on login page and show error
 		await expect(page).toHaveURL(/\/login/);
@@ -67,9 +69,11 @@ test.describe("Login", () => {
 		await page.goto("/login");
 
 		await expect(page.getByText("Welcome back")).toBeVisible();
-		await expect(page.getByLabel("Email")).toBeVisible();
-		await expect(page.getByLabel("Password")).toBeVisible();
-		await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+		await expect(page.getByLabel("Email for sign-in link", { exact: true })).toBeVisible();
+		const passwordForm = page.getByRole("form", { name: "Sign in with password" });
+		await expect(passwordForm.getByLabel("Email", { exact: true })).toBeVisible();
+		await expect(passwordForm.getByLabel("Password", { exact: true })).toBeVisible();
+		await expect(passwordForm.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
 		await expect(page.getByRole("link", { name: /google/i })).toBeVisible();
 	});
 });

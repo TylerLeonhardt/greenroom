@@ -124,14 +124,19 @@ export default function Login() {
 						</div>
 					</div>
 
-					<Form method="post" action="/auth/magic-link/request" className="space-y-4">
+					<Form
+						method="post"
+						action="/auth/magic-link/request"
+						aria-label="Sign in with email link"
+						className="space-y-4"
+					>
 						<CsrfInput />
 						<div>
 							<label
 								htmlFor="magic-link-email"
 								className="block text-sm font-medium text-slate-700"
 							>
-								Email
+								Email for sign-in link
 							</label>
 							<input
 								id="magic-link-email"
@@ -161,7 +166,7 @@ export default function Login() {
 						</div>
 					</div>
 
-					<Form method="post" className="space-y-4">
+					<Form method="post" aria-label="Sign in with password" className="space-y-4">
 						<CsrfInput />
 						<div>
 							<label htmlFor="email" className="block text-sm font-medium text-slate-700">
