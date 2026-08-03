@@ -132,7 +132,6 @@ function NavBar() {
 			{mobileOpen && (
 				<div
 					id="mobile-navigation"
-					aria-label="Mobile navigation"
 					className="border-t border-slate-100 bg-white px-4 pb-4 pt-2 sm:hidden"
 				>
 					{user ? (
