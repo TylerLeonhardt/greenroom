@@ -542,6 +542,65 @@ Any test calling these (directly or indirectly) needs timezone-controlled fixtur
 
 My Call Time has the `playwright-cli` skill (`.github/skills/playwright-cli/`) for browser automation.
 
+### Run the CI App Matrix Before Pushing
+
+Run the same app projects as the `playwright-e2e` CI job:
+
+```bash
+pnpm test:e2e:ci
+```
+
+This executes:
+
+```bash
+CI=1 playwright test --project=setup --project='Desktop Chrome' --project='Mobile Safari' --project='Mobile Chrome'
+```
+
+Do not use bare `playwright test` or a single spec as the final pre-push check. CI runs this
+specific project matrix and excludes the explorer/component projects. A bare local run mixes app
+and explorer projects against one shared seed, which can cascade into false cross-project failures.
+
+### Local Server Hygiene
+
+Playwright starts the app and component explorer on ports 5176 and 5337. An interrupted run can
+leave a server listening; the next run may then serve blank pages during `global.setup.ts`, which
+looks like a setup or login failure.
+
+Check both ports before retrying:
+
+```bash
+lsof -nP -iTCP:5176 -sTCP:LISTEN
+lsof -nP -iTCP:5337 -sTCP:LISTEN
+```
+
+Clear only the specific processes reported by `lsof`, using their numeric PIDs (for example,
+`kill 12345`). Never use `pkill` or `killall`.
+
+Do not run `pnpm run build` concurrently with Playwright. The build can restart or clobber the Vite
+server and cause `ERR_CONNECTION_REFUSED` partway through the suite.
+
+### Shared Seed Limitation
+
+`global.setup.ts` and `seed.ts` create one dataset shared by every app browser project. Tests in an
+earlier project can mutate shared availability requests and make later authenticated pages fail.
+This is a known limitation tracked in
+[#210](https://github.com/TylerLeonhardt/greenroom/issues/210); apparent batch-event or
+authenticated-page retry cascades in the full matrix may be cross-project seed contamination.
+
+### Scope Locators to Visible UI Landmarks
+
+The app renders desktop navigation (`hidden sm:flex`) and mobile navigation (`sm:hidden`) in the
+DOM at the same time. Scope locators to the relevant landmark or container and use `exact: true`:
+
+```typescript
+const mobileNavigation = page.locator("#mobile-navigation");
+await mobileNavigation.getByRole("link", { name: "Groups", exact: true }).click();
+```
+
+Do not use a page-wide `page.getByRole("link", { name: "Groups" })`. That locator matched both the
+desktop and mobile links in the mobile-navigation incident and triggered a Playwright strict-mode
+violation even though only one link was visible at the active viewport.
+
 ### Auth Cookie and Redirect Flows
 
 Mock-only route tests are not sufficient for authentication flows that cross redirects, use

@@ -104,6 +104,10 @@ const user = await requireGroupAdmin(request, groupId);
 
 ## Debugging Approach
 
+Before implementing a fix, reproduce the reported failure and prove which code path causes it
+(for example, confirm the failing gate or line, or show that a new regression test fails before the
+fix and passes after). Do not ship a plausible-but-unverified root cause.
+
 1. **Reproduce** — Get the exact steps and URL
 2. **Identify the route** — Map URL to file: `/groups/abc/events/new` → `app/routes/groups.$groupId.events.new.tsx`
 3. **Check the loader** — Is auth correct? Is data fetching correct?
