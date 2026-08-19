@@ -4,10 +4,16 @@ import {
 	createDefaultHttpClient,
 	type HttpClient,
 	type PipelineRequest,
+	type PipelineResponse,
 } from "@azure/core-rest-pipeline";
+import { logger } from "./logger.server.js";
 
 export const DEFAULT_EMAIL_CLOCK_SKEW_TOLERANCE_SECONDS = 60;
 export const MAX_EMAIL_CLOCK_SKEW_TOLERANCE_SECONDS = 120;
+const CLOCK_SKEW_PATTERN =
+	"time difference between the originating client and the server is greater than the allowed margin";
+const CLOCK_SKEW_RETRY_BASE_DELAY_MS = 100;
+const CLOCK_SKEW_RETRY_JITTER_MS = 200;
 
 export function parseEmailClockSkewToleranceSeconds(value: string | undefined): number {
 	if (value === undefined || value === "") {
@@ -41,39 +47,80 @@ function getAccessKey(connectionString: string): string {
 	throw new Error("AZURE_COMMUNICATION_CONNECTION_STRING is missing AccessKey");
 }
 
-function getRequestBody(request: PipelineRequest): Buffer {
-	if (request.body === undefined || request.body === null) return Buffer.alloc(0);
-	if (typeof request.body === "string") return Buffer.from(request.body);
-	if (request.body instanceof ArrayBuffer) return Buffer.from(request.body);
-	if (ArrayBuffer.isView(request.body)) {
-		return Buffer.from(request.body.buffer, request.body.byteOffset, request.body.byteLength);
-	}
+function getSerializedRequestBody(request: PipelineRequest): string {
+	if (request.body === undefined || request.body === null) return "";
+	if (typeof request.body === "string") return request.body;
+	throw new Error("ACS Email SDK changed its serialized request body type; refusing to re-sign");
+}
 
-	throw new Error("ACS email request body must be a string or byte buffer");
+function assertSdkCredentialPolicyRan(request: PipelineRequest): void {
+	const authorization = request.headers.get("authorization");
+	const sdkDate = request.headers.get("x-ms-date");
+	const sdkContentHash = request.headers.get("x-ms-content-sha256");
+	const sdkHost = request.headers.get("host");
+
+	if (
+		!authorization?.startsWith("HMAC-SHA256 ") ||
+		!sdkDate ||
+		Number.isNaN(Date.parse(sdkDate)) ||
+		!sdkContentHash ||
+		!sdkHost
+	) {
+		throw new Error(
+			"ACS Email SDK credential policy did not run before clock-skew re-signing; " +
+				"review pipeline ordering after the SDK upgrade",
+		);
+	}
 }
 
 function resignRequest(
 	request: PipelineRequest,
 	accessKey: string,
 	toleranceSeconds: number,
+	serverTimeOffsetMs = 0,
 ): void {
-	const signedAt = new Date(Date.now() - toleranceSeconds * 1000).toUTCString();
-	const contentHash = createHash("sha256").update(getRequestBody(request)).digest("base64");
+	assertSdkCredentialPolicyRan(request);
+	const signedAt = new Date(
+		Date.now() + serverTimeOffsetMs - toleranceSeconds * 1000,
+	).toUTCString();
+	const contentHash = createHash("sha256")
+		.update(getSerializedRequestBody(request))
+		.digest("base64");
 	const url = new URL(request.url);
 	const query = url.searchParams.toString();
 	const pathAndQuery = query ? `${url.pathname}?${query}` : url.pathname;
-	const host = request.headers.get("host") ?? url.host;
+	const host = url.host;
 	const stringToSign = `${request.method.toUpperCase()}\n${pathAndQuery}\n${signedAt};${host};${contentHash}`;
 	const signature = createHmac("sha256", Buffer.from(accessKey, "base64"))
 		.update(stringToSign)
 		.digest("base64");
 
+	request.headers.set("host", host);
 	request.headers.set("x-ms-date", signedAt);
 	request.headers.set("x-ms-content-sha256", contentHash);
 	request.headers.set(
 		"Authorization",
 		`HMAC-SHA256 SignedHeaders=x-ms-date;host;x-ms-content-sha256&Signature=${signature}`,
 	);
+}
+
+function isClockSkewResponse(response: PipelineResponse): boolean {
+	return (
+		response.status === 401 &&
+		(response.bodyAsText?.toLowerCase().includes(CLOCK_SKEW_PATTERN) ?? false)
+	);
+}
+
+function getServerTimeOffsetMs(response: PipelineResponse): number | null {
+	const serverDate = response.headers.get("date");
+	if (!serverDate) return null;
+	const serverTimeMs = Date.parse(serverDate);
+	if (Number.isNaN(serverTimeMs)) return null;
+	return serverTimeMs - Date.now();
+}
+
+async function sleep(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export function createSkewTolerantEmailClient(
@@ -95,7 +142,35 @@ export function createSkewTolerantEmailClient(
 	const httpClient: HttpClient = {
 		async sendRequest(request) {
 			resignRequest(request, accessKey, toleranceSeconds);
-			return transport.sendRequest(request);
+			const response = await transport.sendRequest(request);
+			if (!isClockSkewResponse(response)) return response;
+
+			const serverTimeOffsetMs = getServerTimeOffsetMs(response);
+			if (serverTimeOffsetMs === null) {
+				logger.error(
+					{ status: response.status },
+					"ACS clock-skew response had no valid Date header; cannot correct request time",
+				);
+				return response;
+			}
+
+			const delay =
+				CLOCK_SKEW_RETRY_BASE_DELAY_MS + Math.floor(Math.random() * CLOCK_SKEW_RETRY_JITTER_MS);
+			logger.warn(
+				{ delay, serverTimeOffsetMs },
+				"ACS clock skew detected; retrying once with Azure server-time offset",
+			);
+			await sleep(delay);
+
+			resignRequest(request, accessKey, 0, serverTimeOffsetMs);
+			const retryResponse = await transport.sendRequest(request);
+			if (isClockSkewResponse(retryResponse)) {
+				logger.error(
+					{ serverTimeOffsetMs },
+					"ACS rejected the server-time-corrected email request; clock-skew retry exhausted",
+				);
+			}
+			return retryResponse;
 		},
 	};
 

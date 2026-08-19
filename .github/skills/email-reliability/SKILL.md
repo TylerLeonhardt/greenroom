@@ -12,7 +12,8 @@ How My Call Time sends email reliably through **Azure Communication Services (AC
 - Email is sent via the ACS `EmailClient.beginSend()` long-running operation.
 - `sendEmail()` **never throws** — it returns `{ success, error?, errorKind? }`.
 - Failures are classified into one of four kinds: `suppressed`, `clock_skew`, `transient`, `permanent`.
-- Only **transient** errors are retried (exponential backoff). The other three fail fast.
+- **Transient** errors use exponential backoff. Shared-key clock skew gets one server-time-corrected
+  retry in the HTTP transport; unrecoverable clock skew then fails fast.
 - Most callers use **fire-and-forget** (`void sendXNotification(...)`). A few user-facing flows (signup/verification) **must check the result**.
 
 ## Error Classification Taxonomy
@@ -22,7 +23,7 @@ How My Call Time sends email reliably through **Azure Communication Services (AC
 | Kind | What it means | Detection | Retry? |
 |------|---------------|-----------|--------|
 | `suppressed` | The recipient address is on Azure's suppression list (hard bounces, spam complaints, unsubscribes). Azure refuses to deliver. | `message.toLowerCase().includes("suppress")` — covers `Suppressed`, `suppression list`, `AllRecipientsSuppressed`, etc. | **No** — permanent for that address. Surface a user-facing "try a different email" message. |
-| `clock_skew` | The host clock drifted past ACS's allowed margin, so request signing fails. | Message contains `"time difference between the originating client and the server is greater than the allowed margin"`. | **No** — retries use the same host clock. HMAC requests are backdated by a configurable tolerance; larger drift still requires host NTP remediation. |
+| `clock_skew` | The host clock drifted past ACS's real 300-second margin, so request signing fails. | Message contains `"time difference between the originating client and the server is greater than the allowed margin"`. | **Once at the transport layer** — read Azure's response `Date`, compute local-to-server offset, re-sign, and retry. If the header is missing/invalid or the corrected retry fails, fail loudly. |
 | `transient` | Temporary network/throughput failure. | Message contains `ECONNRESET`, `ETIMEDOUT`, `ENOTFOUND`, `socket hang up`, `network`, `503`, or `429`. | **Yes** — retry with exponential backoff. |
 | `permanent` | Anything else (bad payload, auth/config error, malformed address). | Default fall-through. | **No** — retrying won't help. |
 
@@ -41,15 +42,17 @@ for attempt in 0..MAX_RETRIES:
     kind = classifyEmailError(error)
     if kind == "suppressed":  log warn + track "email.suppressed", return { success:false, errorKind:"suppressed" }
     if kind == "permanent":   break (fail fast)
-    if kind == "clock_skew":  log warn (clock skew specific), break (fail fast)
+    if kind == "clock_skew":  transport recovery already failed; log and break
     // transient only:
     if attempt < MAX_RETRIES: sleep(RETRY_BASE_DELAY_MS * 2**attempt) and retry
 // after loop: log error, track EmailSent(success:false) + exception, return { success:false, errorKind }
 ```
 
 - `RETRY_BASE_DELAY_MS = 1000`, so transient backoff is **1s then 2s**.
-- Only `transient` errors fall through to the backoff/sleep. `suppressed`, `clock_skew`, and `permanent` break (or return) immediately — **don't waste latency retrying errors that can't recover**.
-- The clock-skew log is intentionally specific ("Not retrying; fix host clock sync (NTP)") so it's easy to spot in monitoring.
+- Only `transient` errors fall through to this outer backoff/sleep. `suppressed`, unrecovered
+  `clock_skew`, and `permanent` break (or return) immediately.
+- Clock-skew recovery happens below this loop, where the raw Azure response `Date` header is
+  available. It is capped at one corrected retry with bounded jitter.
 
 ## Clock-Skew Tolerance
 
@@ -57,8 +60,26 @@ ACS connection strings use shared-key HMAC authentication. The Azure SDK creates
 from the host clock and includes it in the signature. `app/services/acs-email-auth.server.ts`
 backdates that header by `EMAIL_CLOCK_SKEW_TOLERANCE_SECONDS` and re-signs the final serialized
 request at the HTTP transport boundary. The default is 60 seconds and the maximum is 120 seconds.
-This protects against a slightly fast host without weakening signature validation or exceeding a
-short, bounded tolerance.
+That fixed backdate only protects against a slightly fast host: it cannot repair multi-minute drift
+and makes a slow clock worse.
+
+On a real ACS `AuthenticationFailed` clock-skew response, the transport reads Azure's authoritative
+`Date` response header, computes `server time - local time`, re-signs the already serialized request
+with that offset, and retries once after bounded jitter. This handles arbitrary positive or negative
+drift while preventing retry loops. A missing/invalid `Date` or a rejected corrected request is
+logged as an error and returned to the normal failure path. Host NTP synchronization remains
+recommended defense-in-depth.
+
+The wrapper asserts that the SDK's shared-key credential policy already populated its HMAC headers
+before re-signing. This fails loudly if an SDK upgrade changes policy ordering. It also requires the
+Email SDK's serialized JSON string body so hashing cannot diverge between byte and `.toString()`
+representations, and canonicalizes `host` from `URL.host` to avoid duplicated explicit ports.
+
+Token-based ACS authentication would remove shared-key request signing entirely, but it is not
+enabled in this change: the deployed Container App configuration does not define a managed identity
+or the required ACS Email Sender RBAC assignment. Enabling it in application code first would replace
+a working credential with one that cannot send. Shared-key remains the configured path until identity
+and RBAC are provisioned together.
 
 ## Fire-and-Forget vs. Checked Result
 
@@ -141,7 +162,9 @@ beginSendMock
   .mockResolvedValueOnce({ pollUntilDone: vi.fn().mockResolvedValue(undefined) });
 ```
 
-See `app/services/email.server.test.ts` for the full set: transient-succeeds-on-retry, suppression-breaks-immediately, clock_skew-breaks-immediately, and max-retries-exhausted.
+See `app/services/acs-email-auth.server.test.ts` for real `EmailClient` pipeline tests covering the
+300-second ACS window, fast and slow seven-minute drift recovery, independent HMAC verification,
+and the SDK-policy ordering guard. `app/services/email.server.test.ts` covers the outer retry loop.
 
 ## Key Files
 

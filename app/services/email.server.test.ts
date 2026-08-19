@@ -207,7 +207,7 @@ describe("sendEmail retry loop (Azure SDK mocked)", () => {
 		expect(beginSendMock).toHaveBeenCalledTimes(1);
 	});
 
-	it("does NOT retry a clock_skew error — breaks immediately", async () => {
+	it("fails loudly when no transport-level Azure Date is available for clock-skew recovery", async () => {
 		beginSendMock.mockRejectedValue(new Error(CLOCK_SKEW_MESSAGE));
 
 		const sendEmail = await freshSendEmail();

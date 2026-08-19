@@ -65,8 +65,8 @@ function getEmailClient(): EmailClient | null {
 			);
 		}
 		emailClient = createSkewTolerantEmailClient(connectionString, toleranceSeconds);
-	} catch (error) {
-		logger.error({ err: error }, "Invalid Azure email configuration — email disabled");
+	} catch {
+		logger.error("Invalid Azure email configuration — email disabled");
 		return null;
 	}
 	return emailClient;
@@ -160,14 +160,11 @@ export async function sendEmail(options: {
 				break; // Don't retry permanent errors
 			}
 
-			// Clock skew is effectively permanent: the drift is typically far larger
-			// than the allowed margin (minutes, not seconds), so retries after 1s/2s
-			// are guaranteed to fail and only add dead latency. Fail fast instead.
 			if (errorKind === "clock_skew") {
 				logger.warn(
 					{ to: recipients, subject: options.subject },
-					"Clock skew detected — server time drift exceeds Azure's allowed margin. " +
-						"Not retrying; fix host clock sync (NTP).",
+					"ACS clock-skew recovery failed because Azure returned no usable server time " +
+						"or rejected the corrected retry; verify host clock sync (NTP).",
 				);
 				break;
 			}
