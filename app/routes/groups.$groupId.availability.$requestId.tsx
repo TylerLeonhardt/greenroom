@@ -28,6 +28,7 @@ import { DangerZone } from "~/components/danger-zone";
 import { ResultsHeatmap } from "~/components/results-heatmap";
 import { formatDateMedium, formatTimeRange } from "~/lib/date-utils";
 import {
+	AvailabilityResponseSubmissionError,
 	closeAvailabilityRequest,
 	deleteAvailabilityRequest,
 	getAggregatedResults,
@@ -108,6 +109,19 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	const intent = formData.get("intent");
 
 	if (intent === "respond") {
+		const availRequest = await getAvailabilityRequest(requestId);
+		if (!availRequest || availRequest.groupId !== groupId) {
+			throw new Response("Not Found", { status: 404 });
+		}
+		if (
+			availRequest.status !== "open" ||
+			(availRequest.expiresAt && new Date(availRequest.expiresAt).getTime() <= Date.now())
+		) {
+			throw new Response("Availability request is no longer accepting responses.", {
+				status: 410,
+			});
+		}
+
 		const rateCheck = checkAvailabilityResponseRateLimit(user.id);
 		if (rateCheck.limited) {
 			return Response.json(
@@ -131,9 +145,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		// Validate response values are valid availability statuses
 		const validStatuses: Set<string> = new Set(["available", "maybe", "not_available"]);
 		const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+		const requestedDates = new Set(availRequest.requestedDates);
 		for (const [key, value] of Object.entries(responses)) {
 			if (!datePattern.test(key) || !validStatuses.has(value)) {
 				return { error: "Invalid response data." };
+			}
+			if (!requestedDates.has(key)) {
+				return Response.json({ error: "Invalid response data." }, { status: 400 });
 			}
 		}
 
@@ -155,6 +173,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
 				if (!datePattern.test(key) || typeof value !== "string") {
 					return { error: "Invalid notes data." };
 				}
+				if (!requestedDates.has(key)) {
+					return Response.json({ error: "Invalid notes data." }, { status: 400 });
+				}
 				if (value.length > 200) {
 					return { error: "Notes must be 200 characters or less per day." };
 				}
@@ -170,12 +191,28 @@ export async function action({ request, params }: ActionFunctionArgs) {
 			notes = filteredNotes;
 		}
 
-		await submitAvailabilityResponse({
-			requestId,
-			userId: user.id,
-			responses,
-			notes,
-		});
+		try {
+			await submitAvailabilityResponse({
+				groupId,
+				requestId,
+				userId: user.id,
+				responses,
+				notes,
+			});
+		} catch (error) {
+			if (error instanceof AvailabilityResponseSubmissionError) {
+				if (error.code === "not_found") {
+					throw new Response("Not Found", { status: 404 });
+				}
+				if (error.code === "unavailable") {
+					throw new Response("Availability request is no longer accepting responses.", {
+						status: 410,
+					});
+				}
+				return Response.json({ error: "Invalid response data." }, { status: 400 });
+			}
+			throw error;
+		}
 		trackEvent("AvailabilityResponseSubmitted", {
 			userId: user.id,
 			requestId,

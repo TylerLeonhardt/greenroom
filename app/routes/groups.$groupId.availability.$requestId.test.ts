@@ -35,6 +35,11 @@ vi.mock("~/services/webhook.server", () => ({
 
 // Mock availability service
 vi.mock("~/services/availability.server", () => ({
+	AvailabilityResponseSubmissionError: class AvailabilityResponseSubmissionError extends Error {
+		constructor(public readonly code: string) {
+			super(code);
+		}
+	},
 	getAvailabilityRequest: vi.fn(),
 	getUserResponse: vi.fn().mockResolvedValue(null),
 	getAggregatedResults: vi.fn(),
@@ -88,6 +93,13 @@ describe("availability response action", () => {
 			profileImage: null,
 		});
 		(isGroupAdmin as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+		(getAvailabilityRequest as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: "r1",
+			groupId: "g1",
+			status: "open",
+			expiresAt: null,
+			requestedDates: ["2025-03-15", "2025-03-16"],
+		});
 	});
 
 	it("saves availability response with valid data", async () => {
@@ -108,6 +120,7 @@ describe("availability response action", () => {
 		});
 
 		expect(submitAvailabilityResponse).toHaveBeenCalledWith({
+			groupId: "g1",
 			requestId: "r1",
 			userId: "user-1",
 			responses,
@@ -280,6 +293,13 @@ describe("availability notes validation", () => {
 			name: "Test User",
 			profileImage: null,
 		});
+		(getAvailabilityRequest as ReturnType<typeof vi.fn>).mockResolvedValue({
+			id: "r1",
+			groupId: "g1",
+			status: "open",
+			expiresAt: null,
+			requestedDates: ["2025-03-15", "2025-03-16"],
+		});
 	});
 
 	function makeFormData(responses: Record<string, string>, notes?: string): FormData {
@@ -311,6 +331,7 @@ describe("availability notes validation", () => {
 		});
 
 		expect(submitAvailabilityResponse).toHaveBeenCalledWith({
+			groupId: "g1",
 			requestId: "r1",
 			userId: "user-1",
 			responses,
@@ -360,6 +381,7 @@ describe("availability notes validation", () => {
 		});
 
 		expect(submitAvailabilityResponse).toHaveBeenCalledWith({
+			groupId: "g1",
 			requestId: "r1",
 			userId: "user-1",
 			responses,
@@ -380,6 +402,7 @@ describe("availability notes validation", () => {
 		});
 
 		expect(submitAvailabilityResponse).toHaveBeenCalledWith({
+			groupId: "g1",
 			requestId: "r1",
 			userId: "user-1",
 			responses,
@@ -400,6 +423,7 @@ describe("availability notes validation", () => {
 		});
 
 		expect(submitAvailabilityResponse).toHaveBeenCalledWith({
+			groupId: "g1",
 			requestId: "r1",
 			userId: "user-1",
 			responses,
@@ -477,6 +501,7 @@ describe("availability notes validation", () => {
 		});
 
 		expect(submitAvailabilityResponse).toHaveBeenCalledWith({
+			groupId: "g1",
 			requestId: "r1",
 			userId: "user-1",
 			responses,
