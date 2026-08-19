@@ -93,8 +93,8 @@ export async function action({ request }: ActionFunctionArgs) {
 							);
 						}
 					})
-					.catch((error) => {
-						logger.warn({ err: error, userId: user.id }, "Magic-link email delivery rejected");
+					.catch(() => {
+						logger.warn({ userId: user.id }, "Magic-link email delivery rejected");
 					});
 				void cleanupExpiredMagicLinks().catch((error) => {
 					logger.warn({ err: error }, "Failed to clean up expired magic links");

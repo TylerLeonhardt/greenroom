@@ -90,7 +90,7 @@ export async function sendEmail(options: {
 
 	if (!client) {
 		logger.info(
-			{ recipientCount: recipients.length, subject: options.subject },
+			{ recipientCount: recipients.length },
 			"Azure Communication Services not configured — email not sent",
 		);
 		return { success: true };
@@ -112,17 +112,13 @@ export async function sendEmail(options: {
 				},
 			});
 			await poller.pollUntilDone();
-			logger.info(
-				{ recipientCount: recipients.length, subject: options.subject },
-				"Email sent successfully",
-			);
+			logger.info({ recipientCount: recipients.length }, "Email sent successfully");
 
 			getTelemetryClient()?.trackEvent({
 				name: "EmailSent",
 				properties: {
 					success: "true",
 					recipientCount: String(recipients.length),
-					subject: options.subject,
 				},
 			});
 
@@ -134,7 +130,7 @@ export async function sendEmail(options: {
 			// Never retry permanent or suppression errors
 			if (errorKind === "suppressed") {
 				logger.warn(
-					{ to: recipients, subject: options.subject },
+					{ recipientCount: recipients.length, errorKind },
 					"Email suppressed — recipient(s) on Azure suppression list",
 				);
 
@@ -143,8 +139,7 @@ export async function sendEmail(options: {
 					telemetry.trackEvent({
 						name: "email.suppressed",
 						properties: {
-							recipients: recipients.join(", "),
-							subject: options.subject,
+							recipientCount: String(recipients.length),
 						},
 					});
 				}
@@ -162,7 +157,7 @@ export async function sendEmail(options: {
 
 			if (errorKind === "clock_skew") {
 				logger.warn(
-					{ to: recipients, subject: options.subject },
+					{ recipientCount: recipients.length, errorKind },
 					"ACS clock-skew recovery failed because Azure returned no usable server time " +
 						"or rejected the corrected retry; verify host clock sync (NTP).",
 				);
@@ -173,7 +168,7 @@ export async function sendEmail(options: {
 			if (attempt < MAX_RETRIES) {
 				const delay = RETRY_BASE_DELAY_MS * 2 ** attempt;
 				logger.info(
-					{ attempt: attempt + 1, delay, errorKind, to: recipients },
+					{ attempt: attempt + 1, delay, errorKind, recipientCount: recipients.length },
 					"Retrying email send after transient error",
 				);
 				await sleep(delay);
@@ -182,9 +177,8 @@ export async function sendEmail(options: {
 	}
 
 	// All retries exhausted or permanent error
-	const message = lastError instanceof Error ? lastError.message : "Unknown email error";
 	const errorKind = classifyEmailError(lastError);
-	logger.error({ err: lastError, to: recipients, errorKind }, "Failed to send email");
+	logger.error({ recipientCount: recipients.length, errorKind }, "Failed to send email");
 
 	const telemetry = getTelemetryClient();
 	if (telemetry) {
@@ -193,21 +187,19 @@ export async function sendEmail(options: {
 			properties: {
 				success: "false",
 				recipientCount: String(recipients.length),
-				subject: options.subject,
 				errorKind,
 			},
 		});
 		telemetry.trackException({
-			exception: lastError instanceof Error ? lastError : new Error(message),
+			exception: new Error(`Email send failed (${errorKind})`),
 			properties: {
-				emailSubject: options.subject,
 				recipientCount: String(recipients.length),
 				errorKind,
 			},
 		});
 	}
 
-	return { success: false, error: message, errorKind };
+	return { success: false, error: `Email send failed (${errorKind})`, errorKind };
 }
 
 // --- Email Templates ---
@@ -265,11 +257,8 @@ ${ctaButton(options.verificationUrl, "Verify Email Address")}
 
 	logger.info(
 		{
-			to: options.email,
-			subject,
+			recipientCount: 1,
 			htmlLength: html.length,
-			htmlPreview: html.substring(0, 200),
-			verificationUrl: options.verificationUrl,
 		},
 		"About to send verification email",
 	);
@@ -282,7 +271,7 @@ ${ctaButton(options.verificationUrl, "Verify Email Address")}
 	});
 
 	logger.info(
-		{ to: options.email, success: result.success, error: result.error },
+		{ recipientCount: 1, success: result.success, errorKind: result.errorKind },
 		"Verification email result",
 	);
 

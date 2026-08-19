@@ -97,7 +97,7 @@ export async function action({ request }: ActionFunctionArgs) {
 			}
 			// For transient failures, still redirect — the user can resend from check-email
 			logger.warn(
-				{ email: user.email, error: emailResult.error, errorKind: emailResult.errorKind },
+				{ userId: user.id, errorKind: emailResult.errorKind },
 				"Verification email failed during signup, redirecting to check-email for retry",
 			);
 		}
@@ -105,7 +105,10 @@ export async function action({ request }: ActionFunctionArgs) {
 		return redirect(`/check-email?email=${encodeURIComponent(user.email)}`);
 	} catch (error) {
 		if (error instanceof Response) throw error;
-		logger.error({ err: error, route: "signup" }, "Registration failed");
+		logger.error(
+			{ errorName: error instanceof Error ? error.name : "Unknown", route: "signup" },
+			"Registration failed",
+		);
 		return { errors: { form: "Registration failed. Please try again." } };
 	}
 }

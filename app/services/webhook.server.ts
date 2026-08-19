@@ -60,11 +60,8 @@ export async function sendWebhook(
 			type: meta?.type ?? "unknown",
 		});
 		return true;
-	} catch (error) {
-		logger.error(
-			{ err: error, groupId: meta?.groupId, type: meta?.type },
-			"Failed to send Discord webhook",
-		);
+	} catch {
+		logger.error({ groupId: meta?.groupId, type: meta?.type }, "Failed to send Discord webhook");
 		return false;
 	}
 }
