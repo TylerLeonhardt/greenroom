@@ -119,10 +119,10 @@ Email telemetry flows through `getTelemetryClient()` (Application Insights; null
 
 | Signal | When | Notes |
 |--------|------|-------|
-| `EmailSent` (custom event, `success: "true"`) | Successful send | Includes `recipientCount`, `subject`. |
-| `EmailSent` (custom event, `success: "false"`) | After retries exhausted / fail-fast | Includes `errorKind` so you can pivot by failure type. |
-| `email.suppressed` (custom event) | A suppression failure | Includes `recipients`, `subject` — used to identify addresses to clean up. |
-| `trackException` | Final failure | The underlying error plus `emailSubject`, `recipientCount`, `errorKind`. |
+| `EmailSent` (custom event, `success: "true"`) | Successful send | Includes only `recipientCount`; recipient addresses and subjects are never recorded. |
+| `EmailSent` (custom event, `success: "false"`) | After retries exhausted / fail-fast | Includes `recipientCount` and `errorKind` so you can pivot by failure type. |
+| `email.suppressed` (custom event) | A suppression failure | Includes only `recipientCount`; recipient addresses are never recorded. |
+| `trackException` | Final failure | Uses a sanitized error containing the failure kind, plus `recipientCount` and `errorKind`; raw provider errors are never recorded. |
 
 Querying suppression rate in App Insights:
 

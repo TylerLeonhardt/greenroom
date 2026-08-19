@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { beginSendMock } = vi.hoisted(() => ({ beginSendMock: vi.fn() }));
+const { beginSendMock, getTelemetryClientMock, trackEventMock, trackExceptionMock } = vi.hoisted(
+	() => ({
+		beginSendMock: vi.fn(),
+		getTelemetryClientMock: vi.fn(),
+		trackEventMock: vi.fn(),
+		trackExceptionMock: vi.fn(),
+	}),
+);
 
 // Must mock before importing the module under test
 vi.mock("@azure/communication-email", () => ({
@@ -18,7 +25,7 @@ vi.mock("./logger.server.js", () => ({
 }));
 
 vi.mock("./telemetry.server.js", () => ({
-	getTelemetryClient: vi.fn().mockReturnValue(null),
+	getTelemetryClient: getTelemetryClientMock,
 }));
 
 vi.mock("./notification-utils.server.js", () => ({
@@ -69,6 +76,7 @@ describe("classifyEmailError", () => {
 describe("sendEmail", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		getTelemetryClientMock.mockReturnValue(null);
 		// Reset the emailClient singleton by clearing the module-level state
 		// We'll control behavior by setting/unsetting the env var
 		delete process.env.AZURE_COMMUNICATION_CONNECTION_STRING;
@@ -106,6 +114,7 @@ describe("sendEmail", () => {
 describe("sendVerificationEmail", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		getTelemetryClientMock.mockReturnValue(null);
 		delete process.env.AZURE_COMMUNICATION_CONNECTION_STRING;
 	});
 
@@ -119,11 +128,11 @@ describe("sendVerificationEmail", () => {
 		// Without ACS configured, sendEmail returns success
 		expect(result.success).toBe(true);
 		expect(logger.info).toHaveBeenCalledWith(
-			expect.objectContaining({ to: "test@example.com" }),
+			expect.objectContaining({ recipientCount: 1 }),
 			"About to send verification email",
 		);
 		expect(logger.info).toHaveBeenCalledWith(
-			expect.objectContaining({ to: "test@example.com", success: true }),
+			expect.objectContaining({ recipientCount: 1, success: true }),
 			"Verification email result",
 		);
 	});
@@ -132,6 +141,7 @@ describe("sendVerificationEmail", () => {
 describe("sendEmail with telemetry", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		getTelemetryClientMock.mockReturnValue(null);
 		delete process.env.AZURE_COMMUNICATION_CONNECTION_STRING;
 	});
 
@@ -164,6 +174,20 @@ describe("sendEmail retry loop (Azure SDK mocked)", () => {
 		return mod.sendEmail;
 	}
 
+	async function freshSendVerificationEmail() {
+		vi.resetModules();
+		const mod = await import("./email.server.js");
+		const { logger: freshLogger } = await import("./logger.server.js");
+		return { sendVerificationEmail: mod.sendVerificationEmail, freshLogger };
+	}
+
+	async function freshSendMagicLinkEmail() {
+		vi.resetModules();
+		const mod = await import("./email.server.js");
+		const { logger: freshLogger } = await import("./logger.server.js");
+		return { sendMagicLinkEmail: mod.sendMagicLinkEmail, freshLogger };
+	}
+
 	function successPoller() {
 		return { pollUntilDone: vi.fn().mockResolvedValue(undefined) };
 	}
@@ -171,6 +195,7 @@ describe("sendEmail retry loop (Azure SDK mocked)", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		beginSendMock.mockReset();
+		getTelemetryClientMock.mockReturnValue(null);
 		process.env.AZURE_COMMUNICATION_CONNECTION_STRING = CONNECTION_STRING;
 		vi.useFakeTimers();
 	});
@@ -192,6 +217,106 @@ describe("sendEmail retry loop (Azure SDK mocked)", () => {
 
 		expect(result.success).toBe(true);
 		expect(beginSendMock).toHaveBeenCalledTimes(2);
+	});
+
+	it("does not log verification credentials or recipient PII on the send path", async () => {
+		const rawToken = "live-verification-token-224";
+		const verificationUrl = `https://mycalltime.app/verify-email?token=${rawToken}`;
+		const recipient = "private-recipient@example.com";
+		beginSendMock.mockResolvedValueOnce(successPoller());
+		getTelemetryClientMock.mockReturnValue({
+			trackEvent: trackEventMock,
+			trackException: trackExceptionMock,
+		});
+
+		const { sendVerificationEmail, freshLogger } = await freshSendVerificationEmail();
+		const result = await sendVerificationEmail({
+			email: recipient,
+			name: "Private User",
+			verificationUrl,
+		});
+
+		expect(result.success).toBe(true);
+		expect(beginSendMock).toHaveBeenCalledTimes(1);
+
+		const capturedLogs = JSON.stringify([
+			...vi.mocked(freshLogger.info).mock.calls,
+			...vi.mocked(freshLogger.warn).mock.calls,
+			...vi.mocked(freshLogger.error).mock.calls,
+		]);
+		expect(capturedLogs).not.toContain(rawToken);
+		expect(capturedLogs).not.toContain(verificationUrl);
+		expect(capturedLogs).not.toContain(recipient);
+
+		const capturedTelemetry = JSON.stringify([
+			...trackEventMock.mock.calls,
+			...trackExceptionMock.mock.calls,
+		]);
+		expect(capturedTelemetry).not.toContain(rawToken);
+		expect(capturedTelemetry).not.toContain(verificationUrl);
+		expect(capturedTelemetry).not.toContain(recipient);
+	});
+
+	it("does not expose sensitive values when the verification send fails", async () => {
+		const rawToken = "failed-verification-token-224";
+		const verificationUrl = `https://mycalltime.app/verify-email?token=${rawToken}`;
+		const recipient = "failed-recipient@example.com";
+		const providerError = `Provider rejected ${recipient} for ${verificationUrl}`;
+		beginSendMock.mockRejectedValueOnce(new Error(providerError));
+		getTelemetryClientMock.mockReturnValue({
+			trackEvent: trackEventMock,
+			trackException: trackExceptionMock,
+		});
+
+		const { sendVerificationEmail, freshLogger } = await freshSendVerificationEmail();
+		const result = await sendVerificationEmail({
+			email: recipient,
+			name: "Private User",
+			verificationUrl,
+		});
+
+		expect(result).toEqual({
+			success: false,
+			error: "Email send failed (permanent)",
+			errorKind: "permanent",
+		});
+
+		const capturedDiagnostics = JSON.stringify([
+			...vi.mocked(freshLogger.info).mock.calls,
+			...vi.mocked(freshLogger.warn).mock.calls,
+			...vi.mocked(freshLogger.error).mock.calls,
+			...trackEventMock.mock.calls,
+			...trackExceptionMock.mock.calls,
+		]);
+		expect(capturedDiagnostics).not.toContain(rawToken);
+		expect(capturedDiagnostics).not.toContain(verificationUrl);
+		expect(capturedDiagnostics).not.toContain(recipient);
+		expect(capturedDiagnostics).not.toContain(providerError);
+	});
+
+	it("does not log magic-link credentials or recipient PII", async () => {
+		const rawToken = "live-magic-link-token-224";
+		const magicLinkUrl = `https://mycalltime.app/auth/magic-link/consume?token=${rawToken}`;
+		const recipient = "magic-link-recipient@example.com";
+		beginSendMock.mockResolvedValueOnce(successPoller());
+
+		const { sendMagicLinkEmail, freshLogger } = await freshSendMagicLinkEmail();
+		const result = await sendMagicLinkEmail({
+			email: recipient,
+			name: "Magic User",
+			magicLinkUrl,
+		});
+
+		expect(result.success).toBe(true);
+
+		const capturedLogs = JSON.stringify([
+			...vi.mocked(freshLogger.info).mock.calls,
+			...vi.mocked(freshLogger.warn).mock.calls,
+			...vi.mocked(freshLogger.error).mock.calls,
+		]);
+		expect(capturedLogs).not.toContain(rawToken);
+		expect(capturedLogs).not.toContain(magicLinkUrl);
+		expect(capturedLogs).not.toContain(recipient);
 	});
 
 	it("does NOT retry a suppression error — breaks immediately", async () => {

@@ -49,7 +49,9 @@ export function checkRateLimit(
 	if (entry.timestamps.length >= maxRequests) {
 		const oldestInWindow = entry.timestamps[0];
 		const retryAfter = Math.ceil((oldestInWindow + windowMs - now) / 1000);
-		logger.warn({ key, maxRequests, windowMs }, "Rate limit exceeded");
+		const separatorIndex = key.indexOf(":");
+		const scope = separatorIndex === -1 ? "custom" : key.slice(0, separatorIndex);
+		logger.warn({ scope, maxRequests, windowMs }, "Rate limit exceeded");
 		return { limited: true, retryAfter };
 	}
 
