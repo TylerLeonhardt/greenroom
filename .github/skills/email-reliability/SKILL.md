@@ -130,7 +130,7 @@ Querying suppression rate in App Insights:
 customEvents
 | where name == "email.suppressed"
 | where timestamp > ago(7d)
-| summarize count() by tostring(customDimensions.recipients)
+| summarize count() by tostring(customDimensions.recipientCount)
 ```
 
 Querying failures by kind:
