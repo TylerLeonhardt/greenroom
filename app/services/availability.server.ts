@@ -13,6 +13,15 @@ import { trackEvent } from "./telemetry.server.js";
 
 type AvailabilityRequest = typeof availabilityRequests.$inferSelect;
 
+export type AvailabilityResponseSubmissionErrorCode = "not_found" | "unavailable" | "invalid_dates";
+
+export class AvailabilityResponseSubmissionError extends Error {
+	constructor(public readonly code: AvailabilityResponseSubmissionErrorCode) {
+		super(`Availability response rejected: ${code}`);
+		this.name = "AvailabilityResponseSubmissionError";
+	}
+}
+
 // --- Create ---
 
 export async function createAvailabilityRequest(data: {
@@ -153,31 +162,70 @@ export async function getAvailabilityRequest(
 // --- Submit / Update Response (upsert) ---
 
 export async function submitAvailabilityResponse(data: {
+	groupId: string;
 	requestId: string;
 	userId: string;
 	responses: Record<string, "available" | "maybe" | "not_available">;
 	notes?: Record<string, string>;
 }): Promise<void> {
-	const now = new Date();
-	const notes = data.notes ?? {};
-	await db
-		.insert(availabilityResponses)
-		.values({
-			requestId: data.requestId,
-			userId: data.userId,
-			responses: data.responses,
-			notes,
-			respondedAt: now,
-			updatedAt: now,
-		})
-		.onConflictDoUpdate({
-			target: [availabilityResponses.requestId, availabilityResponses.userId],
-			set: {
+	await db.transaction(async (tx) => {
+		const [target] = await tx
+			.select({
+				requestedDates: availabilityRequests.requestedDates,
+				status: availabilityRequests.status,
+				expiresAt: availabilityRequests.expiresAt,
+			})
+			.from(availabilityRequests)
+			.innerJoin(
+				groupMemberships,
+				and(
+					eq(groupMemberships.groupId, availabilityRequests.groupId),
+					eq(groupMemberships.userId, data.userId),
+				),
+			)
+			.where(
+				and(
+					eq(availabilityRequests.id, data.requestId),
+					eq(availabilityRequests.groupId, data.groupId),
+				),
+			)
+			.for("update");
+
+		if (!target) {
+			throw new AvailabilityResponseSubmissionError("not_found");
+		}
+
+		const now = new Date();
+		if (target.status !== "open" || (target.expiresAt && target.expiresAt <= now)) {
+			throw new AvailabilityResponseSubmissionError("unavailable");
+		}
+
+		const requestedDates = new Set(target.requestedDates);
+		const notes = data.notes ?? {};
+		const submittedDates = [...Object.keys(data.responses), ...Object.keys(notes)];
+		if (submittedDates.some((date) => !requestedDates.has(date))) {
+			throw new AvailabilityResponseSubmissionError("invalid_dates");
+		}
+
+		await tx
+			.insert(availabilityResponses)
+			.values({
+				requestId: data.requestId,
+				userId: data.userId,
 				responses: data.responses,
 				notes,
+				respondedAt: now,
 				updatedAt: now,
-			},
-		});
+			})
+			.onConflictDoUpdate({
+				target: [availabilityResponses.requestId, availabilityResponses.userId],
+				set: {
+					responses: data.responses,
+					notes,
+					updatedAt: now,
+				},
+			});
+	});
 }
 
 // --- Get User Response ---

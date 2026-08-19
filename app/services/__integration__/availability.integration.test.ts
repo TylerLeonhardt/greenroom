@@ -357,6 +357,7 @@ describe("availability.server integration", () => {
 			const request = await createTestAvailabilityRequest(group.id, admin.id);
 
 			await submitAvailabilityResponse({
+				groupId: group.id,
 				requestId: request.id,
 				userId: member.id,
 				responses: {
@@ -368,9 +369,12 @@ describe("availability.server integration", () => {
 
 			const response = await getUserResponse(request.id, member.id);
 			expect(response).toEqual({
-				"2026-04-01": "available",
-				"2026-04-02": "maybe",
-				"2026-04-03": "not_available",
+				responses: {
+					"2026-04-01": "available",
+					"2026-04-02": "maybe",
+					"2026-04-03": "not_available",
+				},
+				notes: {},
 			});
 		});
 
@@ -383,6 +387,7 @@ describe("availability.server integration", () => {
 
 			// First response
 			await submitAvailabilityResponse({
+				groupId: group.id,
 				requestId: request.id,
 				userId: member.id,
 				responses: { "2026-04-01": "not_available" },
@@ -390,6 +395,7 @@ describe("availability.server integration", () => {
 
 			// Updated response
 			await submitAvailabilityResponse({
+				groupId: group.id,
 				requestId: request.id,
 				userId: member.id,
 				responses: { "2026-04-01": "available", "2026-04-02": "maybe" },
@@ -397,8 +403,11 @@ describe("availability.server integration", () => {
 
 			const response = await getUserResponse(request.id, member.id);
 			expect(response).toEqual({
-				"2026-04-01": "available",
-				"2026-04-02": "maybe",
+				responses: {
+					"2026-04-01": "available",
+					"2026-04-02": "maybe",
+				},
+				notes: {},
 			});
 		});
 	});
