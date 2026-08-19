@@ -1,6 +1,11 @@
-import { EmailClient } from "@azure/communication-email";
+import type { EmailClient } from "@azure/communication-email";
 import type { NotificationPreferences } from "../../src/db/schema.js";
 import { formatEventTime } from "../lib/date-utils.js";
+import {
+	createSkewTolerantEmailClient,
+	DEFAULT_EMAIL_CLOCK_SKEW_TOLERANCE_SECONDS,
+	parseEmailClockSkewToleranceSeconds,
+} from "./acs-email-auth.server.js";
 import { logger } from "./logger.server.js";
 import { mergeWithDefaults } from "./notification-utils.server.js";
 import { getTelemetryClient } from "./telemetry.server.js";
@@ -48,9 +53,20 @@ function getEmailClient(): EmailClient | null {
 	const connectionString = process.env.AZURE_COMMUNICATION_CONNECTION_STRING;
 	if (!connectionString) return null;
 	try {
-		emailClient = new EmailClient(connectionString);
+		let toleranceSeconds = DEFAULT_EMAIL_CLOCK_SKEW_TOLERANCE_SECONDS;
+		try {
+			toleranceSeconds = parseEmailClockSkewToleranceSeconds(
+				process.env.EMAIL_CLOCK_SKEW_TOLERANCE_SECONDS,
+			);
+		} catch (error) {
+			logger.warn(
+				{ err: error, toleranceSeconds },
+				"Invalid email clock-skew tolerance; using the secure default",
+			);
+		}
+		emailClient = createSkewTolerantEmailClient(connectionString, toleranceSeconds);
 	} catch {
-		console.warn("Invalid AZURE_COMMUNICATION_CONNECTION_STRING — email disabled");
+		logger.error("Invalid Azure email configuration — email disabled");
 		return null;
 	}
 	return emailClient;
@@ -144,14 +160,11 @@ export async function sendEmail(options: {
 				break; // Don't retry permanent errors
 			}
 
-			// Clock skew is effectively permanent: the drift is typically far larger
-			// than the allowed margin (minutes, not seconds), so retries after 1s/2s
-			// are guaranteed to fail and only add dead latency. Fail fast instead.
 			if (errorKind === "clock_skew") {
 				logger.warn(
 					{ to: recipients, subject: options.subject },
-					"Clock skew detected — server time drift exceeds Azure's allowed margin. " +
-						"Not retrying; fix host clock sync (NTP).",
+					"ACS clock-skew recovery failed because Azure returned no usable server time " +
+						"or rejected the corrected retry; verify host clock sync (NTP).",
 				);
 				break;
 			}
