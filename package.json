@@ -27,6 +27,7 @@
 	"dependencies": {
 		"@auth/core": "^0.34.3",
 		"@azure/communication-email": "^1.1.0",
+		"@azure/core-rest-pipeline": "^1.22.2",
 		"@radix-ui/react-slot": "^1.2.4",
 		"@remix-run/node": "^2.17.4",
 		"@remix-run/react": "^2.17.4",

@@ -1,6 +1,11 @@
-import { EmailClient } from "@azure/communication-email";
+import type { EmailClient } from "@azure/communication-email";
 import type { NotificationPreferences } from "../../src/db/schema.js";
 import { formatEventTime } from "../lib/date-utils.js";
+import {
+	createSkewTolerantEmailClient,
+	DEFAULT_EMAIL_CLOCK_SKEW_TOLERANCE_SECONDS,
+	parseEmailClockSkewToleranceSeconds,
+} from "./acs-email-auth.server.js";
 import { logger } from "./logger.server.js";
 import { mergeWithDefaults } from "./notification-utils.server.js";
 import { getTelemetryClient } from "./telemetry.server.js";
@@ -48,9 +53,20 @@ function getEmailClient(): EmailClient | null {
 	const connectionString = process.env.AZURE_COMMUNICATION_CONNECTION_STRING;
 	if (!connectionString) return null;
 	try {
-		emailClient = new EmailClient(connectionString);
-	} catch {
-		console.warn("Invalid AZURE_COMMUNICATION_CONNECTION_STRING — email disabled");
+		let toleranceSeconds = DEFAULT_EMAIL_CLOCK_SKEW_TOLERANCE_SECONDS;
+		try {
+			toleranceSeconds = parseEmailClockSkewToleranceSeconds(
+				process.env.EMAIL_CLOCK_SKEW_TOLERANCE_SECONDS,
+			);
+		} catch (error) {
+			logger.warn(
+				{ err: error, toleranceSeconds },
+				"Invalid email clock-skew tolerance; using the secure default",
+			);
+		}
+		emailClient = createSkewTolerantEmailClient(connectionString, toleranceSeconds);
+	} catch (error) {
+		logger.error({ err: error }, "Invalid Azure email configuration — email disabled");
 		return null;
 	}
 	return emailClient;

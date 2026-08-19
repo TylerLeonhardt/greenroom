@@ -22,7 +22,7 @@ How My Call Time sends email reliably through **Azure Communication Services (AC
 | Kind | What it means | Detection | Retry? |
 |------|---------------|-----------|--------|
 | `suppressed` | The recipient address is on Azure's suppression list (hard bounces, spam complaints, unsubscribes). Azure refuses to deliver. | `message.toLowerCase().includes("suppress")` — covers `Suppressed`, `suppression list`, `AllRecipientsSuppressed`, etc. | **No** — permanent for that address. Surface a user-facing "try a different email" message. |
-| `clock_skew` | The host clock drifted past ACS's allowed margin, so request signing fails. | Message contains `"time difference between the originating client and the server is greater than the allowed margin"`. | **No** — drift is typically minutes, far bigger than 1s/2s backoff, so retries are guaranteed to fail and only add dead latency. Fix host NTP sync instead. |
+| `clock_skew` | The host clock drifted past ACS's allowed margin, so request signing fails. | Message contains `"time difference between the originating client and the server is greater than the allowed margin"`. | **No** — retries use the same host clock. HMAC requests are backdated by a configurable tolerance; larger drift still requires host NTP remediation. |
 | `transient` | Temporary network/throughput failure. | Message contains `ECONNRESET`, `ETIMEDOUT`, `ENOTFOUND`, `socket hang up`, `network`, `503`, or `429`. | **Yes** — retry with exponential backoff. |
 | `permanent` | Anything else (bad payload, auth/config error, malformed address). | Default fall-through. | **No** — retrying won't help. |
 
@@ -50,6 +50,15 @@ for attempt in 0..MAX_RETRIES:
 - `RETRY_BASE_DELAY_MS = 1000`, so transient backoff is **1s then 2s**.
 - Only `transient` errors fall through to the backoff/sleep. `suppressed`, `clock_skew`, and `permanent` break (or return) immediately — **don't waste latency retrying errors that can't recover**.
 - The clock-skew log is intentionally specific ("Not retrying; fix host clock sync (NTP)") so it's easy to spot in monitoring.
+
+## Clock-Skew Tolerance
+
+ACS connection strings use shared-key HMAC authentication. The Azure SDK creates `x-ms-date`
+from the host clock and includes it in the signature. `app/services/acs-email-auth.server.ts`
+backdates that header by `EMAIL_CLOCK_SKEW_TOLERANCE_SECONDS` and re-signs the final serialized
+request at the HTTP transport boundary. The default is 60 seconds and the maximum is 120 seconds.
+This protects against a slightly fast host without weakening signature validation or exceeding a
+short, bounded tolerance.
 
 ## Fire-and-Forget vs. Checked Result
 

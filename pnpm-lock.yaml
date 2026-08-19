@@ -14,6 +14,9 @@ importers:
       '@azure/communication-email':
         specifier: ^1.1.0
         version: 1.1.0
+      '@azure/core-rest-pipeline':
+        specifier: ^1.22.2
+        version: 1.22.2
       '@radix-ui/react-slot':
         specifier: ^1.2.4
         version: 1.2.4(@types/react@18.3.28)(react@18.3.1)

@@ -84,6 +84,7 @@ docker compose down
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | ✅ |
 | `APP_URL` | Public URL of the app (used for emails and OAuth callbacks) | ✅ |
 | `AZURE_COMMUNICATION_CONNECTION_STRING` | Azure Communication Services connection string (for emails) | Optional |
+| `EMAIL_CLOCK_SKEW_TOLERANCE_SECONDS` | ACS HMAC timestamp backdating (default `60`, max `120`) | Optional |
 | `NODE_ENV` | `production` in deployed environments | Auto |
 | `PORT` | Port the server listens on (default: `3000`) | Auto |
 
