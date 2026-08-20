@@ -1,6 +1,43 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("redactSensitiveUrls", () => {
+	it("redacts magic-link tokens", async () => {
+		const { redactSensitiveUrls } = await import("./telemetry.server");
+		expect(redactSensitiveUrls("/auth/magic-link/consume?token=LIVE")).toBe(
+			"/auth/magic-link/consume?token=[REDACTED]",
+		);
+	});
+
+	it("redacts email-verification tokens", async () => {
+		const { redactSensitiveUrls } = await import("./telemetry.server");
+		expect(redactSensitiveUrls("/verify-email?token=LIVE")).toBe("/verify-email?token=[REDACTED]");
+	});
+
+	it("redacts tokens in any query-string position", async () => {
+		const { redactSensitiveUrls } = await import("./telemetry.server");
+		expect(redactSensitiveUrls("/verify-email?a=1&token=LIVE&b=2")).toBe(
+			"/verify-email?a=1&token=[REDACTED]&b=2",
+		);
+	});
+
+	it("redacts token keys case-insensitively", async () => {
+		const { redactSensitiveUrls } = await import("./telemetry.server");
+		expect(redactSensitiveUrls("/verify-email?ToKeN=LIVE")).toBe("/verify-email?ToKeN=[REDACTED]");
+	});
+
+	it("redacts URL-encoded token values", async () => {
+		const { redactSensitiveUrls } = await import("./telemetry.server");
+		expect(redactSensitiveUrls("/verify-email?token=LIVE%2FSECRET%3D%3D")).toBe(
+			"/verify-email?token=[REDACTED]",
+		);
+	});
+
+	it("preserves harmless redirect query parameters", async () => {
+		const { redactSensitiveUrls } = await import("./telemetry.server");
+		const url = "/auth/magic-link/consume?next=%2Fdashboard&redirectTo=%2Fgroups%2F123";
+		expect(redactSensitiveUrls(url)).toBe(url);
+	});
+
 	it("redacts calendar feed token from a full URL", async () => {
 		const { redactSensitiveUrls } = await import("./telemetry.server");
 		expect(redactSensitiveUrls("https://mycalltime.app/api/calendar/abc123TOKEN.ics")).toBe(
@@ -214,6 +251,26 @@ describe("telemetry.server", () => {
 			);
 			expect(envelope.data.baseData.name).toBe(
 				"POST https://discord.com/api/webhooks/[REDACTED]/[REDACTED]",
+			);
+		});
+
+		it("redacts auth tokens from request URL, name, and dependency data", () => {
+			const envelope = {
+				data: {
+					baseData: {
+						url: "https://mycalltime.app/verify-email?token=request-secret",
+						name: "GET /auth/magic-link/consume?token=name-secret",
+						data: "https://mycalltime.app/verify-email?token=dependency-secret",
+					},
+				},
+			};
+			expect(processor(envelope)).toBe(true);
+			expect(envelope.data.baseData.url).toBe(
+				"https://mycalltime.app/verify-email?token=[REDACTED]",
+			);
+			expect(envelope.data.baseData.name).toBe("GET /auth/magic-link/consume?token=[REDACTED]");
+			expect(envelope.data.baseData.data).toBe(
+				"https://mycalltime.app/verify-email?token=[REDACTED]",
 			);
 		});
 

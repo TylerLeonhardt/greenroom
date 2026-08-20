@@ -7,14 +7,17 @@ import { logger } from "./logger.server.js";
 const CALENDAR_TOKEN_PATTERN = /\/api\/calendar\/[^/]+\.ics/g;
 const DISCORD_WEBHOOK_PATTERN =
 	/https:\/\/discord(?:app)?\.com\/api\/webhooks\/[^/\s?]+\/[^/\s?]+/g;
+const AUTH_TOKEN_QUERY_PATTERN = /([?&])(token)=[^&#\s]*/gi;
 
 /**
  * Redact sensitive tokens from a URL string.
+ * - Auth tokens: ?token=SECRET or &token=SECRET → token=[REDACTED]
  * - Calendar feed tokens: /api/calendar/TOKEN.ics → /api/calendar/[REDACTED].ics
  * - Discord webhook URLs: .../webhooks/ID/TOKEN → .../webhooks/[REDACTED]/[REDACTED]
  */
 export function redactSensitiveUrls(url: string): string {
 	return url
+		.replace(AUTH_TOKEN_QUERY_PATTERN, "$1$2=[REDACTED]")
 		.replace(CALENDAR_TOKEN_PATTERN, "/api/calendar/[REDACTED].ics")
 		.replace(DISCORD_WEBHOOK_PATTERN, "https://discord.com/api/webhooks/[REDACTED]/[REDACTED]");
 }
@@ -34,9 +37,8 @@ if (connectionString) {
 	appInsights.defaultClient.context.tags[appInsights.defaultClient.context.keys.cloudRole] =
 		"mycalltime";
 
-	// Redact sensitive tokens (calendar feed tokens, Discord webhook URLs) from all
-	// telemetry before it's sent to App Insights. Covers request URLs/names and
-	// dependency URLs/data fields.
+	// Redact auth query tokens, calendar feed tokens, and Discord webhook URLs from
+	// request URL/name fields and dependency URL/data fields before telemetry is sent.
 	appInsights.defaultClient.addTelemetryProcessor((envelope) => {
 		if (envelope.data?.baseData) {
 			const baseData = envelope.data.baseData as Record<string, unknown>;

@@ -25,6 +25,10 @@ Greenroom uses the **classic `applicationinsights` SDK** (v3.x) in `app/services
 - Cloud role set to `"mycalltime"`
 - `getTelemetryClient()` and `trackEvent()` helpers for custom telemetry
 - Graceful no-op when `APPLICATIONINSIGHTS_CONNECTION_STRING` is not set
+- A telemetry processor redacts credential-bearing `token` query parameters from the
+  auto-collected `url`, `name`, and `data` fields before export. Keep this rule case-insensitive
+  and position-independent, and preserve the existing calendar-feed and Discord-webhook
+  redaction when changing telemetry collection.
 
 The **modern replacement** is `@azure/monitor-opentelemetry` (OpenTelemetry-based). Microsoft recommends migrating to this for new features and long-term support.
 
