@@ -48,10 +48,15 @@ export function classifyEmailError(error: unknown): EmailErrorKind {
 let emailClient: EmailClient | null = null;
 const senderAddress = "DoNotReply@mycalltime.app";
 
-function getEmailClient(): EmailClient | null {
-	if (emailClient) return emailClient;
+type EmailClientUnavailableReason = "not_configured" | "invalid_configuration";
+
+function getEmailClient(): {
+	client: EmailClient | null;
+	unavailableReason?: EmailClientUnavailableReason;
+} {
+	if (emailClient) return { client: emailClient };
 	const connectionString = process.env.AZURE_COMMUNICATION_CONNECTION_STRING;
-	if (!connectionString) return null;
+	if (!connectionString) return { client: null, unavailableReason: "not_configured" };
 	try {
 		let toleranceSeconds = DEFAULT_EMAIL_CLOCK_SKEW_TOLERANCE_SECONDS;
 		try {
@@ -66,10 +71,9 @@ function getEmailClient(): EmailClient | null {
 		}
 		emailClient = createSkewTolerantEmailClient(connectionString, toleranceSeconds);
 	} catch {
-		logger.error("Invalid Azure email configuration — email disabled");
-		return null;
+		return { client: null, unavailableReason: "invalid_configuration" };
 	}
-	return emailClient;
+	return { client: emailClient };
 }
 
 const MAX_RETRIES = 2;
@@ -79,27 +83,58 @@ async function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+type EmailSendResult = { success: boolean; error?: string; errorKind?: EmailErrorKind };
+
+function reportEmailFailure(
+	recipientCount: number,
+	errorKind: EmailErrorKind,
+	context?: { unavailableReason: EmailClientUnavailableReason },
+): EmailSendResult {
+	logger.error({ recipientCount, errorKind, ...context }, "Failed to send email");
+
+	const telemetry = getTelemetryClient();
+	if (telemetry) {
+		telemetry.trackEvent({
+			name: "EmailSent",
+			properties: {
+				success: "false",
+				recipientCount: String(recipientCount),
+				errorKind,
+				...(context ? { unavailableReason: context.unavailableReason } : {}),
+			},
+		});
+		telemetry.trackException({
+			exception: new Error(`Email send failed (${errorKind})`),
+			properties: {
+				recipientCount: String(recipientCount),
+				errorKind,
+				...(context ? { unavailableReason: context.unavailableReason } : {}),
+			},
+		});
+	}
+
+	return { success: false, error: `Email send failed (${errorKind})`, errorKind };
+}
+
 export async function sendEmail(options: {
 	to: string | string[];
 	subject: string;
 	html: string;
 	text?: string;
-}): Promise<{ success: boolean; error?: string; errorKind?: EmailErrorKind }> {
-	const client = getEmailClient();
+}): Promise<EmailSendResult> {
+	const { client, unavailableReason } = getEmailClient();
 	const recipients = Array.isArray(options.to) ? options.to : [options.to];
 
 	if (!client) {
+		if (process.env.NODE_ENV === "production") {
+			return reportEmailFailure(recipients.length, "permanent", {
+				unavailableReason: unavailableReason ?? "invalid_configuration",
+			});
+		}
 		logger.info(
-			{ recipientCount: recipients.length },
+			{ recipientCount: recipients.length, unavailableReason },
 			"Azure Communication Services not configured — email not sent",
 		);
-		if (process.env.NODE_ENV === "production") {
-			return {
-				success: false,
-				error: "Email service is not configured",
-				errorKind: "permanent",
-			};
-		}
 		return { success: true };
 	}
 
@@ -185,28 +220,7 @@ export async function sendEmail(options: {
 
 	// All retries exhausted or permanent error
 	const errorKind = classifyEmailError(lastError);
-	logger.error({ recipientCount: recipients.length, errorKind }, "Failed to send email");
-
-	const telemetry = getTelemetryClient();
-	if (telemetry) {
-		telemetry.trackEvent({
-			name: "EmailSent",
-			properties: {
-				success: "false",
-				recipientCount: String(recipients.length),
-				errorKind,
-			},
-		});
-		telemetry.trackException({
-			exception: new Error(`Email send failed (${errorKind})`),
-			properties: {
-				recipientCount: String(recipients.length),
-				errorKind,
-			},
-		});
-	}
-
-	return { success: false, error: `Email send failed (${errorKind})`, errorKind };
+	return reportEmailFailure(recipients.length, errorKind);
 }
 
 // --- Email Templates ---

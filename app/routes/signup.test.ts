@@ -311,5 +311,37 @@ describe("signup route", () => {
 				"/check-email?email=new%40example.com",
 			);
 		});
+
+		it("returns error on permanent email failure instead of claiming delivery", async () => {
+			const user = {
+				id: "new-user",
+				email: "new@example.com",
+				name: "New User",
+				profileImage: null,
+			};
+			(registerUser as ReturnType<typeof vi.fn>).mockResolvedValue({ user, isNew: true });
+			(sendVerificationEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
+				success: false,
+				error: "Email send failed (permanent)",
+				errorKind: "permanent",
+			});
+
+			const formData = new FormData();
+			formData.set("name", "New User");
+			formData.set("email", "new@example.com");
+			formData.set("password", "securepassword");
+			formData.set("confirmPassword", "securepassword");
+
+			const request = new Request("http://localhost/signup", {
+				method: "POST",
+				body: formData,
+			});
+
+			const result = await action({ request, params: {}, context: {} });
+			expect(result).not.toBeInstanceOf(Response);
+			expect((result as { errors: Record<string, string> }).errors.form).toContain(
+				"Something went wrong",
+			);
+		});
 	});
 });

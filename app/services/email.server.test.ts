@@ -36,7 +36,7 @@ vi.mock("./notification-utils.server.js", () => ({
 	}),
 }));
 
-import { classifyEmailError, sendEmail, sendVerificationEmail } from "./email.server.js";
+import { classifyEmailError, sendVerificationEmail } from "./email.server.js";
 import { logger } from "./logger.server.js";
 
 describe("classifyEmailError", () => {
@@ -74,15 +74,29 @@ describe("classifyEmailError", () => {
 });
 
 describe("sendEmail", () => {
+	const originalNodeEnv = process.env.NODE_ENV;
+
+	async function freshSendEmail() {
+		vi.resetModules();
+		const mod = await import("./email.server.js");
+		const { logger: freshLogger } = await import("./logger.server.js");
+		return { sendEmail: mod.sendEmail, freshLogger };
+	}
+
 	beforeEach(() => {
 		vi.clearAllMocks();
 		getTelemetryClientMock.mockReturnValue(null);
-		// Reset the emailClient singleton by clearing the module-level state
-		// We'll control behavior by setting/unsetting the env var
 		delete process.env.AZURE_COMMUNICATION_CONNECTION_STRING;
 	});
 
-	it("returns success when ACS is not configured", async () => {
+	afterEach(() => {
+		process.env.NODE_ENV = originalNodeEnv;
+		delete process.env.AZURE_COMMUNICATION_CONNECTION_STRING;
+	});
+
+	it("returns success when ACS is not configured outside production", async () => {
+		process.env.NODE_ENV = "development";
+		const { sendEmail, freshLogger } = await freshSendEmail();
 		const result = await sendEmail({
 			to: "test@example.com",
 			subject: "Test",
@@ -90,34 +104,87 @@ describe("sendEmail", () => {
 		});
 
 		expect(result).toEqual({ success: true });
-		expect(logger.info).toHaveBeenCalledWith(
+		expect(freshLogger.info).toHaveBeenCalledWith(
 			expect.objectContaining({ recipientCount: 1 }),
 			expect.stringContaining("not configured"),
 		);
 	});
 
-	it("returns failure when ACS is not configured in production", async () => {
-		const previousNodeEnv = process.env.NODE_ENV;
+	it("returns a permanent failure when ACS is not configured in production", async () => {
 		process.env.NODE_ENV = "production";
+		const { sendEmail, freshLogger } = await freshSendEmail();
 
-		try {
-			const result = await sendEmail({
-				to: "test@example.com",
-				subject: "Test",
-				html: "<p>Test</p>",
-			});
+		const result = await sendEmail({
+			to: "test@example.com",
+			subject: "Test",
+			html: "<p>Test</p>",
+		});
 
-			expect(result).toEqual({
-				success: false,
-				error: "Email service is not configured",
+		expect(result).toEqual({
+			success: false,
+			error: "Email send failed (permanent)",
+			errorKind: "permanent",
+		});
+		expect(freshLogger.error).toHaveBeenCalledWith(
+			expect.objectContaining({
+				recipientCount: 1,
 				errorKind: "permanent",
-			});
-		} finally {
-			process.env.NODE_ENV = previousNodeEnv;
-		}
+				unavailableReason: "not_configured",
+			}),
+			"Failed to send email",
+		);
+	});
+
+	it("returns a permanent failure for invalid ACS configuration in production", async () => {
+		process.env.NODE_ENV = "production";
+		process.env.AZURE_COMMUNICATION_CONNECTION_STRING = "invalid";
+		const { sendEmail, freshLogger } = await freshSendEmail();
+
+		const result = await sendEmail({
+			to: "test@example.com",
+			subject: "Test",
+			html: "<p>Test</p>",
+		});
+
+		expect(result).toEqual({
+			success: false,
+			error: "Email send failed (permanent)",
+			errorKind: "permanent",
+		});
+		expect(freshLogger.error).toHaveBeenCalledWith(
+			expect.objectContaining({
+				recipientCount: 1,
+				errorKind: "permanent",
+				unavailableReason: "invalid_configuration",
+			}),
+			"Failed to send email",
+		);
+	});
+
+	it("returns success for invalid ACS configuration outside production", async () => {
+		process.env.NODE_ENV = "test";
+		process.env.AZURE_COMMUNICATION_CONNECTION_STRING = "invalid";
+		const { sendEmail, freshLogger } = await freshSendEmail();
+
+		const result = await sendEmail({
+			to: "test@example.com",
+			subject: "Test",
+			html: "<p>Test</p>",
+		});
+
+		expect(result).toEqual({ success: true });
+		expect(freshLogger.info).toHaveBeenCalledWith(
+			expect.objectContaining({
+				recipientCount: 1,
+				unavailableReason: "invalid_configuration",
+			}),
+			expect.stringContaining("not configured"),
+		);
 	});
 
 	it("handles array recipients", async () => {
+		process.env.NODE_ENV = "test";
+		const { sendEmail, freshLogger } = await freshSendEmail();
 		const result = await sendEmail({
 			to: ["a@example.com", "b@example.com"],
 			subject: "Test",
@@ -125,7 +192,7 @@ describe("sendEmail", () => {
 		});
 
 		expect(result.success).toBe(true);
-		expect(logger.info).toHaveBeenCalledWith(
+		expect(freshLogger.info).toHaveBeenCalledWith(
 			expect.objectContaining({ recipientCount: 2 }),
 			expect.any(String),
 		);
