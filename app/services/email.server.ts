@@ -132,7 +132,7 @@ export async function sendEmail(options: {
 			});
 		}
 		logger.info(
-			{ recipientCount: recipients.length },
+			{ recipientCount: recipients.length, unavailableReason },
 			"Azure Communication Services not configured — email not sent",
 		);
 		return { success: true };

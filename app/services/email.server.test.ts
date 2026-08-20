@@ -161,6 +161,27 @@ describe("sendEmail", () => {
 		);
 	});
 
+	it("returns success for invalid ACS configuration outside production", async () => {
+		process.env.NODE_ENV = "test";
+		process.env.AZURE_COMMUNICATION_CONNECTION_STRING = "invalid";
+		const { sendEmail, freshLogger } = await freshSendEmail();
+
+		const result = await sendEmail({
+			to: "test@example.com",
+			subject: "Test",
+			html: "<p>Test</p>",
+		});
+
+		expect(result).toEqual({ success: true });
+		expect(freshLogger.info).toHaveBeenCalledWith(
+			expect.objectContaining({
+				recipientCount: 1,
+				unavailableReason: "invalid_configuration",
+			}),
+			expect.stringContaining("not configured"),
+		);
+	});
+
 	it("handles array recipients", async () => {
 		process.env.NODE_ENV = "test";
 		const { sendEmail, freshLogger } = await freshSendEmail();
