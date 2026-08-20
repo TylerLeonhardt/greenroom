@@ -93,6 +93,13 @@ export async function sendEmail(options: {
 			{ recipientCount: recipients.length },
 			"Azure Communication Services not configured — email not sent",
 		);
+		if (process.env.NODE_ENV === "production") {
+			return {
+				success: false,
+				error: "Email service is not configured",
+				errorKind: "permanent",
+			};
+		}
 		return { success: true };
 	}
 

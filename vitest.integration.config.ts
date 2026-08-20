@@ -5,6 +5,7 @@ export default defineConfig({
 		environment: "node",
 		globals: true,
 		include: ["**/*.integration.test.ts"],
+		exclude: [".worktrees/**"],
 		env: {
 			DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/greenroom_test",
 			SESSION_SECRET: "test-secret-for-vitest",

@@ -25,11 +25,13 @@ vi.mock("~/services/email.server", () => ({
 	sendMagicLinkEmail: vi.fn().mockResolvedValue({ success: true }),
 }));
 vi.mock("~/services/logger.server", () => ({
-	logger: { error: vi.fn(), warn: vi.fn() },
+	logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 vi.mock("~/services/magic-link.server", () => ({
+	activateLoginMagicLink: vi.fn().mockResolvedValue(undefined),
 	cleanupExpiredMagicLinks: vi.fn().mockResolvedValue(0),
-	issueLoginMagicLink: vi.fn().mockResolvedValue({
+	invalidateLoginMagicLink: vi.fn().mockResolvedValue(undefined),
+	issuePendingLoginMagicLink: vi.fn().mockResolvedValue({
 		rawToken: acceptance.rawToken,
 		expiresAt: new Date(Date.now() + 600_000),
 	}),

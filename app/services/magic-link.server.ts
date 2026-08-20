@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { and, eq, gt, isNull, lt, ne, sql } from "drizzle-orm";
+import { and, eq, gt, isNotNull, isNull, lt, ne, sql } from "drizzle-orm";
 import { db } from "../../src/db/index.js";
 import { magicLinkTokens } from "../../src/db/schema.js";
 
@@ -66,11 +66,16 @@ export function validateMagicLinkRedirectPath(value: string | null | undefined):
 	return DEFAULT_REDIRECT_PATH;
 }
 
-export async function issueLoginMagicLink(options: {
+type IssueLoginMagicLinkOptions = {
 	userId: string;
 	redirectPath?: string | null;
 	expiryMinutes?: number;
-}): Promise<{ rawToken: string; expiresAt: Date }> {
+};
+
+async function issueLoginMagicLinkWithState(
+	options: IssueLoginMagicLinkOptions,
+	active: boolean,
+): Promise<{ rawToken: string; expiresAt: Date }> {
 	const expiryMinutes = options.expiryMinutes ?? MAGIC_LINK_EXPIRY_MINUTES;
 	if (
 		!Number.isInteger(expiryMinutes) ||
@@ -89,9 +94,53 @@ export async function issueLoginMagicLink(options: {
 		purpose: "login",
 		redirectPath: validateMagicLinkRedirectPath(options.redirectPath),
 		expiresAt,
+		consumedAt: active ? null : new Date(),
 	});
 
 	return { rawToken, expiresAt };
+}
+
+export async function issueLoginMagicLink(
+	options: IssueLoginMagicLinkOptions,
+): Promise<{ rawToken: string; expiresAt: Date }> {
+	return issueLoginMagicLinkWithState(options, true);
+}
+
+export async function issuePendingLoginMagicLink(
+	options: IssueLoginMagicLinkOptions,
+): Promise<{ rawToken: string; expiresAt: Date }> {
+	return issueLoginMagicLinkWithState(options, false);
+}
+
+export async function activateLoginMagicLink(rawToken: string): Promise<void> {
+	const expiresAt = new Date(Date.now() + MAGIC_LINK_EXPIRY_MINUTES * 60 * 1000);
+	const activated = await db
+		.update(magicLinkTokens)
+		.set({ consumedAt: null, expiresAt })
+		.where(
+			and(
+				eq(magicLinkTokens.tokenHash, hashMagicLinkToken(rawToken)),
+				eq(magicLinkTokens.purpose, "login"),
+				isNotNull(magicLinkTokens.consumedAt),
+				gt(magicLinkTokens.expiresAt, sql`now()`),
+			),
+		)
+		.returning({ id: magicLinkTokens.id });
+
+	if (activated.length !== 1) {
+		throw new Error("Pending magic-link login could not be activated.");
+	}
+}
+
+export async function invalidateLoginMagicLink(rawToken: string): Promise<void> {
+	await db
+		.delete(magicLinkTokens)
+		.where(
+			and(
+				eq(magicLinkTokens.tokenHash, hashMagicLinkToken(rawToken)),
+				eq(magicLinkTokens.purpose, "login"),
+			),
+		);
 }
 
 export async function consumeLoginMagicLink(tokenHash: string): Promise<{
