@@ -95,11 +95,18 @@ export async function action({ request }: ActionFunctionArgs) {
 					},
 				};
 			}
-			// For transient failures, still redirect — the user can resend from check-email
 			logger.warn(
 				{ userId: user.id, errorKind: emailResult.errorKind },
-				"Verification email failed during signup, redirecting to check-email for retry",
+				"Verification email failed during signup",
 			);
+			if (emailResult.errorKind !== "transient") {
+				return {
+					errors: {
+						form: "Something went wrong sending your verification email. Please try again in a moment or contact support if the problem persists.",
+					},
+				};
+			}
+			// Transient failures can be retried from check-email.
 		}
 
 		return redirect(`/check-email?email=${encodeURIComponent(user.email)}`);
