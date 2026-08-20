@@ -7,17 +7,43 @@ import { logger } from "./logger.server.js";
 const CALENDAR_TOKEN_PATTERN = /\/api\/calendar\/[^/]+\.ics/g;
 const DISCORD_WEBHOOK_PATTERN =
 	/https:\/\/discord(?:app)?\.com\/api\/webhooks\/[^/\s?]+\/[^/\s?]+/g;
-const AUTH_TOKEN_QUERY_PATTERN = /([?&])(token)=[^&#\s]*/gi;
+const QUERY_PARAMETER_PATTERN = /([?&])([^=&#\s]+)=[^&#\s]*/g;
+const AUTH_TOKEN_QUERY_KEYS = new Set(["token"]);
+const OAUTH_QUERY_KEYS = new Set(["code", "state"]);
+const GOOGLE_OAUTH_URL_PATTERN =
+	/(?:\/auth\/google\/callback|https:\/\/accounts\.google\.com\/o\/oauth2\/v2\/auth)(?:[?\s]|$)/i;
+
+function redactAuthQueryParameters(url: string): string {
+	const isGoogleOAuthUrl = GOOGLE_OAUTH_URL_PATTERN.test(url);
+
+	return url.replace(
+		QUERY_PARAMETER_PATTERN,
+		(parameter, separator: string, encodedKey: string) => {
+			let key: string;
+			try {
+				key = decodeURIComponent(encodedKey.replace(/\+/g, " ")).toLowerCase();
+			} catch {
+				return parameter;
+			}
+
+			if (!AUTH_TOKEN_QUERY_KEYS.has(key) && !(isGoogleOAuthUrl && OAUTH_QUERY_KEYS.has(key))) {
+				return parameter;
+			}
+
+			return `${separator}${encodedKey}=[REDACTED]`;
+		},
+	);
+}
 
 /**
  * Redact sensitive tokens from a URL string.
  * - Auth tokens: ?token=SECRET or &token=SECRET → token=[REDACTED]
+ * - Google OAuth credentials: code and state on authorization/callback URLs
  * - Calendar feed tokens: /api/calendar/TOKEN.ics → /api/calendar/[REDACTED].ics
  * - Discord webhook URLs: .../webhooks/ID/TOKEN → .../webhooks/[REDACTED]/[REDACTED]
  */
 export function redactSensitiveUrls(url: string): string {
-	return url
-		.replace(AUTH_TOKEN_QUERY_PATTERN, "$1$2=[REDACTED]")
+	return redactAuthQueryParameters(url)
 		.replace(CALENDAR_TOKEN_PATTERN, "/api/calendar/[REDACTED].ics")
 		.replace(DISCORD_WEBHOOK_PATTERN, "https://discord.com/api/webhooks/[REDACTED]/[REDACTED]");
 }

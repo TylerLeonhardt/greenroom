@@ -32,9 +32,30 @@ describe("redactSensitiveUrls", () => {
 		);
 	});
 
+	it("redacts URL-encoded token keys", async () => {
+		const { redactSensitiveUrls } = await import("./telemetry.server");
+		expect(redactSensitiveUrls("/verify-email?to%6Ben=LIVE")).toBe(
+			"/verify-email?to%6Ben=[REDACTED]",
+		);
+	});
+
+	it("redacts Google OAuth code and state credentials", async () => {
+		const { redactSensitiveUrls } = await import("./telemetry.server");
+		expect(
+			redactSensitiveUrls(
+				"https://mycalltime.app/auth/google/callback?code=LIVE_CODE&state=LIVE_STATE",
+			),
+		).toBe("https://mycalltime.app/auth/google/callback?code=[REDACTED]&state=[REDACTED]");
+		expect(
+			redactSensitiveUrls(
+				"https://accounts.google.com/o/oauth2/v2/auth?client_id=public&state=LIVE_STATE",
+			),
+		).toBe("https://accounts.google.com/o/oauth2/v2/auth?client_id=public&state=[REDACTED]");
+	});
+
 	it("preserves harmless redirect query parameters", async () => {
 		const { redactSensitiveUrls } = await import("./telemetry.server");
-		const url = "/auth/magic-link/consume?next=%2Fdashboard&redirectTo=%2Fgroups%2F123";
+		const url = "/groups/join?code=ABCD1234&next=%2Fdashboard&redirectTo=%2Fgroups%2F123";
 		expect(redactSensitiveUrls(url)).toBe(url);
 	});
 
@@ -254,23 +275,25 @@ describe("telemetry.server", () => {
 			);
 		});
 
-		it("redacts auth tokens from request URL, name, and dependency data", () => {
+		it("redacts auth credentials from request URL, name, and dependency data", () => {
 			const envelope = {
 				data: {
 					baseData: {
-						url: "https://mycalltime.app/verify-email?token=request-secret",
-						name: "GET /auth/magic-link/consume?token=name-secret",
-						data: "https://mycalltime.app/verify-email?token=dependency-secret",
+						url: "https://mycalltime.app/verify-email?to%6Ben=request-secret",
+						name: "GET /auth/google/callback?code=name-secret&state=state-secret",
+						data: "https://accounts.google.com/o/oauth2/v2/auth?state=dependency-secret",
 					},
 				},
 			};
 			expect(processor(envelope)).toBe(true);
 			expect(envelope.data.baseData.url).toBe(
-				"https://mycalltime.app/verify-email?token=[REDACTED]",
+				"https://mycalltime.app/verify-email?to%6Ben=[REDACTED]",
 			);
-			expect(envelope.data.baseData.name).toBe("GET /auth/magic-link/consume?token=[REDACTED]");
+			expect(envelope.data.baseData.name).toBe(
+				"GET /auth/google/callback?code=[REDACTED]&state=[REDACTED]",
+			);
 			expect(envelope.data.baseData.data).toBe(
-				"https://mycalltime.app/verify-email?token=[REDACTED]",
+				"https://accounts.google.com/o/oauth2/v2/auth?state=[REDACTED]",
 			);
 		});
 
