@@ -3,9 +3,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "../../../src/db/index.js";
 import { magicLinkTokens } from "../../../src/db/schema.js";
 import {
+	activateLoginMagicLink,
 	consumeLoginMagicLink,
 	hashMagicLinkToken,
+	invalidateLoginMagicLink,
 	issueLoginMagicLink,
+	issuePendingLoginMagicLink,
 } from "../magic-link.server.js";
 import { createTestUser } from "./seed.js";
 import { cleanDatabase } from "./setup.js";
@@ -53,6 +56,53 @@ describe("magic-link service integration", () => {
 
 		expect(results.filter((result) => result !== null)).toHaveLength(1);
 		expect(results.filter((result) => result === null)).toHaveLength(1);
+	});
+
+	it("invalidates an issued login token before it can be consumed", async () => {
+		const user = await createTestUser();
+		const { rawToken } = await issueLoginMagicLink({ userId: user.id });
+
+		await invalidateLoginMagicLink(rawToken);
+
+		expect(await consumeLoginMagicLink(hashMagicLinkToken(rawToken))).toBeNull();
+	});
+
+	it("keeps pending login tokens unusable until delivery activation", async () => {
+		const user = await createTestUser();
+		const { rawToken } = await issuePendingLoginMagicLink({
+			userId: user.id,
+			expiryMinutes: 15,
+		});
+		const tokenHash = hashMagicLinkToken(rawToken);
+
+		expect(await consumeLoginMagicLink(tokenHash)).toBeNull();
+
+		await activateLoginMagicLink(rawToken);
+
+		const [activated] = await db
+			.select({ expiresAt: magicLinkTokens.expiresAt })
+			.from(magicLinkTokens)
+			.where(eq(magicLinkTokens.tokenHash, tokenHash));
+		expect(activated?.expiresAt.getTime()).toBeGreaterThan(Date.now() + 9 * 60 * 1000);
+		expect(await consumeLoginMagicLink(tokenHash)).toEqual({
+			userId: user.id,
+			redirectPath: "/dashboard",
+		});
+	});
+
+	it("does not activate an expired pending login token", async () => {
+		const user = await createTestUser();
+		const { rawToken } = await issuePendingLoginMagicLink({ userId: user.id });
+		const tokenHash = hashMagicLinkToken(rawToken);
+		await db
+			.update(magicLinkTokens)
+			.set({ expiresAt: new Date(Date.now() - 1000) })
+			.where(eq(magicLinkTokens.tokenHash, tokenHash));
+
+		await expect(activateLoginMagicLink(rawToken)).rejects.toThrow(
+			"Pending magic-link login could not be activated.",
+		);
+		expect(await consumeLoginMagicLink(tokenHash)).toBeNull();
 	});
 
 	it("returns the same failure for expired and reused tokens", async () => {

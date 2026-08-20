@@ -109,9 +109,13 @@ return { success: true };
 
 > **Pitfall (fixed):** `app/routes/check-email.tsx` once only handled `errorKind === "suppressed"` and fell through to `{ success: true }` for every other failure — telling users an email was sent when it wasn't. Always handle **all** failure cases, not just suppression.
 
-### "Not configured" is treated as success
+### "Not configured" is treated as success outside production
 
-If `AZURE_COMMUNICATION_CONNECTION_STRING` is unset (local dev), `sendEmail()` logs and returns `{ success: true }` without sending. This keeps local flows working. Tests that exercise the real retry loop must **set** the connection string and **mock the SDK** (see below).
+If `AZURE_COMMUNICATION_CONNECTION_STRING` is unset in local development or tests, `sendEmail()`
+logs and returns `{ success: true }` without sending. This keeps local flows working. In production,
+missing ACS configuration returns a permanent failure so checked-result flows cannot report a
+delivery that never happened. Tests that exercise the real retry loop must **set** the connection
+string and **mock the SDK** (see below).
 
 ## Telemetry
 

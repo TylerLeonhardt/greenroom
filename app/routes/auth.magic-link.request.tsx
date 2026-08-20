@@ -8,8 +8,10 @@ import { validateCsrfToken } from "~/services/csrf.server";
 import { sendMagicLinkEmail } from "~/services/email.server";
 import { logger } from "~/services/logger.server";
 import {
+	activateLoginMagicLink,
 	cleanupExpiredMagicLinks,
-	issueLoginMagicLink,
+	invalidateLoginMagicLink,
+	issuePendingLoginMagicLink,
 	validateMagicLinkRedirectPath,
 } from "~/services/magic-link.server";
 import { checkLoginRateLimit, checkRateLimit, getClientIp } from "~/services/rate-limit.server";
@@ -20,9 +22,12 @@ export const meta: MetaFunction = () => {
 
 export const MAGIC_LINK_GENERIC_RESPONSE =
 	"If an account exists for that email, we sent a sign-in link. It expires in 10 minutes.";
+export const MAGIC_LINK_DELIVERY_ERROR =
+	"We couldn't send a sign-in link right now. Please try again.";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const MIN_RESPONSE_TIME_MS = 500;
 
 function normalizeEmail(value: FormDataEntryValue | null): string {
 	return typeof value === "string" ? value.trim().toLowerCase() : "";
@@ -39,7 +44,26 @@ function rateLimitedResponse(retryAfter: number): Response {
 	);
 }
 
+async function waitForMinimumResponseTime(startedAt: number) {
+	const remainingMs = MIN_RESPONSE_TIME_MS - (Date.now() - startedAt);
+	if (remainingMs > 0) {
+		await new Promise((resolve) => setTimeout(resolve, remainingMs));
+	}
+}
+
+async function invalidateIssuedLink(rawToken: string, userId: string, startedAt: number) {
+	try {
+		await invalidateLoginMagicLink(rawToken);
+	} catch {
+		logger.error(
+			{ userId, errorKind: "invalidation", timingMs: Date.now() - startedAt },
+			"Failed to invalidate undelivered magic-link login",
+		);
+	}
+}
+
 export async function action({ request }: ActionFunctionArgs) {
+	const startedAt = Date.now();
 	const loginRateLimit = checkLoginRateLimit(request);
 	if (loginRateLimit.limited) {
 		return rateLimitedResponse(loginRateLimit.retryAfter);
@@ -64,6 +88,7 @@ export async function action({ request }: ActionFunctionArgs) {
 	await performDummyHashComparison(email);
 
 	if (!EMAIL_PATTERN.test(email) || email.length > 255) {
+		await waitForMinimumResponseTime(startedAt);
 		return { success: true, message: MAGIC_LINK_GENERIC_RESPONSE };
 	}
 
@@ -74,37 +99,64 @@ export async function action({ request }: ActionFunctionArgs) {
 				? (formData.get("redirectTo") as string)
 				: null,
 		);
-		void issueLoginMagicLink({
-			userId: user.id,
-			redirectPath,
-		})
-			.then(({ rawToken }) => {
-				const appUrl = process.env.APP_URL ?? "http://localhost:5173";
-				void sendMagicLinkEmail({
-					email: user.email,
-					name: user.name,
-					magicLinkUrl: `${appUrl}/auth/magic-link/consume?token=${encodeURIComponent(rawToken)}`,
-				})
-					.then((emailResult) => {
-						if (!emailResult.success) {
-							logger.warn(
-								{ userId: user.id, errorKind: emailResult.errorKind },
-								"Magic-link email delivery failed",
-							);
-						}
-					})
-					.catch(() => {
-						logger.warn({ userId: user.id }, "Magic-link email delivery rejected");
-					});
-				void cleanupExpiredMagicLinks().catch((error) => {
-					logger.warn({ err: error }, "Failed to clean up expired magic links");
-				});
-			})
-			.catch((error) => {
-				logger.error({ err: error, userId: user.id }, "Failed to issue magic-link login");
+		let rawToken: string | undefined;
+		let errorKind = "issuance";
+
+		try {
+			const issuedLink = await issuePendingLoginMagicLink({
+				userId: user.id,
+				redirectPath,
+				expiryMinutes: 15,
 			});
+			rawToken = issuedLink.rawToken;
+			errorKind = "delivery_rejected";
+
+			const appUrl = process.env.APP_URL ?? "http://localhost:5173";
+			const emailResult = await sendMagicLinkEmail({
+				email: user.email,
+				name: user.name,
+				magicLinkUrl: `${appUrl}/auth/magic-link/consume?token=${encodeURIComponent(rawToken)}`,
+			});
+			if (!emailResult.success) {
+				await invalidateIssuedLink(rawToken, user.id, startedAt);
+				logger.warn(
+					{
+						userId: user.id,
+						errorKind: emailResult.errorKind ?? "unknown",
+						timingMs: Date.now() - startedAt,
+					},
+					"Magic-link email delivery failed",
+				);
+				await waitForMinimumResponseTime(startedAt);
+				return { success: false, error: MAGIC_LINK_DELIVERY_ERROR };
+			}
+
+			errorKind = "activation";
+			await activateLoginMagicLink(rawToken);
+			logger.info(
+				{ userId: user.id, timingMs: Date.now() - startedAt },
+				"Magic-link email delivered",
+			);
+			void cleanupExpiredMagicLinks().catch(() => {
+				logger.warn(
+					{ userId: user.id, errorKind: "cleanup" },
+					"Failed to clean up expired magic links",
+				);
+			});
+		} catch {
+			if (rawToken) {
+				await invalidateIssuedLink(rawToken, user.id, startedAt);
+			}
+			logger.error(
+				{ userId: user.id, errorKind, timingMs: Date.now() - startedAt },
+				"Magic-link request failed",
+			);
+			await waitForMinimumResponseTime(startedAt);
+			return { success: false, error: MAGIC_LINK_DELIVERY_ERROR };
+		}
 	}
 
+	await waitForMinimumResponseTime(startedAt);
 	return { success: true, message: MAGIC_LINK_GENERIC_RESPONSE };
 }
 

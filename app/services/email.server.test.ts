@@ -96,6 +96,27 @@ describe("sendEmail", () => {
 		);
 	});
 
+	it("returns failure when ACS is not configured in production", async () => {
+		const previousNodeEnv = process.env.NODE_ENV;
+		process.env.NODE_ENV = "production";
+
+		try {
+			const result = await sendEmail({
+				to: "test@example.com",
+				subject: "Test",
+				html: "<p>Test</p>",
+			});
+
+			expect(result).toEqual({
+				success: false,
+				error: "Email service is not configured",
+				errorKind: "permanent",
+			});
+		} finally {
+			process.env.NODE_ENV = previousNodeEnv;
+		}
+	});
+
 	it("handles array recipients", async () => {
 		const result = await sendEmail({
 			to: ["a@example.com", "b@example.com"],
