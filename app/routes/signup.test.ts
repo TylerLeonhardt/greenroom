@@ -22,6 +22,13 @@ vi.mock("~/services/csrf.server", () => ({
 	validateCsrfToken: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock("~/services/logger.server", () => ({
+	logger: {
+		error: vi.fn(),
+		warn: vi.fn(),
+	},
+}));
+
 import { action, loader } from "~/routes/signup";
 import { generateVerificationToken, getOptionalUser, registerUser } from "~/services/auth.server";
 import { sendVerificationEmail } from "~/services/email.server";
@@ -128,6 +135,65 @@ describe("signup route", () => {
 			);
 			// Should NOT send a verification email for existing accounts
 			expect(sendVerificationEmail).not.toHaveBeenCalled();
+		});
+
+		it("returns the same redirect without a body for existing, deliverable, and failed addresses", async () => {
+			const submittedEmail = "Target@Example.com";
+			const normalizedEmail = "target@example.com";
+			const user = {
+				id: "target-user",
+				email: normalizedEmail,
+				name: "Target User",
+				profileImage: null,
+			};
+			const createRequest = () =>
+				new Request("http://localhost/signup", {
+					method: "POST",
+					body: new URLSearchParams({
+						name: "Target User",
+						email: submittedEmail,
+						password: "securepassword",
+						confirmPassword: "securepassword",
+					}),
+				});
+			const runAction = () => action({ request: createRequest(), params: {}, context: {} });
+
+			(registerUser as ReturnType<typeof vi.fn>).mockResolvedValue({ user, isNew: false });
+			const existingResponse = await runAction();
+
+			(registerUser as ReturnType<typeof vi.fn>).mockResolvedValue({ user, isNew: true });
+			(sendVerificationEmail as ReturnType<typeof vi.fn>).mockResolvedValue({ success: true });
+			const deliverableResponse = await runAction();
+
+			(sendVerificationEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
+				success: false,
+				error: "Email send failed",
+				errorKind: "permanent",
+			});
+			const permanentFailureResponse = await runAction();
+
+			(sendVerificationEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
+				success: false,
+				error: "Email suppressed",
+				errorKind: "suppressed",
+			});
+			const suppressedFailureResponse = await runAction();
+
+			for (const response of [
+				existingResponse,
+				deliverableResponse,
+				permanentFailureResponse,
+				suppressedFailureResponse,
+			]) {
+				expect(response).toBeInstanceOf(Response);
+				const redirectResponse = response as Response;
+				expect(redirectResponse.status).toBe(302);
+				expect(redirectResponse.headers.get("Location")).toBe(
+					"/check-email?email=target%40example.com",
+				);
+				expect(await redirectResponse.text()).toBe("");
+			}
+			expect(registerUser).toHaveBeenCalledWith(normalizedEmail, "securepassword", "Target User");
 		});
 
 		it("returns error when passwords do not match", async () => {
@@ -247,7 +313,7 @@ describe("signup route", () => {
 			);
 		});
 
-		it("returns error when verification email is suppressed", async () => {
+		it("redirects to check-email when verification email is suppressed", async () => {
 			const user = {
 				id: "new-user",
 				email: "suppressed@example.com",
@@ -273,10 +339,11 @@ describe("signup route", () => {
 			});
 
 			const result = await action({ request, params: {}, context: {} });
-			expect(result).not.toBeInstanceOf(Response);
-			const data = result as { errors: Record<string, string> };
-			expect(data.errors.form).toContain("couldn't deliver");
-			expect(data.errors.form).toContain("different email address");
+			expect(result).toBeInstanceOf(Response);
+			expect((result as Response).status).toBe(302);
+			expect((result as Response).headers.get("Location")).toBe(
+				"/check-email?email=suppressed%40example.com",
+			);
 		});
 
 		it("redirects to check-email on transient email failure (user can resend)", async () => {
@@ -312,7 +379,7 @@ describe("signup route", () => {
 			);
 		});
 
-		it("returns error on permanent email failure instead of claiming delivery", async () => {
+		it("redirects to check-email on permanent email failure", async () => {
 			const user = {
 				id: "new-user",
 				email: "new@example.com",
@@ -338,9 +405,10 @@ describe("signup route", () => {
 			});
 
 			const result = await action({ request, params: {}, context: {} });
-			expect(result).not.toBeInstanceOf(Response);
-			expect((result as { errors: Record<string, string> }).errors.form).toContain(
-				"Something went wrong",
+			expect(result).toBeInstanceOf(Response);
+			expect((result as Response).status).toBe(302);
+			expect((result as Response).headers.get("Location")).toBe(
+				"/check-email?email=new%40example.com",
 			);
 		});
 	});

@@ -21,6 +21,12 @@ vi.mock("~/services/csrf.server", () => ({
 	validateCsrfToken: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock("~/services/logger.server", () => ({
+	logger: {
+		warn: vi.fn(),
+	},
+}));
+
 import { action, loader } from "~/routes/check-email";
 import { generateVerificationToken, getUserByEmail } from "~/services/auth.server";
 import { sendVerificationEmail } from "~/services/email.server";
@@ -111,6 +117,37 @@ describe("check-email route", () => {
 			expect(generateVerificationToken).not.toHaveBeenCalled();
 		});
 
+		it("returns the same neutral response for unknown and delivery-failed addresses", async () => {
+			const createRequest = () =>
+				new Request("http://localhost/check-email", {
+					method: "POST",
+					body: new URLSearchParams({ email: "target@example.com" }),
+				});
+			const runAction = () => action({ request: createRequest(), params: {}, context: {} });
+
+			(getUserByEmail as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+			const unknownResult = await runAction();
+
+			(getUserByEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
+				id: "user-1",
+				email: "target@example.com",
+				name: "Target User",
+				emailVerified: false,
+			});
+
+			for (const errorKind of ["suppressed", "permanent", "transient"] as const) {
+				(sendVerificationEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
+					success: false,
+					error: "Email send failed",
+					errorKind,
+				});
+				const failureResult = await runAction();
+				expect(failureResult).toEqual(unknownResult);
+			}
+
+			expect(unknownResult).toEqual({ success: true });
+		});
+
 		it("redirects to /signup on change-email intent", async () => {
 			const request = new Request("http://localhost/check-email", {
 				method: "POST",
@@ -157,7 +194,7 @@ describe("check-email route", () => {
 			expect((result as Response).headers.get("Location")).toBe("/signup");
 		});
 
-		it("returns error when verification email is suppressed", async () => {
+		it("returns neutral success when verification email is suppressed", async () => {
 			(sendVerificationEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
 				success: false,
 				error: "Email could not be delivered — address is on a suppression list.",
@@ -172,11 +209,10 @@ describe("check-email route", () => {
 			});
 
 			const result = await action({ request, params: {}, context: {} });
-			expect(result).toHaveProperty("error");
-			expect((result as { error: string }).error).toContain("couldn't deliver");
+			expect(result).toEqual({ success: true });
 		});
 
-		it("returns error on transient email failure (does not falsely claim success)", async () => {
+		it("returns neutral success on transient email failure", async () => {
 			(sendVerificationEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
 				success: false,
 				error: "ECONNRESET",
@@ -190,14 +226,11 @@ describe("check-email route", () => {
 				body: formData,
 			});
 
-			// Any send failure must surface an error — never report success when the
-			// email wasn't delivered.
 			const result = await action({ request, params: {}, context: {} });
-			expect(result).toHaveProperty("error");
-			expect((result as { error: string }).error).toContain("Something went wrong");
+			expect(result).toEqual({ success: true });
 		});
 
-		it("returns error on permanent email failure", async () => {
+		it("returns neutral success on permanent email failure", async () => {
 			(sendVerificationEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
 				success: false,
 				error: "Invalid email format",
@@ -212,8 +245,7 @@ describe("check-email route", () => {
 			});
 
 			const result = await action({ request, params: {}, context: {} });
-			expect(result).toHaveProperty("error");
-			expect((result as { error: string }).error).toContain("Something went wrong");
+			expect(result).toEqual({ success: true });
 		});
 	});
 });

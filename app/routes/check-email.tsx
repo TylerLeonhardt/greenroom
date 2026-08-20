@@ -5,6 +5,7 @@ import { CsrfInput } from "~/components/csrf-input";
 import { generateVerificationToken, getUserByEmail } from "~/services/auth.server";
 import { validateCsrfToken } from "~/services/csrf.server";
 import { sendVerificationEmail } from "~/services/email.server";
+import { logger } from "~/services/logger.server";
 import { checkResendVerificationRateLimit } from "~/services/rate-limit.server";
 
 export const meta: MetaFunction = () => {
@@ -55,17 +56,10 @@ export async function action({ request }: ActionFunctionArgs) {
 	});
 
 	if (!emailResult.success) {
-		if (emailResult.errorKind === "suppressed") {
-			return {
-				error:
-					"We couldn't deliver an email to this address. Your email provider may be blocking our messages. Please try a different email address.",
-			};
-		}
-		// Permanent, clock_skew, or transient failure — don't claim success.
-		return {
-			error:
-				"Something went wrong sending your verification email. Please try again in a moment or contact support if the problem persists.",
-		};
+		logger.warn(
+			{ userId: user.id, errorKind: emailResult.errorKind },
+			"Verification email resend failed",
+		);
 	}
 
 	return { success: true };

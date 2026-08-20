@@ -72,11 +72,13 @@ export async function action({ request }: ActionFunctionArgs) {
 		return { errors };
 	}
 
+	const normalizedEmail = (email as string).toLowerCase().trim();
+
 	try {
-		const { user, isNew } = await registerUser(email as string, password as string, name as string);
+		const { user, isNew } = await registerUser(normalizedEmail, password as string, name as string);
 		if (!isNew) {
 			// Email already exists — redirect to same page to prevent enumeration
-			return redirect(`/check-email?email=${encodeURIComponent(email as string)}`);
+			return redirect(`/check-email?email=${encodeURIComponent(normalizedEmail)}`);
 		}
 		// Generate verification token and send email
 		const appUrl = process.env.APP_URL ?? "http://localhost:5173";
@@ -88,28 +90,13 @@ export async function action({ request }: ActionFunctionArgs) {
 		});
 
 		if (!emailResult.success) {
-			if (emailResult.errorKind === "suppressed") {
-				return {
-					errors: {
-						form: "We couldn't deliver a verification email to this address. Your email provider may be blocking our messages. Please try signing up with a different email address, or contact support if the problem persists.",
-					},
-				};
-			}
 			logger.warn(
 				{ userId: user.id, errorKind: emailResult.errorKind },
 				"Verification email failed during signup",
 			);
-			if (emailResult.errorKind !== "transient") {
-				return {
-					errors: {
-						form: "Something went wrong sending your verification email. Please try again in a moment or contact support if the problem persists.",
-					},
-				};
-			}
-			// Transient failures can be retried from check-email.
 		}
 
-		return redirect(`/check-email?email=${encodeURIComponent(user.email)}`);
+		return redirect(`/check-email?email=${encodeURIComponent(normalizedEmail)}`);
 	} catch (error) {
 		if (error instanceof Response) throw error;
 		logger.error(
