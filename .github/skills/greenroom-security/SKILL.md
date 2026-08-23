@@ -397,6 +397,15 @@ My Call Time uses the OAuth `state` parameter to prevent CSRF attacks on the cal
 
 3. If state doesn't match, the callback rejects the request — preventing an attacker from initiating an OAuth flow and tricking a user into completing it.
 
+### Google Email Account Linking
+
+Google OAuth may create a user or link to an existing password account by email only after the
+userinfo response has been runtime-validated and `email_verified === true` as a strict boolean.
+Missing, false, non-boolean, or malformed claims must fail closed before any user lookup mutation,
+account creation, or session creation. Normalize the email with `trim().toLowerCase()` before both
+lookup and insert so linking and uniqueness use the same canonical value. Never replace a different
+non-null Google subject already linked to an account based on an email match alone.
+
 ---
 
 ## Invite Code Security
@@ -426,6 +435,11 @@ My Call Time uses the OAuth `state` parameter to prevent CSRF attacks on the cal
 7. **No account deletion / GDPR path:** Users cannot delete their accounts or request data deletion. ([#25](https://github.com/TylerLeonhardt/greenroom/issues/25))
 
 8. ~~**Email enumeration on signup:** Fixed in PR #36. Generic success messages, timing-safe bcrypt with dummy hash.~~
+
+9. **Google ID tokens are not verified locally:** OAuth currently runtime-validates the Google
+   userinfo response and strictly requires `email_verified === true`, but does not cryptographically
+   verify the signed ID token's issuer, audience, expiry, subject, email, and verification claim.
+   Add direct ID-token verification as defense in depth.
 
 ---
 

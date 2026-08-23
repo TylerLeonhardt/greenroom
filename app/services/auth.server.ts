@@ -12,6 +12,14 @@ import { trackEvent } from "./telemetry.server.js";
 
 type UserRecord = typeof users.$inferSelect;
 
+interface GoogleProfile {
+	googleId: string;
+	email: string;
+	emailVerified: boolean;
+	name: string;
+	profileImage: string | null;
+}
+
 export interface AuthUser {
 	id: string;
 	email: string;
@@ -63,8 +71,16 @@ authenticator.use(
 
 // --- User DB helpers ---
 
+function normalizeEmail(email: string): string {
+	return email.trim().toLowerCase();
+}
+
 export async function getUserByEmail(email: string): Promise<UserRecord | undefined> {
-	const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+	const result = await db
+		.select()
+		.from(users)
+		.where(eq(users.email, normalizeEmail(email)))
+		.limit(1);
 	return result[0];
 }
 
@@ -114,7 +130,8 @@ export async function registerUser(
 	password: string,
 	name: string,
 ): Promise<{ user: AuthUser; isNew: boolean }> {
-	const existing = await getUserByEmail(email);
+	const normalizedEmail = normalizeEmail(email);
+	const existing = await getUserByEmail(normalizedEmail);
 	if (existing) {
 		// Don't reveal that the email exists — hash the password anyway for consistent timing
 		await bcrypt.hash(password, 12);
@@ -126,7 +143,7 @@ export async function registerUser(
 		const result = await db
 			.insert(users)
 			.values({
-				email: email.toLowerCase().trim(),
+				email: normalizedEmail,
 				passwordHash,
 				name: name.trim(),
 				emailVerified: false,
@@ -143,7 +160,10 @@ export async function registerUser(
 	} catch (error) {
 		// Handle race condition: concurrent signup with same email hits unique constraint
 		if (error instanceof Error && error.message.includes("unique")) {
-			return { user: { id: "", email, name, profileImage: null, timezone: null }, isNew: false };
+			return {
+				user: { id: "", email: normalizedEmail, name, profileImage: null, timezone: null },
+				isNew: false,
+			};
 		}
 		throw error;
 	}
@@ -151,25 +171,40 @@ export async function registerUser(
 
 // --- Google OAuth (manual implementation) ---
 
-export async function findOrCreateGoogleUser(profile: {
-	googleId: string;
-	email: string;
-	name: string;
-	profileImage: string | null;
-}): Promise<AuthUser> {
+export async function findOrCreateGoogleUser(profile: GoogleProfile): Promise<AuthUser> {
+	if (
+		profile.emailVerified !== true ||
+		typeof profile.googleId !== "string" ||
+		!profile.googleId.trim() ||
+		typeof profile.email !== "string" ||
+		!profile.email.trim() ||
+		typeof profile.name !== "string" ||
+		!profile.name.trim() ||
+		(profile.profileImage !== null && typeof profile.profileImage !== "string")
+	) {
+		throw new Error("Invalid Google user profile.");
+	}
+
+	const googleId = profile.googleId.trim();
+	const normalizedEmail = normalizeEmail(profile.email);
+	const name = profile.name.trim();
+
 	// Check if user exists by Google ID
-	const existingByGoogle = await getUserByGoogleId(profile.googleId);
+	const existingByGoogle = await getUserByGoogleId(googleId);
 	if (existingByGoogle) {
 		return toAuthUser(existingByGoogle);
 	}
 
 	// Check if user exists by email (link accounts)
-	const existingByEmail = await getUserByEmail(profile.email);
+	const existingByEmail = await getUserByEmail(normalizedEmail);
 	if (existingByEmail) {
+		if (existingByEmail.googleId && existingByEmail.googleId !== googleId) {
+			throw new Error("Google account is already linked.");
+		}
 		const updated = await db
 			.update(users)
 			.set({
-				googleId: profile.googleId,
+				googleId,
 				profileImage: profile.profileImage ?? existingByEmail.profileImage,
 				emailVerified: true,
 				updatedAt: new Date(),
@@ -185,9 +220,9 @@ export async function findOrCreateGoogleUser(profile: {
 	const result = await db
 		.insert(users)
 		.values({
-			email: profile.email.toLowerCase().trim(),
-			name: profile.name,
-			googleId: profile.googleId,
+			email: normalizedEmail,
+			name,
+			googleId,
 			profileImage: profile.profileImage,
 			emailVerified: true,
 		})
@@ -249,6 +284,7 @@ export async function verifyOAuthState(request: Request, state: string | null): 
 export async function exchangeGoogleCode(code: string): Promise<{
 	googleId: string;
 	email: string;
+	emailVerified: boolean;
 	name: string;
 	profileImage: string | null;
 }> {
@@ -277,7 +313,16 @@ export async function exchangeGoogleCode(code: string): Promise<{
 		throw new Error("Failed to exchange Google authorization code.");
 	}
 
-	const tokens = (await tokenResponse.json()) as { access_token: string };
+	const tokens: unknown = await tokenResponse.json();
+	if (
+		typeof tokens !== "object" ||
+		tokens === null ||
+		!("access_token" in tokens) ||
+		typeof tokens.access_token !== "string" ||
+		!tokens.access_token
+	) {
+		throw new Error("Invalid Google token response.");
+	}
 
 	// Fetch user profile
 	const profileResponse = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
@@ -288,18 +333,36 @@ export async function exchangeGoogleCode(code: string): Promise<{
 		throw new Error("Failed to fetch Google user profile.");
 	}
 
-	const profile = (await profileResponse.json()) as {
-		sub: string;
-		email: string;
-		name: string;
-		picture?: string;
-	};
+	const profile: unknown = await profileResponse.json();
+	if (
+		typeof profile !== "object" ||
+		profile === null ||
+		!("sub" in profile) ||
+		typeof profile.sub !== "string" ||
+		!profile.sub.trim() ||
+		!("email" in profile) ||
+		typeof profile.email !== "string" ||
+		!profile.email.trim() ||
+		!("name" in profile) ||
+		typeof profile.name !== "string" ||
+		!profile.name.trim() ||
+		!("email_verified" in profile) ||
+		profile.email_verified !== true ||
+		("picture" in profile &&
+			profile.picture !== undefined &&
+			profile.picture !== null &&
+			typeof profile.picture !== "string")
+	) {
+		throw new Error("Invalid or unverified Google user profile.");
+	}
 
 	return {
-		googleId: profile.sub,
-		email: profile.email,
-		name: profile.name,
-		profileImage: profile.picture ?? null,
+		googleId: profile.sub.trim(),
+		email: normalizeEmail(profile.email),
+		emailVerified: true,
+		name: profile.name.trim(),
+		profileImage:
+			"picture" in profile && typeof profile.picture === "string" ? profile.picture : null,
 	};
 }
 
