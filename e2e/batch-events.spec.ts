@@ -1,20 +1,27 @@
-import { expect, test } from "@playwright/test";
-import { ADMIN_STATE, loadTestData } from "./helpers/test-data";
-
-const td = loadTestData();
+import { expect, test } from "./helpers/fixtures";
+import type { SharedTestData } from "./helpers/test-data";
 
 /** Build the batch creation URL for a subset of availability request dates. */
-function batchUrl(dates: string[]): string {
-	return `/groups/${td.group.id}/availability/${td.availabilityRequest.id}/batch?dates=${dates.join(",")}`;
+function batchUrl(testData: SharedTestData, dates: string[]): string {
+	return `/groups/${testData.group.id}/availability/${testData.availabilityRequest.id}/batch?dates=${dates.join(",")}`;
+}
+
+async function openBatchPage(
+	page: import("@playwright/test").Page,
+	testData: SharedTestData,
+	dates: string[],
+): Promise<void> {
+	await page.goto(batchUrl(testData, dates));
+	await page.waitForLoadState("networkidle");
 }
 
 test.describe("Batch Event Creation", () => {
-	test.use({ storageState: ADMIN_STATE });
+	test.use({ authRole: "admin" });
 
 	test.describe("Happy Path — Fast Path", () => {
-		test("creates events with defaults (minimal interaction)", async ({ page }) => {
-			const dates = td.availabilityRequest.dates.slice(0, 3);
-			await page.goto(batchUrl(dates));
+		test("creates events with defaults (minimal interaction)", async ({ page, testData }) => {
+			const dates = testData.availabilityRequest.dates.slice(0, 3);
+			await openBatchPage(page, testData, dates);
 			await page.waitForLoadState("networkidle");
 
 			// Page heading reflects correct count
@@ -23,7 +30,7 @@ test.describe("Batch Event Creation", () => {
 			).toBeVisible();
 
 			// Title is pre-filled from the availability request
-			await expect(page.locator("#title")).toHaveValue(td.availabilityRequest.title);
+			await expect(page.locator("#title")).toHaveValue(testData.availabilityRequest.title);
 
 			// Event type defaults to "Rehearsal" (active button has emerald styling)
 			await expect(page.getByRole("button", { name: "Rehearsal" })).toHaveClass(/bg-emerald/);
@@ -43,7 +50,7 @@ test.describe("Batch Event Creation", () => {
 			await expect(page.getByText(`Ready to Create — ${dates.length} events`)).toBeVisible();
 
 			// Each event card shows the title
-			const titleElements = page.getByText(td.availabilityRequest.title);
+			const titleElements = page.getByText(testData.availabilityRequest.title);
 			await expect(titleElements.first()).toBeVisible();
 
 			// Each event card shows "Rehearsal" type badge
@@ -67,10 +74,10 @@ test.describe("Batch Event Creation", () => {
 	});
 
 	test.describe("Happy Path — Full Customization", () => {
-		test("creates events with all fields customized", async ({ page }) => {
+		test("creates events with all fields customized", async ({ page, testData }) => {
 			// Use different dates than the fast path to avoid duplicate events
-			const dates = td.availabilityRequest.dates.slice(3, 5);
-			await page.goto(batchUrl(dates));
+			const dates = testData.availabilityRequest.dates.slice(3, 5);
+			await openBatchPage(page, testData, dates);
 			await page.waitForLoadState("networkidle");
 
 			// Custom title
@@ -117,9 +124,9 @@ test.describe("Batch Event Creation", () => {
 	});
 
 	test.describe("Toggle Behavior", () => {
-		test("toggling description off clears the text", async ({ page }) => {
-			const dates = td.availabilityRequest.dates.slice(0, 2);
-			await page.goto(batchUrl(dates));
+		test("toggling description off clears the text", async ({ page, testData }) => {
+			const dates = testData.availabilityRequest.dates.slice(0, 2);
+			await openBatchPage(page, testData, dates);
 			await page.waitForLoadState("networkidle");
 
 			// Toggle description ON and type something
@@ -139,9 +146,9 @@ test.describe("Batch Event Creation", () => {
 			await expect(page.locator("#description")).toHaveValue("");
 		});
 
-		test("toggling locations off clears all location data", async ({ page }) => {
-			const dates = td.availabilityRequest.dates.slice(0, 2);
-			await page.goto(batchUrl(dates));
+		test("toggling locations off clears all location data", async ({ page, testData }) => {
+			const dates = testData.availabilityRequest.dates.slice(0, 2);
+			await openBatchPage(page, testData, dates);
 			await page.waitForLoadState("networkidle");
 
 			// Toggle locations ON and fill values
@@ -167,9 +174,9 @@ test.describe("Batch Event Creation", () => {
 	});
 
 	test.describe("Validation", () => {
-		test("Review button is disabled without a title", async ({ page }) => {
-			const dates = td.availabilityRequest.dates.slice(0, 2);
-			await page.goto(batchUrl(dates));
+		test("Review button is disabled without a title", async ({ page, testData }) => {
+			const dates = testData.availabilityRequest.dates.slice(0, 2);
+			await openBatchPage(page, testData, dates);
 			await page.waitForLoadState("networkidle");
 
 			// Clear the pre-filled title
@@ -179,9 +186,9 @@ test.describe("Batch Event Creation", () => {
 			await expect(page.getByRole("button", { name: /Review Events/ })).toBeDisabled();
 		});
 
-		test("times have defaults so Review button is enabled", async ({ page }) => {
-			const dates = td.availabilityRequest.dates.slice(0, 2);
-			await page.goto(batchUrl(dates));
+		test("times have defaults so Review button is enabled", async ({ page, testData }) => {
+			const dates = testData.availabilityRequest.dates.slice(0, 2);
+			await openBatchPage(page, testData, dates);
 			await page.waitForLoadState("networkidle");
 
 			// Start/end times have defaults
@@ -194,9 +201,9 @@ test.describe("Batch Event Creation", () => {
 	});
 
 	test.describe("Per-Date Locations", () => {
-		test("Apply to All sets the same location for every date", async ({ page }) => {
-			const dates = td.availabilityRequest.dates.slice(0, 3);
-			await page.goto(batchUrl(dates));
+		test("Apply to All sets the same location for every date", async ({ page, testData }) => {
+			const dates = testData.availabilityRequest.dates.slice(0, 3);
+			await openBatchPage(page, testData, dates);
 			await page.waitForLoadState("networkidle");
 
 			// Toggle locations ON
@@ -213,9 +220,9 @@ test.describe("Batch Event Creation", () => {
 			}
 		});
 
-		test("overriding one date does not affect the others", async ({ page }) => {
-			const dates = td.availabilityRequest.dates.slice(0, 3);
-			await page.goto(batchUrl(dates));
+		test("overriding one date does not affect the others", async ({ page, testData }) => {
+			const dates = testData.availabilityRequest.dates.slice(0, 3);
+			await openBatchPage(page, testData, dates);
 			await page.waitForLoadState("networkidle");
 
 			// Toggle locations ON, apply "Main Theater" to all
@@ -236,9 +243,12 @@ test.describe("Batch Event Creation", () => {
 	});
 
 	test.describe("Review ↔ Configure Navigation", () => {
-		test("can go back from review to configure and preserve form state", async ({ page }) => {
-			const dates = td.availabilityRequest.dates.slice(0, 2);
-			await page.goto(batchUrl(dates));
+		test("can go back from review to configure and preserve form state", async ({
+			page,
+			testData,
+		}) => {
+			const dates = testData.availabilityRequest.dates.slice(0, 2);
+			await openBatchPage(page, testData, dates);
 			await page.waitForLoadState("networkidle");
 
 			// Fill in a custom title

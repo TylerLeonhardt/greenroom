@@ -1,17 +1,15 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./helpers/fixtures";
 import { issueTestMagicLink } from "./helpers/seed";
-import { ADMIN_STATE, loadTestData } from "./helpers/test-data";
+import { type SharedTestData, testNamespace } from "./helpers/test-data";
 
-const td = loadTestData();
-
-function magicLinkUserId(projectName: string): string {
+function magicLinkUserId(projectName: string, testData: SharedTestData): string {
 	switch (projectName) {
 		case "Desktop Chrome":
-			return td.admin.id;
+			return testData.admin.id;
 		case "Mobile Safari":
-			return td.member.id;
+			return testData.member.id;
 		case "Mobile Chrome":
-			return td.solo.id;
+			return testData.solo.id;
 		default:
 			throw new Error(`No magic-link test user for ${projectName}`);
 	}
@@ -27,8 +25,10 @@ test.describe("Signup", () => {
 		await expect(page).toHaveURL(/\/signup/);
 	});
 
-	test("signup with valid credentials redirects to check-email", async ({ page }) => {
-		const uniqueEmail = `e2e-signup-${Date.now()}@test.local`;
+	test("signup with valid credentials redirects to check-email", async ({ page }, testInfo) => {
+		const uniqueEmail =
+			`e2e-signup-${testNamespace(testInfo.project.name)}-` +
+			`${testInfo.retry}-${Date.now()}@test.local`;
 
 		await page.goto("/signup");
 		await page.getByLabel("Name").fill("E2E Signup User");
@@ -56,21 +56,26 @@ test.describe("Signup", () => {
 });
 
 test.describe("Login", () => {
-	test("fresh magic link signs in through the clean continue page", async ({ page }, testInfo) => {
-		const rawToken = await issueTestMagicLink(magicLinkUserId(testInfo.project.name));
+	test("fresh magic link signs in through the clean continue page", async ({
+		page,
+		testData,
+	}, testInfo) => {
+		const rawToken = await issueTestMagicLink(magicLinkUserId(testInfo.project.name, testData));
 
 		await page.goto(`/auth/magic-link/consume?token=${rawToken}`);
 		await expect(page).toHaveURL(/\/auth\/magic-link\/consume$/);
+		await page.waitForLoadState("networkidle");
 		await page.getByRole("button", { name: "Continue to My Call Time" }).click();
 
 		await expect(page).toHaveURL(/\/dashboard/);
 		await expect(page.getByText(/welcome back/i)).toBeVisible();
 	});
 
-	test("login with valid credentials redirects to dashboard", async ({ page }) => {
+	test("login with valid credentials redirects to dashboard", async ({ page, testData }) => {
 		await page.goto("/login");
+		await page.waitForLoadState("networkidle");
 		const passwordForm = page.getByRole("form", { name: "Sign in with password" });
-		await passwordForm.getByLabel("Email", { exact: true }).fill(td.admin.email);
+		await passwordForm.getByLabel("Email", { exact: true }).fill(testData.admin.email);
 		await passwordForm.getByLabel("Password", { exact: true }).fill("TestPassword123!");
 		await passwordForm.getByRole("button", { name: "Sign in", exact: true }).click();
 
@@ -78,10 +83,11 @@ test.describe("Login", () => {
 		await expect(page.getByText(/welcome back/i)).toBeVisible();
 	});
 
-	test("login with wrong password shows error", async ({ page }) => {
+	test("login with wrong password shows error", async ({ page, testData }) => {
 		await page.goto("/login");
+		await page.waitForLoadState("networkidle");
 		const passwordForm = page.getByRole("form", { name: "Sign in with password" });
-		await passwordForm.getByLabel("Email", { exact: true }).fill(td.admin.email);
+		await passwordForm.getByLabel("Email", { exact: true }).fill(testData.admin.email);
 		await passwordForm.getByLabel("Password", { exact: true }).fill("WrongPassword999!");
 		await passwordForm.getByRole("button", { name: "Sign in", exact: true }).click();
 
@@ -92,6 +98,7 @@ test.describe("Login", () => {
 
 	test("login page shows email/password fields and Google OAuth", async ({ page }) => {
 		await page.goto("/login");
+		await page.waitForLoadState("networkidle");
 
 		await expect(page.getByText("Welcome back")).toBeVisible();
 		await expect(page.getByLabel("Email for sign-in link", { exact: true })).toBeVisible();
@@ -104,7 +111,7 @@ test.describe("Login", () => {
 });
 
 test.describe("Logout", () => {
-	test.use({ storageState: ADMIN_STATE });
+	test.use({ authRole: "admin" });
 
 	test("logout redirects to landing page", async ({ page, isMobile }) => {
 		await page.goto("/dashboard");
@@ -134,7 +141,7 @@ test.describe("Landing Page", () => {
 });
 
 test.describe("Landing Page (authenticated)", () => {
-	test.use({ storageState: ADMIN_STATE });
+	test.use({ authRole: "admin" });
 
 	test("shows dashboard link when already logged in", async ({ page }) => {
 		await page.goto("/");

@@ -1,8 +1,12 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
-export const ADMIN_STATE = "e2e/.auth/admin.json";
-export const MEMBER_STATE = "e2e/.auth/member.json";
-export const SOLO_STATE = "e2e/.auth/solo.json";
+export const APP_PROJECTS = ["Desktop Chrome", "Mobile Safari", "Mobile Chrome"] as const;
+
+export type AppProjectName = (typeof APP_PROJECTS)[number];
+export type AuthRole = "admin" | "member" | "solo";
 
 export interface SharedTestData {
 	admin: { id: string; email: string; name: string };
@@ -17,28 +21,57 @@ export interface SharedTestData {
 }
 
 /**
- * Loads test data saved by global.setup.ts.
- *
- * Returns empty placeholders when the file doesn't exist yet. This happens
- * during Playwright's test-collection phase which evaluates all spec files
- * at module scope *before* the setup project runs. Worker processes
- * re-evaluate the files after setup completes, at which point the real
- * data is available.
+ * Resolves project-specific files saved by global.setup.ts. Specs access these
+ * through helpers/fixtures.ts after the setup dependency has completed.
  */
-export function loadTestData(): SharedTestData {
-	const path = "e2e/.auth/test-data.json";
+function projectSlug(projectName: string): string {
+	if (!APP_PROJECTS.includes(projectName as AppProjectName)) {
+		throw new Error(`Unknown app E2E project: ${projectName}`);
+	}
+
+	return projectName.toLowerCase().replaceAll(" ", "-");
+}
+
+function runId(): string {
+	const id = process.env.E2E_RUN_ID;
+	if (!id || !/^[a-zA-Z0-9-]+$/.test(id)) {
+		throw new Error("E2E_RUN_ID must be set to an alphanumeric or hyphenated value");
+	}
+	return id;
+}
+
+export function testNamespace(projectName: string): string {
+	return `${runId()}-${projectSlug(projectName)}`;
+}
+
+export function testArtifactsPath(): string {
+	return path.join(os.tmpdir(), "greenroom-e2e", runId());
+}
+
+export function authStatePath(projectName: string, role: AuthRole): string {
+	return path.join(testArtifactsPath(), `${projectSlug(projectName)}-${role}.json`);
+}
+
+export function projectIp(projectName: string): string {
+	const digest = createHash("sha256")
+		.update(`${runId()}:${projectSlug(projectName)}`)
+		.digest("hex")
+		.slice(0, 16);
+	const segments = digest.match(/.{4}/g);
+	if (!segments) {
+		throw new Error("Unable to generate an E2E project IP");
+	}
+	return `2001:db8:${segments.join(":")}`;
+}
+
+export function testDataPath(projectName: string): string {
+	return path.join(testArtifactsPath(), `${projectSlug(projectName)}-test-data.json`);
+}
+
+export function loadTestData(projectName: string): SharedTestData {
+	const path = testDataPath(projectName);
 	if (!fs.existsSync(path)) {
-		return {
-			admin: { id: "", email: "", name: "" },
-			member: { id: "", email: "", name: "" },
-			solo: { id: "", email: "", name: "" },
-			group: { id: "", name: "", inviteCode: "" },
-			availabilityRequest: { id: "", title: "", dates: [] },
-			creatorAvailabilityRequest: { id: "", title: "", dates: [] },
-			eventPermissionGroup: { id: "", name: "", inviteCode: "" },
-			permissionAvailabilityRequest: { id: "", title: "", dates: [] },
-			permissionCreatorAvailabilityRequest: { id: "", title: "", dates: [] },
-		};
+		throw new Error(`Missing E2E test data for ${projectName}: ${path}`);
 	}
 	const raw = fs.readFileSync(path, "utf-8");
 	return JSON.parse(raw);

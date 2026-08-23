@@ -1,7 +1,5 @@
-import { expect, test } from "@playwright/test";
-import { ADMIN_STATE, loadTestData, MEMBER_STATE } from "./helpers/test-data";
-
-const td = loadTestData();
+import { expect, test } from "./helpers/fixtures";
+import type { AuthRole, SharedTestData } from "./helpers/test-data";
 
 /**
  * RSVP Change Feed E2E Tests
@@ -20,6 +18,8 @@ const td = loadTestData();
 /** Helper to create an event as admin and return the event detail URL. */
 async function adminCreatesEvent(
 	browser: import("@playwright/test").Browser,
+	testData: SharedTestData,
+	authStates: Record<AuthRole, string>,
 	options: {
 		title: string;
 		type?: "rehearsal" | "show";
@@ -27,10 +27,10 @@ async function adminCreatesEvent(
 		assignMember?: boolean;
 	},
 ): Promise<string> {
-	const ctx = await browser.newContext({ storageState: ADMIN_STATE });
+	const ctx = await browser.newContext({ storageState: authStates.admin });
 	const page = await ctx.newPage();
 
-	await page.goto(`/groups/${td.group.id}/events/new`);
+	await page.goto(`/groups/${testData.group.id}/events/new`);
 	await page.waitForLoadState("networkidle");
 
 	await page.getByLabel("Title *").fill(options.title);
@@ -49,7 +49,7 @@ async function adminCreatesEvent(
 
 	if (options.assignMember && options.type === "show") {
 		// Checkbox is sr-only with label intercepting; use force click
-		const memberCheckbox = page.getByRole("checkbox", { name: td.member.name });
+		const memberCheckbox = page.getByRole("checkbox", { name: testData.member.name });
 		await expect(memberCheckbox).toBeVisible({ timeout: 5_000 });
 		await memberCheckbox.check({ force: true });
 	}
@@ -64,9 +64,9 @@ async function adminCreatesEvent(
 }
 
 test.describe("RSVP Change Feed", () => {
-	test("full RSVP lifecycle with activity feed", async ({ browser }) => {
+	test("full RSVP lifecycle with activity feed", async ({ authStates, browser, testData }) => {
 		// ── Step 1: Admin creates a show event with the member as a performer ──
-		const eventUrl = await adminCreatesEvent(browser, {
+		const eventUrl = await adminCreatesEvent(browser, testData, authStates, {
 			title: "RSVP Feed Test Show",
 			type: "show",
 			daysFromNow: 14,
@@ -74,7 +74,7 @@ test.describe("RSVP Change Feed", () => {
 		});
 
 		// Verify empty state: admin sees no Activity section
-		const adminCtx = await browser.newContext({ storageState: ADMIN_STATE });
+		const adminCtx = await browser.newContext({ storageState: authStates.admin });
 		const adminPage = await adminCtx.newPage();
 		await adminPage.goto(eventUrl);
 		await adminPage.waitForLoadState("networkidle");
@@ -84,7 +84,7 @@ test.describe("RSVP Change Feed", () => {
 		await adminCtx.close();
 
 		// ── Step 2: Performer (member) confirms attendance ──
-		const memberCtx = await browser.newContext({ storageState: MEMBER_STATE });
+		const memberCtx = await browser.newContext({ storageState: authStates.member });
 		const memberPage = await memberCtx.newPage();
 
 		await memberPage.goto(eventUrl);
@@ -148,16 +148,20 @@ test.describe("RSVP Change Feed", () => {
 		await memberCtx.close();
 	});
 
-	test("member self-registration creates activity feed entry", async ({ browser }) => {
+	test("member self-registration creates activity feed entry", async ({
+		authStates,
+		browser,
+		testData,
+	}) => {
 		// Admin creates a rehearsal event (non-show) so members can self-register
-		const rehearsalUrl = await adminCreatesEvent(browser, {
+		const rehearsalUrl = await adminCreatesEvent(browser, testData, authStates, {
 			title: "Self-Reg Feed Test",
 			type: "rehearsal",
 			daysFromNow: 15,
 		});
 
 		// Member self-registers via "I'll be there"
-		const memberCtx = await browser.newContext({ storageState: MEMBER_STATE });
+		const memberCtx = await browser.newContext({ storageState: authStates.member });
 		const memberPage = await memberCtx.newPage();
 
 		await memberPage.goto(rehearsalUrl);
@@ -186,13 +190,17 @@ test.describe("RSVP Change Feed", () => {
 		await memberCtx.close();
 	});
 
-	test("empty state: no activity heading when no RSVP changes", async ({ browser }) => {
-		const eventUrl = await adminCreatesEvent(browser, {
+	test("empty state: no activity heading when no RSVP changes", async ({
+		authStates,
+		browser,
+		testData,
+	}) => {
+		const eventUrl = await adminCreatesEvent(browser, testData, authStates, {
 			title: "Empty Feed Test",
 			daysFromNow: 16,
 		});
 
-		const adminCtx = await browser.newContext({ storageState: ADMIN_STATE });
+		const adminCtx = await browser.newContext({ storageState: authStates.admin });
 		const adminPage = await adminCtx.newPage();
 		await adminPage.goto(eventUrl);
 		await adminPage.waitForLoadState("networkidle");

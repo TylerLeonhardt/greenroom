@@ -7,6 +7,7 @@ import { defineConfig } from "vite";
 // Excludes the Remix plugin which interferes with the explorer's
 // preamble detection when rendering fixtures outside Remix routes.
 export default defineConfig({
+	cacheDir: process.env.E2E_VITE_CACHE_DIR,
 	resolve: {
 		alias: {
 			"~": path.resolve(__dirname, "app"),

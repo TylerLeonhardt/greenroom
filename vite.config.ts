@@ -11,6 +11,17 @@ declare module "@remix-run/node" {
 }
 
 export default defineConfig({
+	cacheDir: process.env.E2E_VITE_CACHE_DIR,
+	optimizeDeps: {
+		include: [
+			"@remix-run/react",
+			"lucide-react",
+			"react",
+			"react-dom",
+			"react/jsx-dev-runtime",
+			"react/jsx-runtime",
+		],
+	},
 	resolve: {
 		alias: {
 			"~": path.resolve(__dirname, "app"),

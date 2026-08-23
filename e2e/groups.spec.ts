@@ -1,10 +1,7 @@
-import { expect, test } from "@playwright/test";
-import { ADMIN_STATE, loadTestData, SOLO_STATE } from "./helpers/test-data";
-
-const td = loadTestData();
+import { expect, test } from "./helpers/fixtures";
 
 test.describe("Create Group", () => {
-	test.use({ storageState: ADMIN_STATE });
+	test.use({ authRole: "admin" });
 
 	test("admin can create a new group", async ({ page }) => {
 		await page.goto("/groups/new");
@@ -19,13 +16,13 @@ test.describe("Create Group", () => {
 });
 
 test.describe("Join Group", () => {
-	test.use({ storageState: SOLO_STATE });
+	test.use({ authRole: "solo" });
 
-	test("user can join a group with invite code", async ({ page }) => {
-		await page.goto(`/groups/join?code=${td.group.inviteCode}`);
+	test("user can join a group with invite code", async ({ page, testData }) => {
+		await page.goto(`/groups/join?code=${testData.group.inviteCode}`);
 
 		const codeInput = page.getByLabel(/code/i);
-		await expect(codeInput).toHaveValue(td.group.inviteCode);
+		await expect(codeInput).toHaveValue(testData.group.inviteCode);
 
 		await page.getByRole("button", { name: "Join Group" }).click();
 
@@ -35,7 +32,7 @@ test.describe("Join Group", () => {
 });
 
 test.describe("Join Group Errors", () => {
-	test.use({ storageState: ADMIN_STATE });
+	test.use({ authRole: "admin" });
 
 	test("join page shows error for invalid invite code", async ({ page }) => {
 		await page.goto("/groups/join");
@@ -47,27 +44,27 @@ test.describe("Join Group Errors", () => {
 });
 
 test.describe("Group Overview", () => {
-	test.use({ storageState: ADMIN_STATE });
+	test.use({ authRole: "admin" });
 
-	test("displays member list and group info", async ({ page }) => {
-		await page.goto(`/groups/${td.group.id}`);
+	test("displays member list and group info", async ({ page, testData }) => {
+		await page.goto(`/groups/${testData.group.id}`);
 
-		await expect(page.getByText(td.group.name)).toBeVisible();
+		await expect(page.getByText(testData.group.name)).toBeVisible();
 		await expect(page.getByRole("heading", { name: /members/i })).toBeVisible();
 		// Admin name appears in both nav and member list — scope to main content
-		await expect(page.getByRole("main").getByText(td.admin.name)).toBeVisible();
-		await expect(page.getByRole("main").getByText(td.member.name)).toBeVisible();
+		await expect(page.getByRole("main").getByText(testData.admin.name)).toBeVisible();
+		await expect(page.getByRole("main").getByText(testData.member.name)).toBeVisible();
 	});
 
-	test("admin sees invite code on group page", async ({ page }) => {
-		await page.goto(`/groups/${td.group.id}`);
+	test("admin sees invite code on group page", async ({ page, testData }) => {
+		await page.goto(`/groups/${testData.group.id}`);
 
-		await expect(page.getByText(td.group.inviteCode)).toBeVisible();
+		await expect(page.getByText(testData.group.inviteCode)).toBeVisible();
 	});
 
-	test("groups list page shows user's groups", async ({ page }) => {
+	test("groups list page shows user's groups", async ({ page, testData }) => {
 		await page.goto("/groups");
 
-		await expect(page.getByText(td.group.name)).toBeVisible();
+		await expect(page.getByText(testData.group.name)).toBeVisible();
 	});
 });

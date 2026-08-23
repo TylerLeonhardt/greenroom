@@ -579,13 +579,60 @@ Clear only the specific processes reported by `lsof`, using their numeric PIDs (
 Do not run `pnpm run build` concurrently with Playwright. The build can restart or clobber the Vite
 server and cause `ERR_CONNECTION_REFUSED` partway through the suite.
 
-### Shared Seed Limitation
+### Project-Isolated Seed and Auth State
 
-`global.setup.ts` and `seed.ts` create one dataset shared by every app browser project. Tests in an
-earlier project can mutate shared availability requests and make later authenticated pages fail.
-This is a known limitation tracked in
-[#210](https://github.com/TylerLeonhardt/greenroom/issues/210); apparent batch-event or
-authenticated-page retry cascades in the full matrix may be cross-project seed contamination.
+`global.setup.ts` creates a separate dataset and three authenticated storage states for each app
+browser project. `e2e/helpers/fixtures.ts` selects the matching data and auth files from
+`testInfo.project.name`, so Desktop Chrome, Mobile Safari, and Mobile Chrome never mutate the same
+users, groups, availability requests, events, memberships, or sessions. Each app project and test
+run also sends a distinct test-only `x-forwarded-for` value so concurrent matrices sharing a local
+server do not collide in the in-memory auth rate limiter. Every Playwright invocation also gets a generated run ID;
+database namespaces and auth/data files under the OS temp directory include that ID, and global
+teardown removes the database records and auth/data files while preserving failure artifacts.
+Concurrent app matrices therefore do not delete or overwrite each other's fixtures.
+Setup removes E2E data older than 24 hours so interrupted local runs self-heal without deleting a
+concurrently running matrix.
+The Playwright web servers also receive port-scoped Vite cache directories outside
+`node_modules/.vite`. Concurrent servers must use different ports and therefore cannot invalidate
+each other's optimized dependencies. The app Vite config pre-bundles the React/Remix dependencies
+used across lazy routes to avoid mid-run `504 Outdated Optimize Dep` responses.
+
+App E2E specs must import `test` and `expect` from the shared fixture:
+
+```typescript
+import { expect, test } from "./helpers/fixtures";
+
+test.describe("Admin workflow", () => {
+  test.use({ authRole: "admin" });
+
+  test("updates project-owned data", async ({ page, testData }) => {
+    await page.goto(`/groups/${testData.group.id}`);
+  });
+});
+```
+
+Use `authRole: "admin" | "member" | "solo"` instead of a hard-coded `storageState` path. Tests that
+need multiple users should use the project-scoped `authStates` fixture:
+
+```typescript
+test("admin and member interact", async ({ authStates, browser, testData }) => {
+  const adminContext = await browser.newContext({ storageState: authStates.admin });
+  const memberContext = await browser.newContext({ storageState: authStates.member });
+  // Both users and testData belong to the current Playwright project.
+});
+```
+
+Rules for mutating app E2E specs:
+
+1. Never load seeded data at module scope or reference files such as `e2e/.auth/admin.json`.
+2. Use `testData` and `authStates`; they are guaranteed to belong to the current browser project.
+3. Create unique records for mutations that can collide within one project, using a UUID or a title
+   containing `testInfo.project.name`.
+4. Wait for the page to reach `networkidle` before interacting with client-controlled forms.
+5. Delete direct SQL fixtures in `afterAll`; global teardown removes browser-created records in the
+   current run namespace.
+6. Run `pnpm test:e2e:ci` for the full app matrix. A single spec or browser project cannot prove
+   cross-project isolation.
 
 ### Scope Locators to Visible UI Landmarks
 

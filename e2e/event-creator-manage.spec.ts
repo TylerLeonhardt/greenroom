@@ -1,9 +1,7 @@
 import crypto from "node:crypto";
-import { expect, test } from "@playwright/test";
 import pg from "pg";
-import { loadTestData, MEMBER_STATE } from "./helpers/test-data";
-
-const td = loadTestData();
+import { expect, test } from "./helpers/fixtures";
+import type { SharedTestData } from "./helpers/test-data";
 
 function getPool(): pg.Pool {
 	return new pg.Pool({
@@ -22,11 +20,13 @@ function getPool(): pg.Pool {
  * the browser as that member.
  */
 test.describe("Event creator manages participants (non-admin)", () => {
-	test.use({ storageState: MEMBER_STATE });
+	test.use({ authRole: "member" });
 
 	let eventId: string;
+	let td: SharedTestData;
 
-	test.beforeAll(async () => {
+	test.beforeAll(async ({ testData }) => {
+		td = testData;
 		const pool = getPool();
 		try {
 			eventId = crypto.randomUUID();
