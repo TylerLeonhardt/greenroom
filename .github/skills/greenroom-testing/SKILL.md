@@ -590,6 +590,8 @@ server do not collide in the in-memory auth rate limiter. Every Playwright invoc
 database namespaces and auth/data files under the OS temp directory include that ID, and global
 teardown removes the database records and auth/data files while preserving failure artifacts.
 Concurrent app matrices therefore do not delete or overwrite each other's fixtures.
+Setup removes E2E data older than 24 hours so interrupted local runs self-heal without deleting a
+concurrently running matrix.
 The Playwright web servers also receive port-scoped Vite cache directories outside
 `node_modules/.vite`. Concurrent servers must use different ports and therefore cannot invalidate
 each other's optimized dependencies. The app Vite config pre-bundles the React/Remix dependencies

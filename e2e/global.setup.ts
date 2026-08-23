@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import { test as setup } from "@playwright/test";
-import { seedStandaloneUser, seedTestData } from "./helpers/seed";
+import { cleanupStaleTestData, seedStandaloneUser, seedTestData } from "./helpers/seed";
 import {
 	APP_PROJECTS,
 	authStatePath,
@@ -20,6 +20,7 @@ setup("seed and authenticate", async ({ page }) => {
 
 	// Ensure auth directory exists (gitignored — absent on fresh clones and CI)
 	fs.mkdirSync(testArtifactsPath(), { recursive: true });
+	await cleanupStaleTestData();
 
 	const browser = page.context().browser();
 	if (!browser) throw new Error("Browser not available");

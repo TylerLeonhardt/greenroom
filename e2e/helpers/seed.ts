@@ -131,6 +131,77 @@ export async function cleanupTestNamespace(prefix: string): Promise<void> {
 	}
 }
 
+export async function cleanupStaleTestData(): Promise<void> {
+	const pool = getPool();
+	const userPattern = "e2e-%@test.local";
+	const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+	try {
+		await pool.query(
+			`DELETE FROM availability_responses WHERE request_id IN (
+				SELECT id FROM availability_requests WHERE group_id IN (
+					SELECT id FROM groups WHERE created_by_id IN (
+						SELECT id FROM users WHERE email LIKE $1 AND created_at < $2
+					)
+				)
+			)`,
+			[userPattern, cutoff],
+		);
+		await pool.query(
+			`DELETE FROM event_assignments WHERE event_id IN (
+				SELECT id FROM events WHERE group_id IN (
+					SELECT id FROM groups WHERE created_by_id IN (
+						SELECT id FROM users WHERE email LIKE $1 AND created_at < $2
+					)
+				)
+			)`,
+			[userPattern, cutoff],
+		);
+		await pool.query(
+			`DELETE FROM events WHERE group_id IN (
+				SELECT id FROM groups WHERE created_by_id IN (
+					SELECT id FROM users WHERE email LIKE $1 AND created_at < $2
+				)
+			)`,
+			[userPattern, cutoff],
+		);
+		await pool.query(
+			`DELETE FROM availability_requests WHERE group_id IN (
+				SELECT id FROM groups WHERE created_by_id IN (
+					SELECT id FROM users WHERE email LIKE $1 AND created_at < $2
+				)
+			)`,
+			[userPattern, cutoff],
+		);
+		await pool.query(
+			`DELETE FROM group_memberships WHERE group_id IN (
+				SELECT id FROM groups WHERE created_by_id IN (
+					SELECT id FROM users WHERE email LIKE $1 AND created_at < $2
+				)
+			)`,
+			[userPattern, cutoff],
+		);
+		await pool.query(
+			`DELETE FROM group_memberships WHERE user_id IN (
+				SELECT id FROM users WHERE email LIKE $1 AND created_at < $2
+			)`,
+			[userPattern, cutoff],
+		);
+		await pool.query(
+			`DELETE FROM groups WHERE created_by_id IN (
+				SELECT id FROM users WHERE email LIKE $1 AND created_at < $2
+			)`,
+			[userPattern, cutoff],
+		);
+		await pool.query(`DELETE FROM users WHERE email LIKE $1 AND created_at < $2`, [
+			userPattern,
+			cutoff,
+		]);
+	} finally {
+		await pool.end();
+	}
+}
+
 /**
  * Seeds the test database with an admin user, a member user, and a group.
  * All users have email_verified = true and a known password.
