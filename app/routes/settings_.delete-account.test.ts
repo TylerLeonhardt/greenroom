@@ -247,6 +247,70 @@ describe("settings.delete-account action", () => {
 		]);
 	});
 
+	it("rejects a decision for a group outside the user's sole-admin groups", async () => {
+		(getAccountDeletionPreview as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+			soleAdminGroups: [
+				{
+					groupId: "g1",
+					groupName: "My Group",
+					role: "admin",
+					isSoleAdmin: true,
+					memberCount: 1,
+					otherAdmins: [],
+					otherMembers: [],
+				},
+			],
+			sharedAdminGroups: [],
+			memberOnlyGroups: [],
+			createdRequestCount: 0,
+			createdEventCount: 0,
+		});
+
+		const decisions = JSON.stringify([
+			{ action: "delete", groupId: "g1" },
+			{ action: "delete", groupId: "another-tenant-group" },
+		]);
+		const result = await action({
+			request: makeDeleteRequest("test@example.com", decisions),
+			params: {},
+			context: {},
+		});
+
+		expect(result).toEqual({ error: "Invalid group decisions." });
+		expect(executeAccountDeletion).not.toHaveBeenCalled();
+	});
+
+	it("rejects duplicate group decisions", async () => {
+		const decisions = JSON.stringify([
+			{ action: "delete", groupId: "g1" },
+			{ action: "delete", groupId: "g1" },
+		]);
+		const result = await action({
+			request: makeDeleteRequest("test@example.com", decisions),
+			params: {},
+			context: {},
+		});
+
+		expect(result).toEqual({ error: "Invalid group decisions." });
+		expect(executeAccountDeletion).not.toHaveBeenCalled();
+	});
+
+	it.each([
+		[{ action: "archive", groupId: "g1" }],
+		[{ action: "delete" }],
+		[{ action: "delete", groupId: "g1", newAdminId: "unexpected" }],
+		[{ action: "transfer", groupId: "g1" }],
+	])("rejects malformed group decisions: %j", async (decision) => {
+		const result = await action({
+			request: makeDeleteRequest("test@example.com", JSON.stringify(decision)),
+			params: {},
+			context: {},
+		});
+
+		expect(result).toEqual({ error: "Invalid group decisions." });
+		expect(executeAccountDeletion).not.toHaveBeenCalled();
+	});
+
 	it("rejects transfer to non-member", async () => {
 		(getAccountDeletionPreview as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
 			soleAdminGroups: [

@@ -489,6 +489,20 @@ for (const [key, value] of Object.entries(responses)) {
 }
 ```
 
+### Client Decisions for Destructive Multi-Tenant Operations
+
+Client-submitted decision arrays are untrusted authorization input. Runtime-validate each item as a
+strict discriminated union: reject unknown actions, missing or extra fields, empty identifiers, and
+duplicate resource IDs. Then require the submitted IDs to exactly equal a server-derived set of
+resources the user is authorized to manage; reject the entire request if any ID is missing or extra.
+
+Repeat that authorization check inside the mutation transaction. Lock the user's memberships, the
+candidate groups, and their memberships before deriving the current sole-admin set and validating
+transfer targets. Use only IDs and targets from those locked, server-verified rows in destructive
+updates and deletes—never raw route input. This closes both cross-tenant IDORs and preview/action
+TOCTOU races. Regression coverage must prove the foreign tenant's parent row and cascading child
+data survive a malicious extra decision.
+
 ### PII in Logs
 
 Never log email addresses or other PII. Log counts or anonymized identifiers instead:

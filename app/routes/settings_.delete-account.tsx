@@ -3,10 +3,10 @@ import { Form, Link, useActionData, useLoaderData, useNavigation } from "@remix-
 import { AlertTriangle, ArrowLeft, ArrowRight, Shield, Trash2, Users } from "lucide-react";
 import { useState } from "react";
 import { CsrfInput } from "~/components/csrf-input";
+import { type GroupDecision, parseGroupDecisions } from "~/lib/account-deletion";
 import {
 	type AccountDeletionPreview,
 	executeAccountDeletion,
-	type GroupDecision,
 	getAccountDeletionPreview,
 } from "~/services/account.server";
 import { requireUser } from "~/services/auth.server";
@@ -42,24 +42,27 @@ export async function action({ request }: ActionFunctionArgs) {
 
 	// Parse group decisions
 	const decisionsJson = formData.get("decisions");
-	let decisions: GroupDecision[] = [];
+	let rawDecisions: unknown = [];
 	if (typeof decisionsJson === "string" && decisionsJson) {
 		try {
-			decisions = JSON.parse(decisionsJson);
+			rawDecisions = JSON.parse(decisionsJson);
 		} catch {
 			return { error: "Invalid group decisions." };
 		}
 	}
+	const decisions = parseGroupDecisions(rawDecisions);
+	if (!decisions) {
+		return { error: "Invalid group decisions." };
+	}
 
-	// Validate that all sole-admin groups have a decision
+	// Decisions must exactly match the user's current sole-admin groups.
 	const preview = await getAccountDeletionPreview(user.id);
 	const soleAdminGroupIds = new Set(preview.soleAdminGroups.map((g) => g.groupId));
-	const decidedGroupIds = new Set(decisions.map((d) => d.groupId));
-
-	for (const groupId of soleAdminGroupIds) {
-		if (!decidedGroupIds.has(groupId)) {
-			return { error: "Please choose what to do with all groups where you are the only admin." };
-		}
+	if (decisions.some((decision) => !soleAdminGroupIds.has(decision.groupId))) {
+		return { error: "Invalid group decisions." };
+	}
+	if (decisions.length !== soleAdminGroupIds.size) {
+		return { error: "Please choose what to do with all groups where you are the only admin." };
 	}
 
 	// Validate transfer targets are actual group members
