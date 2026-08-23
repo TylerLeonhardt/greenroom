@@ -1,8 +1,7 @@
-import { expect, test } from "@playwright/test";
-import { ADMIN_STATE } from "./helpers/test-data";
+import { expect, test } from "./helpers/fixtures";
 
 test.describe("Settings", () => {
-	test.use({ storageState: ADMIN_STATE });
+	test.use({ authRole: "admin" });
 
 	test("settings page renders with timezone and danger zone", async ({ page }) => {
 		await page.goto("/settings");

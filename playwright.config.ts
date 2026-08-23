@@ -1,10 +1,18 @@
+import crypto from "node:crypto";
+import os from "node:os";
+import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
+import { projectIp, testArtifactsPath } from "./e2e/helpers/test-data";
 
-const EXPLORER_PORT = 5337;
-const APP_PORT = 5176;
+const EXPLORER_PORT = Number(process.env.E2E_EXPLORER_PORT || 5337);
+const APP_PORT = Number(process.env.E2E_APP_PORT || 5176);
 const APP_BASE_URL = process.env.E2E_BASE_URL || `http://localhost:${APP_PORT}`;
+process.env.E2E_BASE_URL ||= APP_BASE_URL;
+process.env.E2E_RUN_ID ||= crypto.randomUUID();
 
 export default defineConfig({
+	globalTeardown: "./e2e/global.teardown.ts",
+	outputDir: path.join(testArtifactsPath(), "test-results"),
 	testDir: "./e2e",
 	testIgnore: ["**/helpers/**"],
 	timeout: 30_000,
@@ -36,6 +44,7 @@ export default defineConfig({
 			name: "Desktop Chrome",
 			use: {
 				...devices["Desktop Chrome"],
+				extraHTTPHeaders: { "x-forwarded-for": projectIp("Desktop Chrome") },
 			},
 			dependencies: ["setup"],
 			testIgnore: ["**/helpers/**", "**/components/**"],
@@ -44,6 +53,7 @@ export default defineConfig({
 			name: "Mobile Safari",
 			use: {
 				...devices["iPhone 14"],
+				extraHTTPHeaders: { "x-forwarded-for": projectIp("Mobile Safari") },
 			},
 			dependencies: ["setup"],
 			testIgnore: ["**/helpers/**", "**/components/**"],
@@ -52,6 +62,7 @@ export default defineConfig({
 			name: "Mobile Chrome",
 			use: {
 				...devices["Pixel 7"],
+				extraHTTPHeaders: { "x-forwarded-for": projectIp("Mobile Chrome") },
 			},
 			dependencies: ["setup"],
 			testIgnore: ["**/helpers/**", "**/components/**"],
@@ -86,6 +97,8 @@ export default defineConfig({
 			env: {
 				...process.env,
 				APP_URL: APP_BASE_URL,
+				AZURE_COMMUNICATION_CONNECTION_STRING: "",
+				E2E_VITE_CACHE_DIR: path.join(os.tmpdir(), "greenroom-e2e-vite", `app-${APP_PORT}`),
 			},
 		},
 		{
@@ -93,6 +106,14 @@ export default defineConfig({
 			port: EXPLORER_PORT,
 			reuseExistingServer: !process.env.CI,
 			timeout: 30_000,
+			env: {
+				...process.env,
+				E2E_VITE_CACHE_DIR: path.join(
+					os.tmpdir(),
+					"greenroom-e2e-vite",
+					`explorer-${EXPLORER_PORT}`,
+				),
+			},
 		},
 	],
 });

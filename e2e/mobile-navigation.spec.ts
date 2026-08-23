@@ -1,10 +1,7 @@
-import { expect, test } from "@playwright/test";
-import { ADMIN_STATE, loadTestData } from "./helpers/test-data";
-
-const td = loadTestData();
+import { expect, test } from "./helpers/fixtures";
 
 test.describe("Hamburger Menu", () => {
-	test.use({ storageState: ADMIN_STATE });
+	test.use({ authRole: "admin" });
 
 	test("hamburger menu button is visible on mobile", async ({ page, isMobile }) => {
 		test.skip(!isMobile, "Mobile-only test");
@@ -85,7 +82,7 @@ test.describe("Mobile Forms (unauthenticated)", () => {
 });
 
 test.describe("Mobile Pages (authenticated)", () => {
-	test.use({ storageState: ADMIN_STATE });
+	test.use({ authRole: "admin" });
 
 	test("dashboard is functional on mobile", async ({ page, isMobile }) => {
 		test.skip(!isMobile, "Mobile-only test");
@@ -96,19 +93,19 @@ test.describe("Mobile Pages (authenticated)", () => {
 		await expect(page.getByText(/welcome back/i)).toBeVisible();
 	});
 
-	test("group overview is functional on mobile", async ({ page, isMobile }) => {
+	test("group overview is functional on mobile", async ({ page, isMobile, testData }) => {
 		test.skip(!isMobile, "Mobile-only test");
 
-		await page.goto(`/groups/${td.group.id}`);
+		await page.goto(`/groups/${testData.group.id}`);
 		await page.waitForLoadState("networkidle");
 
 		await expect(page.getByRole("heading", { name: /members/i })).toBeVisible();
-		await expect(page.getByRole("main").getByText(td.admin.name)).toBeVisible();
+		await expect(page.getByRole("main").getByText(testData.admin.name)).toBeVisible();
 	});
 });
 
 test.describe("Desktop Navigation", () => {
-	test.use({ storageState: ADMIN_STATE });
+	test.use({ authRole: "admin" });
 
 	test("desktop nav shows all links without hamburger", async ({ page, isMobile }) => {
 		test.skip(isMobile === true, "Desktop-only test");

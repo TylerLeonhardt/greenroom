@@ -73,6 +73,64 @@ function generateTestInviteCode(): string {
 	return code;
 }
 
+async function cleanupTestNamespaceWithPool(pool: pg.Pool, prefix: string): Promise<void> {
+	const userPattern = `e2e-%-${prefix}-%@test.local`;
+	const groupName = `Test Group ${prefix}`;
+
+	await pool.query(
+		`DELETE FROM availability_responses WHERE request_id IN (
+			SELECT id FROM availability_requests WHERE group_id IN (
+				SELECT id FROM groups WHERE name = $1 OR created_by_id IN (SELECT id FROM users WHERE email LIKE $2)
+			)
+		)`,
+		[groupName, userPattern],
+	);
+	await pool.query(
+		`DELETE FROM event_assignments WHERE event_id IN (
+			SELECT id FROM events WHERE group_id IN (
+				SELECT id FROM groups WHERE name = $1 OR created_by_id IN (SELECT id FROM users WHERE email LIKE $2)
+			)
+		)`,
+		[groupName, userPattern],
+	);
+	await pool.query(
+		`DELETE FROM events WHERE group_id IN (
+			SELECT id FROM groups WHERE name = $1 OR created_by_id IN (SELECT id FROM users WHERE email LIKE $2)
+		)`,
+		[groupName, userPattern],
+	);
+	await pool.query(
+		`DELETE FROM availability_requests WHERE group_id IN (
+			SELECT id FROM groups WHERE name = $1 OR created_by_id IN (SELECT id FROM users WHERE email LIKE $2)
+		)`,
+		[groupName, userPattern],
+	);
+	await pool.query(
+		`DELETE FROM group_memberships WHERE group_id IN (
+			SELECT id FROM groups WHERE name = $1 OR created_by_id IN (SELECT id FROM users WHERE email LIKE $2)
+		)`,
+		[groupName, userPattern],
+	);
+	await pool.query(
+		`DELETE FROM group_memberships WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1)`,
+		[userPattern],
+	);
+	await pool.query(
+		`DELETE FROM groups WHERE name = $1 OR created_by_id IN (SELECT id FROM users WHERE email LIKE $2)`,
+		[groupName, userPattern],
+	);
+	await pool.query(`DELETE FROM users WHERE email LIKE $1`, [userPattern]);
+}
+
+export async function cleanupTestNamespace(prefix: string): Promise<void> {
+	const pool = getPool();
+	try {
+		await cleanupTestNamespaceWithPool(pool, prefix);
+	} finally {
+		await pool.end();
+	}
+}
+
 /**
  * Seeds the test database with an admin user, a member user, and a group.
  * All users have email_verified = true and a known password.
@@ -155,53 +213,7 @@ export async function seedTestData(prefix: string): Promise<TestData> {
 
 	// Clean up any stale test data from previous runs with same prefix
 	// Delete groups created by e2e users (from "Create Group" tests) and named test groups
-	const userPattern = `e2e-%-${prefix}-%@test.local`;
-	const groupName = `Test Group ${prefix}`;
-
-	// First clean child records for groups created by e2e users
-	await pool.query(
-		`DELETE FROM availability_responses WHERE request_id IN (
-			SELECT id FROM availability_requests WHERE group_id IN (
-				SELECT id FROM groups WHERE name = $1 OR created_by_id IN (SELECT id FROM users WHERE email LIKE $2)
-			)
-		)`,
-		[groupName, userPattern],
-	);
-	await pool.query(
-		`DELETE FROM event_assignments WHERE event_id IN (
-			SELECT id FROM events WHERE group_id IN (
-				SELECT id FROM groups WHERE name = $1 OR created_by_id IN (SELECT id FROM users WHERE email LIKE $2)
-			)
-		)`,
-		[groupName, userPattern],
-	);
-	await pool.query(
-		`DELETE FROM events WHERE group_id IN (
-			SELECT id FROM groups WHERE name = $1 OR created_by_id IN (SELECT id FROM users WHERE email LIKE $2)
-		)`,
-		[groupName, userPattern],
-	);
-	await pool.query(
-		`DELETE FROM availability_requests WHERE group_id IN (
-			SELECT id FROM groups WHERE name = $1 OR created_by_id IN (SELECT id FROM users WHERE email LIKE $2)
-		)`,
-		[groupName, userPattern],
-	);
-	await pool.query(
-		`DELETE FROM group_memberships WHERE group_id IN (
-			SELECT id FROM groups WHERE name = $1 OR created_by_id IN (SELECT id FROM users WHERE email LIKE $2)
-		)`,
-		[groupName, userPattern],
-	);
-	await pool.query(
-		`DELETE FROM group_memberships WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1)`,
-		[userPattern],
-	);
-	await pool.query(
-		`DELETE FROM groups WHERE name = $1 OR created_by_id IN (SELECT id FROM users WHERE email LIKE $2)`,
-		[groupName, userPattern],
-	);
-	await pool.query(`DELETE FROM users WHERE email LIKE $1`, [userPattern]);
+	await cleanupTestNamespaceWithPool(pool, prefix);
 
 	// Insert users
 	await pool.query(
