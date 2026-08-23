@@ -212,8 +212,25 @@ describe("executeAccountDeletion", () => {
 		vi.clearAllMocks();
 	});
 
-	it("calls transaction for deletion", async () => {
-		// Set up the tx mock to handle the full flow
+	function mockDeletionTransaction(options?: {
+		userMemberships?: Array<{ groupId: string; role: "admin" | "member" }>;
+		administeredMemberships?: Array<{
+			groupId: string;
+			userId: string;
+			role: "admin" | "member";
+		}>;
+	}) {
+		const userMemberships = options?.userMemberships ?? [];
+		const administeredMemberships = options?.administeredMemberships ?? [];
+		const lockedResults = userMemberships.some((membership) => membership.role === "admin")
+			? [
+					userMemberships,
+					userMemberships.map((membership) => ({ id: membership.groupId })),
+					administeredMemberships,
+				]
+			: [userMemberships];
+		let lockedSelectIndex = 0;
+
 		const mockTxUpdate = vi.fn().mockReturnValue({
 			set: vi.fn().mockReturnValue({
 				where: vi.fn().mockResolvedValue(undefined),
@@ -222,11 +239,17 @@ describe("executeAccountDeletion", () => {
 		const mockTxDelete = vi.fn().mockReturnValue({
 			where: vi.fn().mockResolvedValue(undefined),
 		});
-		const mockTxSelect = vi.fn().mockReturnValue({
+		const mockTxSelect = vi.fn().mockImplementation(() => ({
 			from: vi.fn().mockReturnValue({
-				where: vi.fn().mockResolvedValue([]),
+				where: vi.fn().mockImplementation(() => {
+					if (lockedSelectIndex < lockedResults.length) {
+						const rows = lockedResults[lockedSelectIndex++];
+						return { for: vi.fn().mockResolvedValue(rows) };
+					}
+					return Promise.resolve([]);
+				}),
 			}),
-		});
+		}));
 
 		mockTransaction.mockImplementationOnce(async (cb) => {
 			await cb({
@@ -235,6 +258,12 @@ describe("executeAccountDeletion", () => {
 				select: mockTxSelect,
 			});
 		});
+
+		return { mockTxUpdate, mockTxDelete };
+	}
+
+	it("calls transaction for deletion", async () => {
+		const { mockTxUpdate, mockTxDelete } = mockDeletionTransaction();
 
 		await executeAccountDeletion("user-1", []);
 
@@ -246,26 +275,12 @@ describe("executeAccountDeletion", () => {
 	});
 
 	it("handles transfer decision correctly", async () => {
-		const mockTxUpdate = vi.fn().mockReturnValue({
-			set: vi.fn().mockReturnValue({
-				where: vi.fn().mockResolvedValue(undefined),
-			}),
-		});
-		const mockTxDelete = vi.fn().mockReturnValue({
-			where: vi.fn().mockResolvedValue(undefined),
-		});
-		const mockTxSelect = vi.fn().mockReturnValue({
-			from: vi.fn().mockReturnValue({
-				where: vi.fn().mockResolvedValue([]),
-			}),
-		});
-
-		mockTransaction.mockImplementationOnce(async (cb) => {
-			await cb({
-				update: mockTxUpdate,
-				delete: mockTxDelete,
-				select: mockTxSelect,
-			});
+		const { mockTxUpdate } = mockDeletionTransaction({
+			userMemberships: [{ groupId: "g1", role: "admin" }],
+			administeredMemberships: [
+				{ groupId: "g1", userId: "user-1", role: "admin" },
+				{ groupId: "g1", userId: "user-2", role: "member" },
+			],
 		});
 
 		await executeAccountDeletion("user-1", [
@@ -279,26 +294,9 @@ describe("executeAccountDeletion", () => {
 	});
 
 	it("handles delete decision correctly", async () => {
-		const mockTxUpdate = vi.fn().mockReturnValue({
-			set: vi.fn().mockReturnValue({
-				where: vi.fn().mockResolvedValue(undefined),
-			}),
-		});
-		const mockTxDelete = vi.fn().mockReturnValue({
-			where: vi.fn().mockResolvedValue(undefined),
-		});
-		const mockTxSelect = vi.fn().mockReturnValue({
-			from: vi.fn().mockReturnValue({
-				where: vi.fn().mockResolvedValue([]),
-			}),
-		});
-
-		mockTransaction.mockImplementationOnce(async (cb) => {
-			await cb({
-				update: mockTxUpdate,
-				delete: mockTxDelete,
-				select: mockTxSelect,
-			});
+		const { mockTxDelete } = mockDeletionTransaction({
+			userMemberships: [{ groupId: "g1", role: "admin" }],
+			administeredMemberships: [{ groupId: "g1", userId: "user-1", role: "admin" }],
 		});
 
 		await executeAccountDeletion("user-1", [{ action: "delete", groupId: "g1" }]);
@@ -309,26 +307,16 @@ describe("executeAccountDeletion", () => {
 	});
 
 	it("handles mixed decisions (transfer and delete)", async () => {
-		const mockTxUpdate = vi.fn().mockReturnValue({
-			set: vi.fn().mockReturnValue({
-				where: vi.fn().mockResolvedValue(undefined),
-			}),
-		});
-		const mockTxDelete = vi.fn().mockReturnValue({
-			where: vi.fn().mockResolvedValue(undefined),
-		});
-		const mockTxSelect = vi.fn().mockReturnValue({
-			from: vi.fn().mockReturnValue({
-				where: vi.fn().mockResolvedValue([]),
-			}),
-		});
-
-		mockTransaction.mockImplementationOnce(async (cb) => {
-			await cb({
-				update: mockTxUpdate,
-				delete: mockTxDelete,
-				select: mockTxSelect,
-			});
+		mockDeletionTransaction({
+			userMemberships: [
+				{ groupId: "g1", role: "admin" },
+				{ groupId: "g2", role: "admin" },
+			],
+			administeredMemberships: [
+				{ groupId: "g1", userId: "user-1", role: "admin" },
+				{ groupId: "g1", userId: "user-2", role: "member" },
+				{ groupId: "g2", userId: "user-1", role: "admin" },
+			],
 		});
 
 		await executeAccountDeletion("user-1", [
@@ -340,27 +328,7 @@ describe("executeAccountDeletion", () => {
 	});
 
 	it("handles empty decisions (no sole-admin groups)", async () => {
-		const mockTxUpdate = vi.fn().mockReturnValue({
-			set: vi.fn().mockReturnValue({
-				where: vi.fn().mockResolvedValue(undefined),
-			}),
-		});
-		const mockTxDelete = vi.fn().mockReturnValue({
-			where: vi.fn().mockResolvedValue(undefined),
-		});
-		const mockTxSelect = vi.fn().mockReturnValue({
-			from: vi.fn().mockReturnValue({
-				where: vi.fn().mockResolvedValue([]),
-			}),
-		});
-
-		mockTransaction.mockImplementationOnce(async (cb) => {
-			await cb({
-				update: mockTxUpdate,
-				delete: mockTxDelete,
-				select: mockTxSelect,
-			});
-		});
+		const { mockTxUpdate } = mockDeletionTransaction();
 
 		await executeAccountDeletion("user-1", []);
 

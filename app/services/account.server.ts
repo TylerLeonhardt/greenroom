@@ -1,4 +1,4 @@
-import { and, count, eq, ne } from "drizzle-orm";
+import { and, count, eq, inArray, ne } from "drizzle-orm";
 import { db } from "../../src/db/index.js";
 import {
 	availabilityRequests,
@@ -9,6 +9,7 @@ import {
 	groups,
 	users,
 } from "../../src/db/schema.js";
+import { type GroupDecision, parseGroupDecisions } from "../lib/account-deletion.js";
 import { logger } from "./logger.server.js";
 
 // --- Types ---
@@ -30,10 +31,6 @@ export interface AccountDeletionPreview {
 	createdRequestCount: number;
 	createdEventCount: number;
 }
-
-export type GroupDecision =
-	| { action: "transfer"; groupId: string; newAdminId: string }
-	| { action: "delete"; groupId: string };
 
 // --- Preview ---
 
@@ -112,38 +109,124 @@ export async function getAccountDeletionPreview(userId: string): Promise<Account
 
 // --- Execute Deletion ---
 
+export class AccountDeletionValidationError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "AccountDeletionValidationError";
+	}
+}
+
 export async function executeAccountDeletion(
 	userId: string,
 	decisions: GroupDecision[],
 ): Promise<void> {
 	await db.transaction(async (tx) => {
+		const validatedDecisions = parseGroupDecisions(decisions);
+		if (!validatedDecisions) {
+			throw new AccountDeletionValidationError("Invalid group decisions.");
+		}
+
+		// Lock the user's memberships first, then the administered groups and all their
+		// memberships. The group locks prevent new memberships while the membership locks
+		// stabilize admin roles for the remainder of the transaction.
+		const userMemberships = await tx
+			.select({
+				groupId: groupMemberships.groupId,
+				role: groupMemberships.role,
+			})
+			.from(groupMemberships)
+			.where(eq(groupMemberships.userId, userId))
+			.for("update");
+		const administeredGroupIds = userMemberships
+			.filter((membership) => membership.role === "admin")
+			.map((membership) => membership.groupId);
+
+		let administeredMemberships: Array<{
+			groupId: string;
+			userId: string;
+			role: "admin" | "member";
+		}> = [];
+		if (administeredGroupIds.length > 0) {
+			await tx
+				.select({ id: groups.id })
+				.from(groups)
+				.where(inArray(groups.id, administeredGroupIds))
+				.for("update");
+			administeredMemberships = await tx
+				.select({
+					groupId: groupMemberships.groupId,
+					userId: groupMemberships.userId,
+					role: groupMemberships.role,
+				})
+				.from(groupMemberships)
+				.where(inArray(groupMemberships.groupId, administeredGroupIds))
+				.for("update");
+		}
+
+		const soleAdminGroupIds = new Set(
+			administeredGroupIds.filter((groupId) => {
+				const adminCount = administeredMemberships.filter(
+					(membership) => membership.groupId === groupId && membership.role === "admin",
+				).length;
+				return adminCount === 1;
+			}),
+		);
+		if (
+			validatedDecisions.length !== soleAdminGroupIds.size ||
+			validatedDecisions.some((decision) => !soleAdminGroupIds.has(decision.groupId))
+		) {
+			throw new AccountDeletionValidationError(
+				"Group ownership changed. Review your account deletion choices and try again.",
+			);
+		}
+
 		// 1. Handle sole-admin groups per user decisions
-		for (const decision of decisions) {
+		for (const decision of validatedDecisions) {
+			const verifiedGroupId = [...soleAdminGroupIds].find(
+				(groupId) => groupId === decision.groupId,
+			);
+			if (!verifiedGroupId) {
+				throw new AccountDeletionValidationError("Invalid group decision.");
+			}
+
 			if (decision.action === "transfer") {
+				const transferTarget = administeredMemberships.find(
+					(membership) =>
+						membership.groupId === verifiedGroupId &&
+						membership.userId === decision.newAdminId &&
+						membership.userId !== userId,
+				);
+				if (!transferTarget) {
+					throw new AccountDeletionValidationError(
+						"Selected transfer target is not a member of the group.",
+					);
+				}
+				const verifiedNewAdminId = transferTarget.userId;
+
 				// Promote the new admin
 				await tx
 					.update(groupMemberships)
 					.set({ role: "admin" })
 					.where(
 						and(
-							eq(groupMemberships.groupId, decision.groupId),
-							eq(groupMemberships.userId, decision.newAdminId),
+							eq(groupMemberships.groupId, verifiedGroupId),
+							eq(groupMemberships.userId, verifiedNewAdminId),
 						),
 					);
 
 				// Reassign createdById on the group itself
 				await tx
 					.update(groups)
-					.set({ createdById: decision.newAdminId, updatedAt: new Date() })
-					.where(eq(groups.id, decision.groupId));
+					.set({ createdById: verifiedNewAdminId, updatedAt: new Date() })
+					.where(eq(groups.id, verifiedGroupId));
 
 				// Reassign createdById on availability requests in this group
 				await tx
 					.update(availabilityRequests)
-					.set({ createdById: decision.newAdminId })
+					.set({ createdById: verifiedNewAdminId })
 					.where(
 						and(
-							eq(availabilityRequests.groupId, decision.groupId),
+							eq(availabilityRequests.groupId, verifiedGroupId),
 							eq(availabilityRequests.createdById, userId),
 						),
 					);
@@ -151,28 +234,25 @@ export async function executeAccountDeletion(
 				// Reassign createdById on events in this group
 				await tx
 					.update(events)
-					.set({ createdById: decision.newAdminId, updatedAt: new Date() })
-					.where(and(eq(events.groupId, decision.groupId), eq(events.createdById, userId)));
+					.set({ createdById: verifiedNewAdminId, updatedAt: new Date() })
+					.where(and(eq(events.groupId, verifiedGroupId), eq(events.createdById, userId)));
 
 				// Remove the departing user's membership
 				await tx
 					.delete(groupMemberships)
 					.where(
-						and(
-							eq(groupMemberships.groupId, decision.groupId),
-							eq(groupMemberships.userId, userId),
-						),
+						and(eq(groupMemberships.groupId, verifiedGroupId), eq(groupMemberships.userId, userId)),
 					);
 
 				logger.info(
-					{ userId, groupId: decision.groupId, newAdminId: decision.newAdminId },
+					{ userId, groupId: verifiedGroupId, newAdminId: verifiedNewAdminId },
 					"Transferred group ownership during account deletion",
 				);
 			} else if (decision.action === "delete") {
 				// Use direct delete — FK cascades handle cleanup
-				await tx.delete(groups).where(eq(groups.id, decision.groupId));
+				await tx.delete(groups).where(eq(groups.id, verifiedGroupId));
 
-				logger.info({ userId, groupId: decision.groupId }, "Deleted group during account deletion");
+				logger.info({ userId, groupId: verifiedGroupId }, "Deleted group during account deletion");
 			}
 		}
 
