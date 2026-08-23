@@ -157,6 +157,106 @@ The health endpoint is available at `GET /api/health` and returns:
 { "status": "ok", "timestamp": "2025-01-01T00:00:00.000Z" }
 ```
 
+## Managed Identity for ACS Email (#215)
+
+Greenroom sends email through Azure Communication Services (ACS). It currently authenticates with
+the shared-key `AZURE_COMMUNICATION_CONNECTION_STRING`, whose HMAC signature includes the host
+clock-derived `x-ms-date` header; this caused a production clock-skew incident. Issue #215 migrates
+email authentication to Azure Managed Identity using an Azure AD `TokenCredential`, removing
+host-clock HMAC signing entirely.
+
+The migration is a small behind-the-seam constructor swap.
+`app/services/email.server.ts` creates the email client through
+`createSkewTolerantEmailClient()` in `app/services/acs-email-auth.server.ts`, which currently calls
+`new EmailClient(connectionString, { httpClient })`. The installed
+`@azure/communication-email@1.1.0` client also supports
+`new EmailClient(endpoint, TokenCredential, options)`, so the managed-identity path can remove the
+custom HMAC `httpClient`. `@azure/identity` is not yet a project dependency.
+
+### Why managed identity
+
+Managed identity replaces the clock-sensitive shared-key HMAC signature with an Azure AD access
+token. Because the host clock no longer generates an `x-ms-date` value for HMAC signing, the
+clock-skew failure mode from the production incident is removed.
+
+### Provisioning steps (ops action, run once)
+
+Run these commands in order while authenticated to the subscription that owns the resources.
+
+1. Enable the Container App's system-assigned identity:
+
+   ```bash
+   az containerapp identity assign \
+     --name greenroom \
+     --resource-group greenroom-rg \
+     --system-assigned
+   ```
+
+2. Capture its principal ID:
+
+   ```bash
+   PRINCIPAL_ID=$(az containerapp identity show \
+     --name greenroom \
+     --resource-group greenroom-rg \
+     --query principalId \
+     -o tsv)
+   ```
+
+3. Set the subscription ID and ACS resource scope:
+
+   ```bash
+   SUBSCRIPTION_ID="${AZURE_SUBSCRIPTION_ID:?Set AZURE_SUBSCRIPTION_ID first}"
+   ACS_ID="/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/greenroom-rg/providers/Microsoft.Communication/CommunicationServices/greenroom-comm"
+   ```
+
+4. Grant the identity permission to send email, scoped only to the ACS resource:
+
+   ```bash
+   az role assignment create \
+     --assignee-object-id "$PRINCIPAL_ID" \
+     --assignee-principal-type ServicePrincipal \
+     --role "Communication Services Email Sender" \
+     --scope "$ACS_ID"
+   ```
+
+5. Verify the assignment:
+
+   ```bash
+   az role assignment list --scope "$ACS_ID"
+   ```
+
+RBAC propagation can take up to approximately 5 minutes after the role assignment is created.
+
+### App configuration
+
+Issue #215 introduces `AZURE_COMMUNICATION_ENDPOINT`, set to the ACS endpoint URL (for example,
+`https://greenroom-comm.communication.azure.com`). The intended authentication selection is:
+
+- If `AZURE_COMMUNICATION_ENDPOINT` is set, use `DefaultAzureCredential` and managed identity.
+- Otherwise, fall back to `AZURE_COMMUNICATION_CONNECTION_STRING` and shared-key authentication.
+
+Keep both variables set for the first managed-identity release. This preserves an immediate
+configuration-only rollback path: unset `AZURE_COMMUNICATION_ENDPOINT` to select the existing
+shared-key path.
+
+### Validation (cannot be tested in CI)
+
+Managed-identity authentication cannot be exercised locally or in CI because those environments do
+not have the Container App's Azure AD identity. Live acceptance requires all of the following:
+
+1. Deploy the managed-identity implementation and configuration.
+2. Trigger a real email, such as a magic-link or verification email.
+3. In Application Insights, observe `customEvents` where `name == "EmailSent"` and
+   `customDimensions.success == "true"`.
+4. Confirm a clean observation window has no `errorKind=clock_skew` events and exception volume
+   remains at its baseline.
+
+### Rollback
+
+Unset `AZURE_COMMUNICATION_ENDPOINT` to fall back to shared-key authentication through
+`AZURE_COMMUNICATION_CONNECTION_STRING`. If both variables were retained, this configuration
+change does not require a redeploy.
+
 ## Email Deliverability (Custom Domain)
 
 My Call Time sends emails from `DoNotReply@mycalltime.app` via Azure Communication Services. For emails to actually be delivered (and not land in spam), your custom domain needs SPF, DKIM, and DMARC DNS records.
