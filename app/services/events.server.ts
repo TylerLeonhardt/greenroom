@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, or, type SQL, sql } from "drizzle-orm";
 import { db } from "../../src/db/index.js";
 import {
 	availabilityRequests,
@@ -12,6 +12,20 @@ import {
 } from "../../src/db/schema.js";
 import { localTimeToUTC } from "../lib/date-utils.js";
 import { trackEvent } from "./telemetry.server.js";
+
+/**
+ * SQL condition: event is still "upcoming" — its calendar day (in the event's
+ * timezone) has not ended yet. An event that starts at 7 PM Saturday stays
+ * upcoming until midnight Saturday night / Sunday morning.
+ *
+ * Equivalent to: end-of-day(startTime, event timezone) > now()
+ */
+function eventIsUpcoming(): SQL {
+	return sql`(
+		(${events.startTime} AT TIME ZONE COALESCE(${events.timezone}, 'UTC'))::date
+		+ interval '1 day'
+	) AT TIME ZONE COALESCE(${events.timezone}, 'UTC') > now()`;
+}
 
 type Event = typeof events.$inferSelect;
 
@@ -135,7 +149,7 @@ export async function getGroupEvents(
 	const conditions = [eq(events.groupId, groupId)];
 
 	if (options?.upcoming) {
-		conditions.push(gte(events.startTime, new Date()));
+		conditions.push(eventIsUpcoming());
 	}
 	if (options?.eventType) {
 		conditions.push(eq(events.eventType, options.eventType as "rehearsal" | "show" | "other"));
@@ -204,12 +218,7 @@ export async function getGroupEventSummaries(
 			startTime: events.startTime,
 		})
 		.from(events)
-		.where(
-			and(
-				eq(events.groupId, groupId),
-				or(gte(events.startTime, new Date()), eq(events.id, currentEventId)),
-			),
-		)
+		.where(and(eq(events.groupId, groupId), or(eventIsUpcoming(), eq(events.id, currentEventId))))
 		.orderBy(events.startTime)
 		.limit(limit);
 
@@ -448,7 +457,7 @@ export async function getUserUpcomingEvents(
 			groupMemberships,
 			and(eq(groupMemberships.groupId, groups.id), eq(groupMemberships.userId, userId)),
 		)
-		.where(gte(events.startTime, new Date()))
+		.where(eventIsUpcoming())
 		.orderBy(events.startTime)
 		.limit(limit);
 
@@ -633,7 +642,7 @@ export async function confirmAllPendingEventsInGroup(
 					eq(events.groupId, groupId),
 					eq(eventAssignments.userId, userId),
 					eq(eventAssignments.status, "pending"),
-					gte(events.startTime, new Date()),
+					eventIsUpcoming(),
 				),
 			);
 
