@@ -145,15 +145,6 @@ export default function Events() {
 						<option value="rehearsal">🎯 Rehearsals</option>
 						<option value="other">📅 Other</option>
 					</select>
-
-					{canCreateEvents && (
-						<Link
-							to={`/groups/${groupId}/events/new`}
-							className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
-						>
-							<Plus className="h-4 w-4" /> Create Event
-						</Link>
-					)}
 				</div>
 			</div>
 
@@ -205,10 +196,10 @@ export default function Events() {
 							actions={
 								canCreateEvents ? (
 									<Link
-										to={`/groups/${groupId}/events/new`}
+										to={`/groups/${groupId}/create`}
 										className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
 									>
-										<Plus className="h-4 w-4" /> Create Event
+										<Plus className="h-4 w-4" /> Choose what to create
 									</Link>
 								) : undefined
 							}

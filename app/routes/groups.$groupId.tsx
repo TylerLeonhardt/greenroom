@@ -1,5 +1,6 @@
 import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { Link, Outlet, useLoaderData, useLocation } from "@remix-run/react";
+import { Plus } from "lucide-react";
 import { getGroupById, getUserRole, requireGroupMember } from "~/services/groups.server";
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
@@ -42,6 +43,9 @@ export default function GroupLayout() {
 	const { group, role } = useLoaderData<typeof loader>();
 	const location = useLocation();
 	const basePath = `/groups/${group.id}`;
+	const canCreate =
+		role === "admin" || group.membersCanCreateRequests || group.membersCanCreateEvents;
+	const isCreate = location.pathname === `${basePath}/create`;
 
 	const isOverview = location.pathname === basePath || location.pathname === `${basePath}/`;
 	const isAvailability = location.pathname.startsWith(`${basePath}/availability`);
@@ -51,12 +55,23 @@ export default function GroupLayout() {
 
 	return (
 		<div>
-			<div className="mb-6">
-				<Link to="/groups" className="text-sm text-slate-500 hover:text-slate-700">
-					← Back to Groups
-				</Link>
-				<h1 className="mt-2 text-3xl font-bold text-slate-900">{group.name}</h1>
-				{group.description && <p className="mt-1 text-slate-600">{group.description}</p>}
+			<div className="mb-6 flex items-start justify-between gap-4">
+				<div>
+					<Link to="/groups" className="text-sm text-slate-500 hover:text-slate-700">
+						← Back to Groups
+					</Link>
+					<h1 className="mt-2 text-3xl font-bold text-slate-900">{group.name}</h1>
+					{group.description && <p className="mt-1 text-slate-600">{group.description}</p>}
+				</div>
+				{canCreate && !isCreate && (
+					<Link
+						to={`${basePath}/create`}
+						className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:ring-offset-2"
+					>
+						<Plus className="h-4 w-4" aria-hidden="true" />
+						Create
+					</Link>
+				)}
 			</div>
 
 			<div className="mb-6 flex gap-0 overflow-x-auto border-b border-slate-200">
