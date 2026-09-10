@@ -56,7 +56,7 @@ export default function CreateChooser() {
 						</Link>
 					) : (
 						<p className="mt-6 rounded-lg bg-slate-100 px-4 py-2.5 text-center text-sm text-slate-600">
-							Only group admins can create availability requests.
+							You don't have permission to create availability requests.
 						</p>
 					)}
 				</article>
@@ -84,7 +84,7 @@ export default function CreateChooser() {
 						</Link>
 					) : (
 						<p className="mt-6 rounded-lg bg-slate-100 px-4 py-2.5 text-center text-sm text-slate-600">
-							Only group admins can create events.
+							You don't have permission to create events.
 						</p>
 					)}
 				</article>
