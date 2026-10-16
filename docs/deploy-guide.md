@@ -304,7 +304,7 @@ curl https://YOUR_APP_URL/api/health
 You should see:
 
 ```json
-{"status":"ok","timestamp":"2026-02-27T..."}
+{"status":"ok","db":"connected","timestamp":"2026-02-27T..."}
 ```
 
 🎉 **Congratulations!** My Call Time is live on the internet. But Google login won't work yet — do Part 3 to set that up.
@@ -572,7 +572,11 @@ You should see the `AllowAzureServices` rule with `0.0.0.0`.
 
 ### "Health check returns 503"
 
-The database might not be ready. Check if migrations have been run (Part 1, Step 10). Also make sure the `DATABASE_URL` in your Container App env vars is correct.
+The endpoint retries transient database connection failures three times within 2.7 seconds before
+returning `503`. Check the `PostgreSQL health probe` dependencies in Application Insights or the
+structured Container App logs for the attempt count, result code, and duration. If failures persist,
+check that migrations have run (Part 1, Step 10) and that the Container App's `DATABASE_URL` is
+correct.
 
 ### "Google login doesn't work"
 
