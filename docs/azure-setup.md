@@ -157,7 +157,7 @@ The health endpoint is available at `GET /api/health` and returns:
 { "status": "ok", "db": "connected", "timestamp": "2025-01-01T00:00:00.000Z" }
 ```
 
-The database probe retries transient connection failures up to three times within a 2.7-second
+The database probe retries transient connection failures up to three attempts within a 3-second
 budget before returning `503`. Each attempt emits structured logs and an Application Insights
 `PostgreSQL health probe` dependency when telemetry is configured.
 

@@ -1,12 +1,12 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
-import { sql } from "drizzle-orm";
+import type { PoolClient } from "pg";
 import { logger } from "~/services/logger.server";
 import { getTelemetryClient } from "~/services/telemetry.server";
 import { db } from "../../src/db/index.js";
 
 const MAX_ATTEMPTS = 3;
-const ATTEMPT_TIMEOUT_MS = 700;
-const RETRY_DELAYS_MS = [200, 400] as const;
+const ATTEMPT_TIMEOUT_MS = 600;
+const RETRY_DELAYS_MS = [400, 800] as const;
 const TRANSIENT_ERROR_CODES = new Set([
 	"ECONNREFUSED",
 	"ECONNRESET",
@@ -87,9 +87,13 @@ function sleep(ms: number): Promise<void> {
 }
 
 async function executeProbeWithTimeout(): Promise<void> {
+	let client: PoolClient | undefined;
+	let timedOut = false;
+	let succeeded = false;
 	let timeout: ReturnType<typeof setTimeout> | undefined;
 	const timeoutPromise = new Promise<never>((_, reject) => {
 		timeout = setTimeout(() => {
+			timedOut = true;
 			const error = new Error("Database health probe timed out");
 			Object.assign(error, { code: "ETIMEDOUT" });
 			reject(error);
@@ -97,10 +101,24 @@ async function executeProbeWithTimeout(): Promise<void> {
 		timeout.unref?.();
 	});
 
+	const probe = async () => {
+		const acquired = await db.$client.connect();
+		// Acquisition can finish after the deadline; never start a late query or leak its client.
+		if (timedOut) {
+			acquired.release(true);
+			return;
+		}
+		client = acquired;
+		await client.query("SELECT 1");
+	};
+
 	try {
-		await Promise.race([db.execute(sql`SELECT 1`), timeoutPromise]);
+		await Promise.race([probe(), timeoutPromise]);
+		succeeded = true;
 	} finally {
 		if (timeout) clearTimeout(timeout);
+		// Destroy failed/timed-out connections instead of leaving queries running in the pool.
+		client?.release(!succeeded);
 	}
 }
 

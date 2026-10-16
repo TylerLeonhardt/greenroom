@@ -572,7 +572,7 @@ You should see the `AllowAzureServices` rule with `0.0.0.0`.
 
 ### "Health check returns 503"
 
-The endpoint retries transient database connection failures three times within 2.7 seconds before
+The endpoint retries transient database connection failures up to three attempts within 3 seconds before
 returning `503`. Check the `PostgreSQL health probe` dependencies in Application Insights or the
 structured Container App logs for the attempt count, result code, and duration. If failures persist,
 check that migrations have run (Part 1, Step 10) and that the Container App's `DATABASE_URL` is
