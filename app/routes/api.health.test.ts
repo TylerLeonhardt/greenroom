@@ -36,11 +36,13 @@ describe("GET /api/health", () => {
 		connect.mockReset();
 		query.mockReset();
 		vi.useFakeTimers();
+		vi.stubEnv("CONTAINER_APP_REVISION", "greenroom--test-revision");
 		connect.mockResolvedValue({ query, release });
 	});
 
 	afterEach(() => {
 		vi.useRealTimers();
+		vi.unstubAllEnvs();
 	});
 
 	it("returns status ok with db connected when DB is reachable", async () => {
@@ -64,10 +66,16 @@ describe("GET /api/health", () => {
 		expect(trackDependency).toHaveBeenCalledWith(
 			expect.objectContaining({
 				name: "PostgreSQL health probe",
-				resultCode: "OK",
 				success: true,
+				properties: {
+					probeResultCode: "OK",
+					attempt: 1,
+					maxAttempts: 3,
+					revision: "greenroom--test-revision",
+				},
 			}),
 		);
+		expect(trackDependency.mock.calls[0][0]).not.toHaveProperty("resultCode");
 	});
 
 	it("returns 200 when a transient DB failure recovers within the retry budget", async () => {
@@ -98,17 +106,22 @@ describe("GET /api/health", () => {
 		expect(trackDependency).toHaveBeenNthCalledWith(
 			1,
 			expect.objectContaining({
-				resultCode: "ECONNREFUSED",
 				success: false,
-				properties: expect.objectContaining({ attempt: 1, retrying: true }),
+				properties: {
+					probeResultCode: "ECONNREFUSED",
+					attempt: 1,
+					maxAttempts: 3,
+					transient: true,
+					retrying: true,
+					revision: "greenroom--test-revision",
+				},
 			}),
 		);
 		expect(trackDependency).toHaveBeenNthCalledWith(
 			2,
 			expect.objectContaining({
-				resultCode: "OK",
 				success: true,
-				properties: expect.objectContaining({ attempt: 2 }),
+				properties: expect.objectContaining({ probeResultCode: "OK", attempt: 2 }),
 			}),
 		);
 	});
@@ -132,6 +145,13 @@ describe("GET /api/health", () => {
 		expect(data.timestamp).toBeDefined();
 		expect(query).toHaveBeenCalledTimes(3);
 		expect(trackDependency).toHaveBeenCalledTimes(3);
+		for (const [dependency] of trackDependency.mock.calls) {
+			expect(dependency).toMatchObject({
+				success: false,
+				properties: { probeResultCode: "ECONNREFUSED", revision: "greenroom--test-revision" },
+			});
+			expect(dependency).not.toHaveProperty("resultCode");
+		}
 	});
 
 	it("does not retry a non-transient query error", async () => {
@@ -149,6 +169,41 @@ describe("GET /api/health", () => {
 		expect(response.status).toBe(503);
 		expect(data.error).toBe("Database health probe failed after 1 attempt");
 		expect(query).toHaveBeenCalledTimes(1);
+		expect(trackDependency).toHaveBeenCalledWith(
+			expect.objectContaining({
+				success: false,
+				properties: expect.objectContaining({
+					probeResultCode: "42501",
+					transient: false,
+					retrying: false,
+				}),
+			}),
+		);
+	});
+
+	it("records a queryable fallback code when an error has no code", async () => {
+		vi.stubEnv("CONTAINER_APP_REVISION", "");
+		query.mockRejectedValue(new Error("Unknown database failure"));
+
+		const response = await loader({
+			request: new Request("http://localhost/api/health"),
+			params: {},
+			context: {},
+		});
+
+		expect(response.status).toBe(503);
+		expect(trackDependency).toHaveBeenCalledExactlyOnceWith(
+			expect.objectContaining({
+				success: false,
+				properties: {
+					probeResultCode: "ERROR",
+					attempt: 1,
+					maxAttempts: 3,
+					transient: false,
+					retrying: false,
+				},
+			}),
+		);
 	});
 
 	it.each([
@@ -208,10 +263,13 @@ describe("GET /api/health", () => {
 		expect(vi.getTimerCount()).toBe(0);
 		expect(trackDependency).toHaveBeenLastCalledWith(
 			expect.objectContaining({
-				resultCode: "ETIMEDOUT",
 				duration: 600,
 				success: false,
-				properties: expect.objectContaining({ attempt: 3, retrying: false }),
+				properties: expect.objectContaining({
+					probeResultCode: "ETIMEDOUT",
+					attempt: 3,
+					retrying: false,
+				}),
 			}),
 		);
 		expect(logger.error).toHaveBeenCalledWith(
