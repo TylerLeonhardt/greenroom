@@ -151,9 +151,16 @@ export async function loader(_args: LoaderFunctionArgs) {
 				target: getDatabaseTarget(),
 				data: "SELECT 1",
 				duration: durationMs,
-				resultCode: "OK",
 				success: true,
-				properties: { attempt, maxAttempts: MAX_ATTEMPTS },
+				// The v3 SDK drops resultCode for DB dependencies; preserve it as a custom dimension.
+				properties: {
+					probeResultCode: "OK",
+					attempt,
+					maxAttempts: MAX_ATTEMPTS,
+					...(process.env.CONTAINER_APP_REVISION
+						? { revision: process.env.CONTAINER_APP_REVISION }
+						: {}),
+				},
 			});
 
 			return Response.json({
@@ -187,9 +194,17 @@ export async function loader(_args: LoaderFunctionArgs) {
 				target: getDatabaseTarget(),
 				data: "SELECT 1",
 				duration: durationMs,
-				resultCode: errorCode,
 				success: false,
-				properties: { attempt, maxAttempts: MAX_ATTEMPTS, transient, retrying },
+				properties: {
+					probeResultCode: errorCode,
+					attempt,
+					maxAttempts: MAX_ATTEMPTS,
+					transient,
+					retrying,
+					...(process.env.CONTAINER_APP_REVISION
+						? { revision: process.env.CONTAINER_APP_REVISION }
+						: {}),
+				},
 			});
 
 			if (!retrying) break;

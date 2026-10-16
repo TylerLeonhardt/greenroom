@@ -30,6 +30,18 @@ Do not automatically retry ordinary application writes.
 
 Each attempt emits pino diagnostics and an optional Application Insights
 `PostgreSQL health probe` dependency with duration, result code, success, and attempt.
+**App Insights SDK gotcha:** `applicationinsights` 3.14.0 accepts `resultCode?: string | number`,
+but its OpenTelemetry shim only maps that field for HTTP/RPC, not database dependencies.
+The installed Azure Monitor exporter (1.0.0-beta.39) defaults DB `dependencies.resultCode`
+to `"0"` on both success and failure. This is a dropped field, not numeric coercion;
+changing `"OK"` to `"200"` does not fix it. Do not misclassify Postgres as HTTP to work around it.
+The probe instead preserves `"OK"` or the exact error code (e.g. `ECONNREFUSED`, `ETIMEDOUT`,
+SQLSTATE `42501`, or fallback `ERROR`) in `customDimensions.probeResultCode`, alongside
+`success`, attempt/retry metadata, and `customDimensions.revision` when running in Container Apps.
+Query `dependencies | where name == "PostgreSQL health probe" | project timestamp, success,
+resultCode, probeResultCode=tostring(customDimensions.probeResultCode),
+revision=tostring(customDimensions.revision)`. Do not rely on the native resultCode column
+for these DB probes; recheck the actual shim/exporter behavior when upgrading the SDK.
 Keep credentials and raw database errors out of the public response.
 Acceptance and timeout/cleanup regression tests live in `app/routes/api.health.test.ts`.
 
