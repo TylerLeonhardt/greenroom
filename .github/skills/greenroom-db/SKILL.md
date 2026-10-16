@@ -11,18 +11,32 @@ The entire schema lives in `src/db/schema.ts`. The database connection is in `sr
 
 ### Connection Setup
 
+The live configuration in `src/db/index.ts` uses a shared `pg` pool (10 clients,
+10-second idle timeout, 1-second connection timeout) with verified production TLS.
+The pool's `error` listener logs idle-client failures; `pg` evicts those clients automatically.
+Drizzle uses this pool for normal application queries.
+
+### Health Probe Resilience
+
+`app/routes/api.health.tsx` probes `SELECT 1` using Drizzle's underlying pool
+(`db.$client`) so it can explicitly release or destroy a checked-out client.
+Transient connection failures get at most three attempts, each capped at 600 ms
+(including acquisition), with 400/800 ms backoff: a 3-second scheduled budget,
+well under the availability test's 30-second timeout. Healthy requests have no backoff.
+The backoffs span 1.2 seconds even on immediate refusals, tolerating sub-second outages.
+Do not replace timeout cleanup with a bare `Promise.race`: it does not cancel DB work.
+Destroy failed/timed-out clients, and release late-acquired clients without starting a query.
+Do not automatically retry ordinary application writes.
+
+Each attempt emits pino diagnostics and an optional Application Insights
+`PostgreSQL health probe` dependency with duration, result code, success, and attempt.
+Keep credentials and raw database errors out of the public response.
+Acceptance and timeout/cleanup regression tests live in `app/routes/api.health.test.ts`.
+
+Reuse the shared database module rather than creating pools per request:
+
 ```typescript
-// src/db/index.ts
-import { drizzle } from "drizzle-orm/node-postgres";
-import pg from "pg";
-import * as schema from "./schema.js";
-
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
-});
-
-export const db = drizzle(pool, { schema });
+import { db } from "../../src/db/index.js";
 ```
 
 ### Enums
