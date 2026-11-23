@@ -35,7 +35,7 @@ docker run --detach --name greenroom-ci-postgres --network greenroom-ci-network 
       -c ssl_cert_file=/tmp/server.crt -c ssl_key_file=/tmp/server.key
   '
 timeout 60s bash -c \
-  'until docker exec greenroom-ci-postgres pg_isready -U postgres -d greenroom; do sleep 1; done'
+  'until docker exec greenroom-ci-postgres pg_isready -h 127.0.0.1 -U postgres -d greenroom; do sleep 1; done'
 
 # Trust only the disposable PostgreSQL certificate; retain NODE_ENV=production
 # and the real TLS verification path without changing production code.
