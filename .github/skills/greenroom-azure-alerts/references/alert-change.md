@@ -4,7 +4,65 @@
 approved the six-resource change and subsequently explicitly authorized registering
 only `Microsoft.AlertsManagement` on the greenroom subscription.
 
-## Latest attempt: fresh backup captured; offline verifier blocked
+## Latest attempt: session-local verifier also denied; no alert writes
+
+On 2026-11-23 the account matched the approved subscription and the provider
+was already `Registered`. No registration was repeated. Fresh raw originals,
+generated apply/rollback bodies, and a SHA-256 manifest were captured by
+**17:51:26 UTC** at:
+
+`/Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T175116Z`
+
+The root, `source/`, and `payloads/` directories are mode 0700. Earlier backup
+directories were not accessed or changed. The environment denied this exact
+next command, even though its venv is session-local and it contains no removal:
+
+```bash
+set -euo pipefail
+python3 -m venv /Users/tyleonha/.copilot/session-state/42da2978-3395-4018-bbdc-0852602b0b9f/files/alert-verifier-venv
+/Users/tyleonha/.copilot/session-state/42da2978-3395-4018-bbdc-0852602b0b9f/files/alert-verifier-venv/bin/pip install --quiet jsonschema
+/Users/tyleonha/.copilot/session-state/42da2978-3395-4018-bbdc-0852602b0b9f/files/alert-verifier-venv/bin/python .github/skills/greenroom-azure-alerts/references/verify-alert-payloads.py /Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T175116Z/payloads
+shasum -a 256 -c /Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T175116Z/SHA256SUMS
+```
+
+The exact error was:
+
+```text
+Permission denied because no interactive user response was available. Retry in an interactive session so the user can approve it, or try an alternative that does not require this permission.
+```
+
+No alternative route was attempted. No successful venv creation, offline
+verification, or checksum validation is claimed. These payloads are **not ready
+to apply**. Full pre-write guards, including both Fired checks and the final
+duplicate-run guard, were not reached. No Azure write or rollback occurred.
+
+Read-back completed **17:51:52 UTC**: every writable property of all five rules
+exactly matched both this backup's `.before.json` and the committed baseline.
+All remain enabled; the log rule remains Sev 1, 5m/5m with its original query
+and action group; the error metric retains `["5"]`. The processing-rule inventory
+was empty (one page), and scheduled/metric inventories contained exactly one/four
+rules without continuation. The provider was still Registered.
+Live `attention.kql` returned zero rows with explicit API bounds
+**17:21:48/17:51:48 UTC**.
+
+No propagation or 15-minute post-apply evaluation wait ran: the combined rule
+was never installed. Provisioning/query validation, evaluation health/history,
+and real fired-email delivery/resolved-email suppression remain unverified.
+Do not inject production failures. No rollback is needed and **no suppression
+DELETE belongs to this attempt**, which created none. Any separately authorized
+restoration must validate this backup and all guards, then restore its four
+metric `.before.json` bodies in the rollback order below, followed by its
+`log.before.json`; never substitute a different snapshot.
+Provider registration need not be undone.
+
+Keep venvs and scratch files in the current session's `files/`, with only durable
+backup evidence under `~/.george/greenroom-alert-backups/`. This remains the
+recommended separation, not a permission guarantee. If a command is denied even
+there, stop before writes; do not change trust settings, retry through another
+execution route, or substitute CI's baseline verification for the fresh-backup
+verifier. A future authorized apply requires fresh preparation and every guard.
+
+## Earlier attempt: fresh backup captured; offline verifier blocked
 
 On 2026-11-23 at **17:36:06 UTC**, read-only verification confirmed
 `Microsoft.AlertsManagement` was already `Registered`; no registration request
@@ -234,6 +292,11 @@ re-GET and compare all five live rules' writable properties with the saved
 Stop on drift, authentication failure, incomplete pagination, or an active incident.
 Review all currently Fired alerts in Azure Monitor, including older incidents.
 The subscription alerts API's default time range must not silently narrow that check.
+Use both the paginated 30-day check and an unbounded current-state check, including
+older active incidents. Immediately before the first write, reread issue #241's
+latest comments and recheck all five live bodies and every processing-rule page.
+If any rule differs from this apply's `.before.json`, or the suppression name now
+exists, stop: another operator may be mid-apply. Never overwrite or adopt its rule.
 
 For an explicit, paginated last-30-days check (conservatively stop on **any**
 Fired alert; also check older active incidents in Azure Monitor):

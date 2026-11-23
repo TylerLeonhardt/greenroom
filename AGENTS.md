@@ -495,10 +495,33 @@ Production telemetry is powered by Azure Application Insights, initialized in `a
 | `mycalltime-app-unhealthy` | Metric | Availability <80% | Sev 2 | 5m / 15m | Enabled |
 
 **All five rules above remain enabled**, reverified November 23, 2026 at
-17:36:54 UTC; all writable properties exactly match both the new attempt's fresh
+17:51:52 UTC; all writable properties exactly match both the new attempt's fresh
 `.before.json` bodies and the committed original baseline. The recovery-processing
 rule is absent (complete one-page list empty).
 The combined Sev 2 / 15m / 5m rule and four disabled metrics are **not live**.
+
+The **17:51 UTC** retry confirmed the provider was already Registered and did
+not register it again. A new private backup was captured by 17:51:26 UTC at
+`/Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T175116Z`
+(root/source/payloads mode 0700), leaving earlier backups untouched.
+The required verifier command was denied with
+`Permission denied because no interactive user response was available`
+**even with the venv in this session's `files/` and no removal command**.
+The runbook and #241 record the exact denied command. No alternative route was
+attempted; no successful offline verification or checksum validation is claimed.
+The generated bodies are not ready to apply; full pre-write guards did not run.
+Read-back matched all five fresh originals and the committed baseline;
+suppression was absent (complete one-page list). Live `attention.kql` returned
+zero rows with bounds 17:21:48/17:51:48 UTC, not rule-evaluation evidence.
+No Azure write, rollback, propagation wait, or post-apply observation occurred.
+This attempt created no suppression rule and must not delete one.
+
+Keep verifier venvs and scratch files in the current Copilot session's `files/`,
+not the durable backup directory. That separation does not guarantee execution
+permission: if the session-local verifier is denied, stop before writes rather
+than bypassing verification or changing trust settings. A later apply still
+requires fresh originals and every runbook guard, including the immediate
+duplicate-run check. Alert rollback does not require unregistering the provider.
 
 After explicit owner authorization, `Microsoft.AlertsManagement` registration
 was requested at 17:26:42 UTC and confirmed **Registered at 17:28:02 UTC**.

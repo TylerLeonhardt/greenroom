@@ -163,7 +163,7 @@ termination message; do not treat that message as a precise process-death time.
 
 ## Alerts, notification counts, and replay
 
-Live state reverified 2026-11-23 17:36:54 UTC: all five original rules remain
+Live state reverified 2026-11-23 17:51:52 UTC: all five original rules remain
 enabled and notify `mycalltime-alerts`:
 
 | Rule | Severity / condition | Evaluation / window |
@@ -174,7 +174,39 @@ enabled and notify `mycalltime-alerts`:
 | high-error-rate | 2; failed Count >5, broken result-code value `"5"` | 1m / 5m |
 | exception-spike | 1; exceptions Count >5, 1/1 periods | 5m / 5m |
 
-**Latest attempt, 17:36 UTC:** read-only provider verification confirmed
+**Latest attempt, 17:51 UTC:** the provider was already `Registered`; it was
+not registered again. Fresh originals, generated bodies, and a SHA-256 manifest
+were captured by 17:51:26 UTC in the new private durable directory
+`/Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T175116Z`
+(root/source/payloads mode 0700). Earlier backups were left untouched.
+
+The mandatory verifier command was denied with
+`Permission denied because no interactive user response was available`
+**despite placing the venv in this Copilot session's `files/` directory and
+including no removal command**. No alternative execution route was attempted.
+The exact command is recorded in the runbook and issue #241. No successful
+offline verification or checksum validation is claimed; generated payloads
+are not ready to apply. Full pre-write guards, including both Fired checks,
+did not run. No Azure write, rollback, propagation wait, or post-apply observation
+occurred. This attempt created no suppression rule and must not delete one.
+
+Read-back at 17:51:52 UTC matched every writable property of all five fresh
+`.before.json` bodies and the committed baseline. The complete suppression
+inventory was empty (one page); scheduled/metric inventories contained one/four
+rules without continuation. Live `attention.kql` returned zero rows with API
+bounds 17:21:48/17:51:48 UTC. This is query execution, not evidence of evaluation
+health for the uninstalled combined rule. Real fired/recovery email behavior
+remains unverified; never inject production failures.
+
+**Venv-location lesson:** keep verifier venvs and scratch files in the current
+Copilot session's `files/`, not under the durable backup directory. That location
+avoids mixing disposable tooling with rollback evidence, but does not guarantee
+execution permission. If the prescribed session-local command is denied, stop
+before writes rather than changing trust settings, bypassing verification, or
+trying another execution route. A future apply still needs a new backup and all
+runbook guards. Provider registration can remain during alert rollback.
+
+**Earlier attempt, 17:36 UTC:** read-only provider verification confirmed
 `Microsoft.AlertsManagement` was already `Registered` at 17:36:06 UTC; it was
 not registered again. The complete processing-rule inventory was empty.
 Fresh raw originals, generated apply/rollback bodies, and a SHA-256 manifest
