@@ -163,7 +163,7 @@ termination message; do not treat that message as a precise process-death time.
 
 ## Alerts, notification counts, and replay
 
-Live state reverified 2026-11-23 16:56 UTC: all five original rules remain
+Live state reverified 2026-11-23 17:04 UTC: all five original rules remain
 enabled and notify `mycalltime-alerts`:
 
 | Rule | Severity / condition | Evaluation / window |
@@ -184,6 +184,19 @@ No Azure mutation succeeded, no rollback writes were needed, and no provider
 registration, merge, or deployment was attempted. Registration is outside the
 approved six-resource change: stop rather than registering or bypassing suppression.
 The approved redesign is **not live**; the original broken `"5"` filter remains.
+
+The 17:04 UTC follow-up confirmed `NotRegistered` with a read-only provider GET
+and stopped at that prerequisite without retrying a PUT. All five writable
+definitions match the committed baseline and fresh `.before.json` bodies;
+direct suppression GET returns `ResourceNotFound` and its complete list is empty.
+The new private evidence directory is
+`/Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T170404Z-guard-stop`.
+All eleven bodies passed offline verification, checksums passed, and the isolated
+venv was removed. Both complete Fired checks (30-day API and unbounded current
+state, including older incidents) returned zero; current `attention.kql` returned
+no rows. This is not a post-apply evaluation: the combined rule is not installed.
+No Azure writes or rollback were attempted. Keep each attempt's backup separate;
+this follow-up cannot replace the original 16:55 rollback source.
 
 The private durable backup for this attempt is
 `~/.george/greenroom-alert-backups/issue-241-20261123T1655Z` on the operator's host.

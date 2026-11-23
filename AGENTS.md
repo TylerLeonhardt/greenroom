@@ -486,15 +486,15 @@ Production telemetry is powered by Azure Application Insights, initialized in `a
 
 ### Alert Rules
 
-| Alert | Type | Condition | Severity | Window |
-|-------|------|-----------|----------|--------|
-| `mycalltime-exception-spike` | Scheduled Query | >5 exceptions in 5 min | Sev 1 | 5 min |
-| `mycalltime-slow-response` | Metric | Avg response time >5s | Sev 2 | 5 min |
-| `mycalltime-high-error-rate` | Metric | >5 failed requests; result-code filter `"5"` (misconfigured, not all 5xx) | Sev 2 | 5 min |
-| `mycalltime-availability-alert` | Webtest Availability | ≥2 locations fail | Sev 1 | 5 min |
-| `mycalltime-app-unhealthy` | Metric | Availability <80% | Sev 2 | 15 min |
+| Alert | Type | Condition | Severity | Evaluation / window | State |
+|-------|------|-----------|----------|---------------------|-------|
+| `mycalltime-exception-spike` | Scheduled Query | >5 exceptions in 5 min | Sev 1 | 5m / 5m | Enabled |
+| `mycalltime-slow-response` | Metric | Avg response time >5s | Sev 2 | 5m / 5m | Enabled |
+| `mycalltime-high-error-rate` | Metric | >5 failed requests; result-code filter `"5"` (misconfigured, not all 5xx) | Sev 2 | 1m / 5m | Enabled |
+| `mycalltime-availability-alert` | Webtest Availability | ≥2 locations fail | Sev 1 | 1m / 5m | Enabled |
+| `mycalltime-app-unhealthy` | Metric | Availability <80% | Sev 2 | 5m / 15m | Enabled |
 
-**All five rules above remain enabled**, reverified November 23, 2026 at 16:56 UTC.
+**All five rules above remain enabled**, reverified November 23, 2026 at 17:04 UTC.
 The owner-approved combined-alert change was blocked on its first PUT:
 `MissingSubscriptionRegistration` (`Microsoft.AlertsManagement` is `NotRegistered`).
 The recovery-processing rule remains absent; all five writable definitions
@@ -502,6 +502,15 @@ exactly match the saved originals. No Azure mutation succeeded, no rollback
 writes were needed, and no provider registration, merge, or deployment occurred.
 Registration is outside the approved scope; do not register it or bypass suppression.
 The combined Sev 2 / 15m / 5m rule and four disabled metrics are **not live**.
+
+The 17:04 UTC follow-up stopped at the same prerequisite, confirmed read-only,
+without retrying any Azure write. All five writable definitions match both the
+committed baseline and that follow-up's fresh originals; suppression is absent.
+Its private evidence is at
+`/Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T170404Z-guard-stop`.
+This is not a replacement rollback source for the earlier 16:55 apply. Neither
+attempt changed configuration, so no restoration or processing-rule deletion is
+needed. Combined-rule evaluation and notification behavior remain unverified.
 
 The unhealthy rule's description still says
 <95% / 5 min, but its actual condition is <80% / 15 min, evaluated every 5 min.

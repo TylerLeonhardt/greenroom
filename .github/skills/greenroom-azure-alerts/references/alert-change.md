@@ -23,6 +23,31 @@ drift, complete rule inventories, and both the paginated last-30-day and
 unbounded current-state/older Fired-alert checks passed. Do not substitute this
 backup for fresh preparation on a later authorized retry.
 
+## Follow-up prerequisite stop: 2026-11-23 17:04 UTC
+
+A read-only provider GET still reports `Microsoft.AlertsManagement` as
+`NotRegistered`. The follow-up stopped without retrying the rejected PUT or
+issuing any other Azure write. Do not retry under an assumed authorization to
+register the provider; resolving this subscription prerequisite needs a separate
+owner decision outside the approved six-resource change.
+
+Fresh private sources, payloads, checksums, and read-back evidence are retained at
+`/Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T170404Z-guard-stop`.
+All eleven bodies passed the offline verifier in an isolated venv, subsequently
+removed. Read-back completed at 17:04:37 UTC: every existing rule's writable
+properties match both this directory's `.before.json` and the committed baseline,
+not the proposed `.after.json`. Suppression is absent (direct `ResourceNotFound`;
+complete one-page list empty). Scheduled/metric inventories contain exactly one
+and four rules. Both complete Fired-alert checks returned zero, including older
+active incidents via an unbounded current-state query. Live `attention.kql`
+returned no rows. No propagation wait or post-apply evaluation can validate the
+uninstalled combined configuration; notification delivery remains unverified.
+
+No rollback is needed and no processing-rule DELETE is authorized by ownership:
+this follow-up created nothing. Its backup is only this follow-up's source, never
+a replacement for the earlier attempt's backup. The guarded restoration sequence
+below remains unchanged; do not execute it just to restore an unchanged state.
+
 The original jq expressions in issue #241 generate valid request bodies.
 The corrected process below additionally fails on pipeline errors, preserves
 raw source definitions, follows processing-rule pagination, refuses an existing
