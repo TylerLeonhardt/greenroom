@@ -566,6 +566,14 @@ asserts every migration was applied to an empty database, landing/health HTTP
 success, Node/Remix as PID 1, a real SQL migration error exits 1 without starting
 Remix, and SIGTERM exits 0 within 15 seconds without a SIGKILL fallback.
 
+Docker internal-only networks do not publish host ports. A separate disposable
+NGINX test ingress joins both that network and the regular bridge to expose HTTPS;
+PostgreSQL also exposes a host-side seed port through the regular bridge.
+The application joins **only** the internal network. HTTPS allows all browsers
+to exercise production Secure cookies; Playwright accepts the disposable test
+certificate, while curl and the application's DB client verify its trust chain.
+Wait for PostgreSQL's TCP listener, not its socket-only bootstrap server.
+
 The complete app browser matrix runs against this same container using
 `E2E_EXTERNAL_SERVER=1` and `E2E_BASE_URL`, which disable Playwright's Vite
 web-server startup. The existing development-server and component jobs remain.

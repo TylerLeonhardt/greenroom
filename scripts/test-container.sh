@@ -8,7 +8,7 @@ TLS="$RUNNER_TEMP/greenroom-container-tls"
 mkdir -p "$EVIDENCE" "$TLS"
 
 cleanup() {
-  for container in greenroom-ci greenroom-ci-failed greenroom-ci-postgres; do
+  for container in greenroom-ci-proxy greenroom-ci greenroom-ci-failed greenroom-ci-postgres; do
     if docker inspect "$container" >/dev/null 2>&1; then
       docker logs "$container" > "$EVIDENCE/$container.log" 2>&1
       docker inspect --format '{{json .State}}' "$container" > "$EVIDENCE/$container.state.json"
@@ -19,13 +19,17 @@ cleanup() {
 }
 trap cleanup EXIT
 
+docker pull postgres:16
+docker pull nginx:alpine
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
   -subj '/CN=postgres' -addext 'subjectAltName=DNS:postgres,DNS:localhost,IP:127.0.0.1' \
   -keyout "$TLS/server.key" -out "$TLS/server.crt"
 docker network create --internal greenroom-ci-network
 test "$(docker network inspect --format '{{.Internal}}' greenroom-ci-network)" = true
-docker run --detach --name greenroom-ci-postgres --network greenroom-ci-network \
-  --network-alias postgres --publish 127.0.0.1:5432:5432 \
+# Host-side seed queries need a published port on a non-internal interface.
+# Only the database and HTTPS test ingress get that interface, never the app.
+docker create --name greenroom-ci-postgres --network bridge \
+  --publish 127.0.0.1:5432:5432 \
   --env POSTGRES_USER=postgres --env POSTGRES_PASSWORD=postgres --env POSTGRES_DB=greenroom \
   --volume "$TLS:/test-tls:ro" postgres:16 sh -ec '
     cp /test-tls/server.key /test-tls/server.crt /tmp/
@@ -34,25 +38,52 @@ docker run --detach --name greenroom-ci-postgres --network greenroom-ci-network 
     exec docker-entrypoint.sh postgres -c ssl=on \
       -c ssl_cert_file=/tmp/server.crt -c ssl_key_file=/tmp/server.key
   '
+docker network connect --alias postgres greenroom-ci-network greenroom-ci-postgres
+docker start greenroom-ci-postgres
 timeout 60s bash -c \
   'until docker exec greenroom-ci-postgres pg_isready -h 127.0.0.1 -U postgres -d greenroom; do sleep 1; done'
 
 # Trust only the disposable PostgreSQL certificate; retain NODE_ENV=production
 # and the real TLS verification path without changing production code.
 docker run --detach --name greenroom-ci --network greenroom-ci-network \
-  --publish 127.0.0.1:5176:3000 \
   --volume "$TLS/server.crt:/app/certs/DigiCertGlobalRootG2.crt.pem:ro" \
   --env DATABASE_URL=postgresql://postgres:postgres@postgres:5432/greenroom \
   --env SESSION_SECRET --env GOOGLE_CLIENT_ID --env GOOGLE_CLIENT_SECRET --env APP_URL \
   greenroom:ci
+docker inspect --format '{{json .NetworkSettings.Networks}}' greenroom-ci \
+  > "$EVIDENCE/app-networks.json"
+app_ip=$(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' greenroom-ci)
+# Internal-only bridges intentionally do not publish host ports. Terminate TLS
+# at a separate test ingress, like ACA, so browsers also exercise Secure cookies.
+cat > "$TLS/proxy.conf" <<EOF
+events {}
+http {
+  server {
+    listen 443 ssl;
+    ssl_certificate /test-tls/server.crt;
+    ssl_certificate_key /test-tls/server.key;
+    location / {
+      proxy_pass http://$app_ip:3000;
+      proxy_set_header Host \$http_host;
+      proxy_set_header X-Forwarded-Proto https;
+    }
+  }
+}
+EOF
+docker create --name greenroom-ci-proxy --network bridge \
+  --publish 127.0.0.1:5176:443 --volume "$TLS:/test-tls:ro" \
+  --volume "$TLS/proxy.conf:/etc/nginx/nginx.conf:ro" nginx:alpine
+docker network connect greenroom-ci-network greenroom-ci-proxy
+docker start greenroom-ci-proxy
 timeout 60s bash -c '
-  until curl --fail --silent http://localhost:5176/api/health > "$1/health.json"; do
+  until curl --fail --silent --cacert "$2/server.crt" https://localhost:5176/api/health > "$1/health.json"; do
     test "$(docker inspect --format "{{.State.Running}}" greenroom-ci)" = true || exit 1
     sleep 1
   done
-' _ "$EVIDENCE"
+' _ "$EVIDENCE" "$TLS"
 jq -e '.status == "ok"' "$EVIDENCE/health.json"
-curl --fail --silent --show-error http://localhost:5176/ > "$EVIDENCE/landing.html"
+curl --fail --silent --show-error --cacert "$TLS/server.crt" https://localhost:5176/ \
+  > "$EVIDENCE/landing.html"
 grep -q 'My Call Time' "$EVIDENCE/landing.html"
 test "$(docker exec greenroom-ci-postgres psql -U postgres -d greenroom -Atc \
   'SELECT count(*) FROM drizzle.__drizzle_migrations')" = "$(jq '.entries | length' drizzle/meta/_journal.json)"

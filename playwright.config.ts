@@ -26,6 +26,7 @@ export default defineConfig({
 	reporter: process.env.CI ? [["github"], ["html"]] : "html",
 	use: {
 		baseURL: APP_BASE_URL,
+		ignoreHTTPSErrors: process.env.E2E_EXTERNAL_SERVER === "1",
 		screenshot: "only-on-failure",
 		trace: "on-first-retry",
 	},
