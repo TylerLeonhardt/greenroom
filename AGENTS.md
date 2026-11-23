@@ -495,8 +495,9 @@ Production telemetry is powered by Azure Application Insights, initialized in `a
 | `mycalltime-app-unhealthy` | Metric | Availability <80% | Sev 2 | 5m / 15m | Enabled |
 
 **All five rules above remain enabled**, reverified November 23, 2026 at
-17:28:37 UTC; all writable properties exactly match the committed original
-baseline. The recovery-processing rule is absent (complete list empty).
+17:36:54 UTC; all writable properties exactly match both the new attempt's fresh
+`.before.json` bodies and the committed original baseline. The recovery-processing
+rule is absent (complete one-page list empty).
 The combined Sev 2 / 15m / 5m rule and four disabled metrics are **not live**.
 
 After explicit owner authorization, `Microsoft.AlertsManagement` registration
@@ -510,6 +511,22 @@ The intended path
 is unverified and **not a usable rollback source**. No alternative access was
 attempted. No alert writes, rollback, merge, or deployment occurred. Provider
 registration may remain; alert rollback does not require unregistering it.
+
+At **17:36:06 UTC**, a new run confirmed the provider was already Registered
+without registering it again; the complete processing-rule inventory was empty.
+Fresh originals, generated payloads, and a SHA-256 manifest were successfully
+captured by 17:36:19 UTC in a new private durable directory:
+`/Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T173606Z`
+(root/source/payload directories mode 0700). Earlier directories were left alone.
+The environment then denied the isolated-verifier command with
+`Permission denied because no interactive user response was available`.
+No alternative route was attempted. Offline verification/checksum validation
+did not complete; venv creation/removal cannot be confirmed. These generated
+payloads are not verified or ready to apply. No alert PUT, rollback, propagation
+wait, or post-apply observation occurred. Read-only `attention.kql` returned no
+rows (API bounds 17:06:51/17:36:51 UTC), not proof of uninstalled-rule health.
+The full pre-apply guard sequence did not complete. This attempt created no
+suppression rule and must not delete one; provider registration can remain.
 
 The earlier 16:55 and 17:04 attempts stopped at the then-unregistered provider
 and changed nothing. Their private backups remain separate and untouched;

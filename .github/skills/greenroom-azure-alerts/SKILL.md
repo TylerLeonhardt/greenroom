@@ -163,7 +163,7 @@ termination message; do not treat that message as a precise process-death time.
 
 ## Alerts, notification counts, and replay
 
-Live state reverified 2026-11-23 17:28:37 UTC: all five original rules remain
+Live state reverified 2026-11-23 17:36:54 UTC: all five original rules remain
 enabled and notify `mycalltime-alerts`:
 
 | Rule | Severity / condition | Evaluation / window |
@@ -174,7 +174,31 @@ enabled and notify `mycalltime-alerts`:
 | high-error-rate | 2; failed Count >5, broken result-code value `"5"` | 1m / 5m |
 | exception-spike | 1; exceptions Count >5, 1/1 periods | 5m / 5m |
 
-**Latest attempt:** the owner explicitly authorized registration of only
+**Latest attempt, 17:36 UTC:** read-only provider verification confirmed
+`Microsoft.AlertsManagement` was already `Registered` at 17:36:06 UTC; it was
+not registered again. The complete processing-rule inventory was empty.
+Fresh raw originals, generated apply/rollback bodies, and a SHA-256 manifest
+were successfully captured in the new durable private directory
+`/Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T173606Z`
+(backup/source/payload directories mode 0700). Earlier backups were left alone.
+
+The environment then denied the isolated-verifier command with
+`Permission denied because no interactive user response was available`.
+No alternative execution route was attempted. Offline verification and checksum
+validation did not complete; verifier-venv creation/removal cannot be confirmed.
+Do not treat these generated payloads as verified or ready to apply. No alert
+write, rollback, propagation wait, or post-apply observation occurred.
+Read-back at 17:36:54 UTC exactly matched this attempt's fresh `.before.json`
+bodies **and** the committed original baseline for all five rules. Suppression
+was absent (complete one-page list empty). Live read-only `attention.kql`, with
+API bounds 17:06:51/17:36:51 UTC, returned no rows; this is not evaluation-health
+evidence for the uninstalled combined rule. Full pre-apply guards did not run.
+The approved redesign remains **not live**. Real fired-email delivery and
+resolved-email suppression remain unverified; never inject production failures.
+No processing rule was created, so no DELETE is warranted. Provider registration
+can remain. A later apply still needs fresh preparation and every runbook guard.
+
+**Earlier registration attempt:** the owner explicitly authorized registration of only
 `Microsoft.AlertsManagement` in addition to the six-resource alert change.
 Registration was requested at 17:26:42 UTC and confirmed `Registered` at
 17:28:02 UTC on 2026-11-23. The processing-rule list API worked and was empty,

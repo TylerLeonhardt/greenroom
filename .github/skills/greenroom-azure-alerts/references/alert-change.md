@@ -4,7 +4,56 @@
 approved the six-resource change and subsequently explicitly authorized registering
 only `Microsoft.AlertsManagement` on the greenroom subscription.
 
-## Latest attempt: provider registered; backup preparation blocked
+## Latest attempt: fresh backup captured; offline verifier blocked
+
+On 2026-11-23 at **17:36:06 UTC**, read-only verification confirmed
+`Microsoft.AlertsManagement` was already `Registered`; no registration request
+was repeated. The processing-rule list API worked and its complete inventory
+was empty. A new private durable backup was successfully captured by
+**17:36:19 UTC** at:
+
+`/Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T173606Z`
+
+Its root, `source/`, and `payloads/` directories have mode 0700. Raw source GETs,
+generated apply/rollback bodies, and the SHA-256 manifest are retained there;
+no earlier backup was accessed or changed.
+
+The next command (isolated venv, dependency installation, offline verifier,
+venv removal, then checksum validation) was denied by the execution environment:
+
+```text
+Permission denied because no interactive user response was available. Retry in an interactive session so the user can approve it, or try an alternative that does not require this permission.
+```
+
+No alternative route was attempted. Venv creation/removal cannot be confirmed,
+and no successful offline verification or checksum validation is claimed.
+The backup capture succeeded, but its generated payloads are **not verified
+or ready to apply**. The full pre-apply guard sequence was not completed.
+No processing-rule, scheduled-query, or metric-rule PUT was attempted.
+
+Read-back completed **17:36:54 UTC**: every writable property of all five live
+rules exactly matched this attempt's fresh `.before.json` bodies and the
+committed original baseline. All remain enabled; the log rule remains Sev 1,
+5m/5m with its original query/action group, and the error metric retains `["5"]`.
+Suppression was absent (complete one-page list empty); the provider remained
+Registered. Live read-only `attention.kql` returned no rows with explicit API
+bounds **17:06:51/17:36:51 UTC**.
+
+No rollback is needed. This attempt created no processing rule and must not
+delete one. If separately authorized restoration ever becomes necessary, use
+this attempt's originals only after checksum, quiet-state, and ownership checks:
+restore the four metric `.before.json` bodies in the order below, then
+`log.before.json`; no suppression DELETE belongs to this stopped attempt.
+Never use an older or newly captured snapshot as its substitute. Alert rollback
+does not require unregistering the provider.
+
+No propagation/evaluation wait ran because the combined rule was not installed.
+Its provisioning, query validation, evaluation health/history, real fired-email
+delivery, and actual suppression of resolved emails remain unverified. Query
+execution alone cannot establish rule health; notification behavior needs a real
+incident, never an injected production failure.
+
+## Earlier attempt: provider registered; backup preparation blocked
 
 On 2026-11-23 registration was requested at **17:26:42 UTC** and polling first
 confirmed **Registered at 17:28:02 UTC**. The resource-group processing-rule list
