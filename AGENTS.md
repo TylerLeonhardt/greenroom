@@ -494,11 +494,24 @@ Production telemetry is powered by Azure Application Insights, initialized in `a
 | `mycalltime-availability-alert` | Webtest Availability | ≥2 locations fail | Sev 1 | 5 min |
 | `mycalltime-app-unhealthy` | Metric | Availability <80% | Sev 2 | 15 min |
 
-Live values verified November 23, 2026: the unhealthy rule's description still says
+**All five rules above remain enabled**, reverified November 23, 2026 at 16:56 UTC.
+The owner-approved combined-alert change was blocked on its first PUT:
+`MissingSubscriptionRegistration` (`Microsoft.AlertsManagement` is `NotRegistered`).
+The recovery-processing rule remains absent; all five writable definitions
+exactly match the saved originals. No Azure mutation succeeded, no rollback
+writes were needed, and no provider registration, merge, or deployment occurred.
+Registration is outside the approved scope; do not register it or bypass suppression.
+The combined Sev 2 / 15m / 5m rule and four disabled metrics are **not live**.
+
+The unhealthy rule's description still says
 <95% / 5 min, but its actual condition is <80% / 15 min, evaluated every 5 min.
 Alert rules are live Azure resources, not repository-managed IaC. See the
 `greenroom-azure-alerts` skill and [#241](https://github.com/TylerLeonhardt/greenroom/issues/241)
-for the read-only investigation runbook, replica-replacement evidence, and known alert blind spots.
+for the blocked apply, private durable backup location, investigation evidence,
+and known alert blind spots. The skill's `references/alert-change.md` preserves
+the guarded apply/rollback procedure: restore the same apply's saved metric
+`.before.json` bodies, then its log body, then delete only suppression that apply
+created after checking ownership. Never roll back from a new snapshot.
 
 All alerts notify the `mycalltime-alerts` action group (tylerl0706@gmail.com).
 

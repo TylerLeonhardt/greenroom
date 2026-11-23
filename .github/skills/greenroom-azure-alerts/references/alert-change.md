@@ -1,8 +1,27 @@
-# Approval-only alert change: preparation and rollback
+# Owner-approved alert change: preparation and rollback
 
-**No Azure writes are authorized by this runbook.** The current task verified
-GETs, local body generation, and offline schemas only. Do not execute the apply
-or rollback sections without separate owner approval.
+**This runbook does not itself authorize Azure writes.** The owner separately
+approved the six-resource change on 2026-11-23, but its first PUT at 16:55 UTC
+(recovery suppression) was rejected with HTTP 409 `MissingSubscriptionRegistration`:
+the subscription is not registered for `Microsoft.AlertsManagement`. A read-only
+provider GET confirmed `NotRegistered`. Provider registration is outside that
+approval; do not register it or proceed without suppression.
+
+No mutation succeeded. All five rules were read back and exactly match their
+`.before.json` bodies; suppression GET returned `ResourceNotFound` and the complete
+processing-rule list was empty. No rollback writes were needed. The original
+five-rule policy (including the broken `"5"` filter) remains live. The approved
+combined rule, propagation, evaluation health, and real notification delivery
+remain unverified. Read-only `attention.kql` returned no rows at 16:55:59 UTC.
+
+The attempt's private durable backup is
+`/Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T1655Z`.
+Its raw source GETs, exact payloads, and SHA-256 manifest are retained there, not
+in the repository or expiring session artifacts. All eleven payloads passed the
+offline verifier; its isolated venv was removed. Pre-apply checksum, baseline,
+drift, complete rule inventories, and both the paginated last-30-day and
+unbounded current-state/older Fired-alert checks passed. Do not substitute this
+backup for fresh preparation on a later authorized retry.
 
 The original jq expressions in issue #241 generate valid request bodies.
 The corrected process below additionally fails on pipeline errors, preserves
@@ -68,7 +87,7 @@ The `verified-alert-payloads` CI artifact contains generated bodies and schemas,
 not personal metadata, and expires after 30 days. It does not replace a durable
 operator backup.
 
-## Apply — approval required; not executed
+## Apply — approval required; first attempt rejected
 
 Keep the variable definitions from preparation. Before writing, verify checksums,
 re-GET and compare all five live rules' writable properties with the saved
@@ -90,7 +109,7 @@ while test -n "$url"; do
     "$BACKUP/fired-page.json" >/dev/null
   url=$(jq -r '.nextLink // empty' "$BACKUP/fired-page.json")
 done
-# The following writes STILL require separate owner approval.
+# Execute only within a separately owner-approved apply.
 az rest --method put --url "$APR?api-version=2021-08-08" \
   --body @"$BACKUP/payloads/recovery-suppression.json" --output none
 sleep 1800 # Allow up to 30 minutes for processing-rule propagation.
@@ -120,6 +139,8 @@ Restore metric coverage first, then the original query, then delete only the
 processing rule created by this apply. If apply failed before creating that
 rule, do not delete any rule. On a partial apply, restore all five saved bodies;
 do not reconstruct them from memory or from proposed settings.
+If the very first write is rejected and read-back proves nothing changed, there
+is no partial apply to restore: do not issue unnecessary restoration writes.
 
 ```bash
 test "$(az account show --query id -o tsv)" = "$SUB"

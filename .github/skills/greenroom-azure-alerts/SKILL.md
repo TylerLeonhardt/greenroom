@@ -163,7 +163,8 @@ termination message; do not treat that message as a precise process-death time.
 
 ## Alerts, notification counts, and replay
 
-Baseline five enabled rules all notify `mycalltime-alerts`:
+Live state reverified 2026-11-23 16:56 UTC: all five original rules remain
+enabled and notify `mycalltime-alerts`:
 
 | Rule | Severity / condition | Evaluation / window |
 |---|---|---|
@@ -172,6 +173,29 @@ Baseline five enabled rules all notify `mycalltime-alerts`:
 | slow-response | 2; average duration >5000ms | 5m / 5m |
 | high-error-rate | 2; failed Count >5, broken result-code value `"5"` | 1m / 5m |
 | exception-spike | 1; exceptions Count >5, 1/1 periods | 5m / 5m |
+
+The owner-approved combined-alert apply was **blocked on its first PUT** at
+16:55 UTC: Azure returned `MissingSubscriptionRegistration` for
+`Microsoft.AlertsManagement`; a read-only provider GET confirmed `NotRegistered`.
+`mycalltime-attention-no-recovery` remains absent (direct GET `ResourceNotFound`,
+complete processing-rule list empty). All five rules' writable properties still
+exactly match the fresh `.before.json` bodies and the committed baseline.
+No Azure mutation succeeded, no rollback writes were needed, and no provider
+registration, merge, or deployment was attempted. Registration is outside the
+approved six-resource change: stop rather than registering or bypassing suppression.
+The approved redesign is **not live**; the original broken `"5"` filter remains.
+
+The private durable backup for this attempt is
+`~/.george/greenroom-alert-backups/issue-241-20261123T1655Z` on the operator's host.
+Raw GETs must remain private. All eleven bodies passed offline verification,
+checksums passed, and the isolated verifier venv was removed. Before the PUT,
+the complete 30-day Fired-alert query and current-state Resource Graph query
+(without an age filter, including older active incidents) both returned zero.
+Live `attention.kql` returned no rows at 16:55:59 UTC. This is query execution,
+not proof of the unapplied rule's evaluation health or notification delivery.
+See issue #241 and [references/alert-change.md](references/alert-change.md) for
+the failed attempt and guarded rollback sequence. Do not retry under an assumed
+provider-registration authorization.
 
 Metric `autoMitigate` is omitted (ARM default true); log rule explicitly true.
 The unhealthy description is stale (<95% / 5m); trust actual properties.
@@ -191,7 +215,7 @@ instance, GET `ALERT_ID/history?api-version=2019-03-01`; count
 The 16 historical instances have **32 action-group executions** (fired + resolved
 for every instance), not proof of 32 delivered/read messages in the CEO inbox.
 
-The approval-only proposal reuses the existing 5-minute scheduled-query rule,
+The owner-approved, currently blocked proposal reuses the existing 5-minute scheduled-query rule,
 disables the four metric rules, and uses [references/attention.kql](references/attention.kql)
 as a single non-dimensional Boolean condition (row Count >0, 1/1, window 15m,
 Sev 2, autoMitigate true, existing action group). This combines sustained
@@ -202,12 +226,14 @@ Use a narrowly scoped `Microsoft.AlertsManagement/actionRules@2021-08-08`
 RemoveAllActionGroups rule with `MonitorCondition == Resolved` AND the exact
 scheduled rule ID to suppress **only recoveries**. Propagation can take 30m.
 This keeps the existing log-rule count/evaluation frequency and adds no compute
-or notification service. All live changes require approval; nothing is deployed.
+or notification service. Its first write was rejected; no configuration changed.
 See [references/alert-change.md](references/alert-change.md) for read-only
 preparation, exact rollback sources, and the separately approval-gated commands.
 The `Alert payload verification` workflow generates all eleven request bodies
 offline and checks the published REST schemas, minimal changes, and restoration.
-The dated snapshot is evidence, not permission to apply stale configuration.
+The dated snapshot remains the verified original live state, not permission to
+apply stale configuration. A later authorized retry needs fresh preparation and
+guards; use an apply's own original backup for rollback, never a later snapshot.
 
 Replay using all synthetic results plus 20m warm-up and all 500-599 request
 samples (`sum(itemCount)` for weighting). Use relative age buckets for the three
