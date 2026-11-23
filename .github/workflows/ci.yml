@@ -87,3 +87,38 @@ jobs:
           name: playwright-e2e-report
           path: playwright-report/
           retention-days: 30
+
+  container-e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/greenroom
+      SESSION_SECRET: ci-test-secret-do-not-use-in-production
+      GOOGLE_CLIENT_ID: ci-placeholder
+      GOOGLE_CLIENT_SECRET: ci-placeholder
+      APP_URL: http://localhost:5176
+      E2E_BASE_URL: http://localhost:5176
+      E2E_EXTERNAL_SERVER: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build production image
+        run: docker build --tag greenroom:ci .
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium webkit
+      - name: Verify offline startup, migrations, production E2E, and shutdown
+        run: bash scripts/test-container.sh
+      - name: Upload container evidence and browser report
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: container-e2e-report
+          path: |
+            playwright-report/
+            ${{ runner.temp }}/greenroom-container-evidence/
+          retention-days: 30

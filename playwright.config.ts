@@ -88,32 +88,35 @@ export default defineConfig({
 			},
 		},
 	],
-	webServer: [
-		{
-			command: `pnpm run dev --port ${APP_PORT}`,
-			port: APP_PORT,
-			reuseExistingServer: !process.env.CI,
-			timeout: 60_000,
-			env: {
-				...process.env,
-				APP_URL: APP_BASE_URL,
-				AZURE_COMMUNICATION_CONNECTION_STRING: "",
-				E2E_VITE_CACHE_DIR: path.join(os.tmpdir(), "greenroom-e2e-vite", `app-${APP_PORT}`),
-			},
-		},
-		{
-			command: `pnpm vite dev --config vite.explorer.config.ts --port ${EXPLORER_PORT}`,
-			port: EXPLORER_PORT,
-			reuseExistingServer: !process.env.CI,
-			timeout: 30_000,
-			env: {
-				...process.env,
-				E2E_VITE_CACHE_DIR: path.join(
-					os.tmpdir(),
-					"greenroom-e2e-vite",
-					`explorer-${EXPLORER_PORT}`,
-				),
-			},
-		},
-	],
+	webServer:
+		process.env.E2E_EXTERNAL_SERVER === "1"
+			? undefined
+			: [
+					{
+						command: `pnpm run dev --port ${APP_PORT}`,
+						port: APP_PORT,
+						reuseExistingServer: !process.env.CI,
+						timeout: 60_000,
+						env: {
+							...process.env,
+							APP_URL: APP_BASE_URL,
+							AZURE_COMMUNICATION_CONNECTION_STRING: "",
+							E2E_VITE_CACHE_DIR: path.join(os.tmpdir(), "greenroom-e2e-vite", `app-${APP_PORT}`),
+						},
+					},
+					{
+						command: `pnpm vite dev --config vite.explorer.config.ts --port ${EXPLORER_PORT}`,
+						port: EXPLORER_PORT,
+						reuseExistingServer: !process.env.CI,
+						timeout: 30_000,
+						env: {
+							...process.env,
+							E2E_VITE_CACHE_DIR: path.join(
+								os.tmpdir(),
+								"greenroom-e2e-vite",
+								`explorer-${EXPLORER_PORT}`,
+							),
+						},
+					},
+				],
 });

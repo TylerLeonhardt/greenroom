@@ -420,10 +420,11 @@ Before committing:
 2. `pnpm run lint` — Biome linter passes
 3. `pnpm run build` — Production build succeeds
 
-CI runs on every push/PR to `master` with three parallel jobs:
+CI runs on every push/PR to `master` with four parallel jobs:
 - **check** — typecheck → lint → build → vitest (unit tests)
 - **playwright-explorer** — Component explorer Playwright tests (172 tests, no DB needed). Uses `playwright.explorer.config.ts` which only starts the explorer Vite server.
 - **playwright-e2e** — App E2E Playwright tests (119 tests) with PostgreSQL 16 service container. Runs DB migrations, seeds test data, tests across Desktop Chrome, Mobile Safari, and Mobile Chrome.
+- **container-e2e** — Builds the production Dockerfile and checks offline startup against TLS PostgreSQL, migration failure, HTTP, PID 1, the app browser matrix, and SIGTERM shutdown.
 
 ### Code Style
 
@@ -459,7 +460,7 @@ CI runs on every push/PR to `master` with three parallel jobs:
 - **Container:** Node.js 20 slim, multi-stage Docker build (deps → build → runtime)
 - **Migrations:** Auto-run on container startup via `scripts/migrate.mjs` (uses `drizzle-orm/node-postgres/migrator`, not drizzle-kit). Idempotent — safe with multiple replicas. Fails fast if migration fails (prevents app from starting with broken schema).
 - **CI/CD:** GitHub Actions
-  - `ci.yml` — Three parallel jobs: check (typecheck + lint + build + vitest), playwright-explorer (component tests), playwright-e2e (app E2E with PostgreSQL)
+  - `ci.yml` — Four parallel jobs: check, playwright-explorer, playwright-e2e (development server), container-e2e (production Docker image)
   - `deploy.yml` — Docker build → Azure Container Registry → Azure Container Apps on push to `master`
 - **Database:** Azure PostgreSQL (SSL in production, verified against DigiCert Global Root G2 CA cert in `certs/`)
 
@@ -489,9 +490,15 @@ Production telemetry is powered by Azure Application Insights, initialized in `a
 |-------|------|-----------|----------|--------|
 | `mycalltime-exception-spike` | Scheduled Query | >5 exceptions in 5 min | Sev 1 | 5 min |
 | `mycalltime-slow-response` | Metric | Avg response time >5s | Sev 2 | 5 min |
-| `mycalltime-high-error-rate` | Metric | >5 failed requests in 5 min (5xx only) | Sev 2 | 5 min |
+| `mycalltime-high-error-rate` | Metric | >5 failed requests; result-code filter `"5"` (misconfigured, not all 5xx) | Sev 2 | 5 min |
 | `mycalltime-availability-alert` | Webtest Availability | ≥2 locations fail | Sev 1 | 5 min |
-| `mycalltime-app-unhealthy` | Metric | Availability <95% | Sev 2 | 5 min |
+| `mycalltime-app-unhealthy` | Metric | Availability <80% | Sev 2 | 15 min |
+
+Live values verified November 23, 2026: the unhealthy rule's description still says
+<95% / 5 min, but its actual condition is <80% / 15 min, evaluated every 5 min.
+Alert rules are live Azure resources, not repository-managed IaC. See the
+`greenroom-azure-alerts` skill and [#241](https://github.com/TylerLeonhardt/greenroom/issues/241)
+for the read-only investigation runbook, replica-replacement evidence, and known alert blind spots.
 
 All alerts notify the `mycalltime-alerts` action group (tylerl0706@gmail.com).
 
@@ -539,6 +546,7 @@ getTelemetryClient()?.trackException({ exception: error });
 
 ## Available Skills
 
+- **greenroom-azure-alerts** (`.github/skills/greenroom-azure-alerts/`) — App-specific read-only Azure alert investigation: live resource map, alert history APIs, telemetry encoding traps, replica replacement correlation, and notification-noise diagnosis.
 - **greenroom-architecture** (`.github/skills/greenroom-architecture/`) — Remix route structure, loader/action patterns, service layer conventions, component architecture, and UI styling guidelines. Reference for how to build features that match the existing codebase.
 - **greenroom-db** (`.github/skills/greenroom-db/`) — Drizzle ORM schema reference, migration workflow, query patterns (joins, upserts, transactions, window functions), JSON column patterns, index strategy, and multi-tenancy approach.
 - **schema-changes** (`.github/skills/schema-changes/`) — **Required reading before any schema change.** Checklist covering write-site discovery, NOT NULL pitfalls, migration defaults, lifecycle testing, FK cascades, and LEFT JOIN awareness. Born from a production bug where Drizzle `.default()` didn't propagate to the DB.

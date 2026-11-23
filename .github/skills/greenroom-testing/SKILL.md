@@ -550,6 +550,29 @@ the November 2026 move to Ubuntu 26.04 failed at `playwright install --with-deps
 before any tests ran, including on an unchanged copy of `master` (run 45197931114).
 Upgrade the runner and Playwright together in a separately verified change.
 
+### Production Docker Image in CI
+
+`container-e2e` builds the actual Dockerfile (no registry push/deployment), then
+runs `bash scripts/test-container.sh` on a disposable GitHub runner. Use CI when
+local Docker or shell execution is unavailable; do not bypass local restrictions.
+The script deliberately requires `CI=true` and owns its fixed-name test containers.
+Do not run it against shared Docker services.
+
+The image keeps `NODE_ENV=production` and its normal CMD. An internal Docker
+network permits only the test containers, not internet egress, proving startup
+does not download pnpm. PostgreSQL 16 uses a disposable TLS certificate mounted
+as the application's trusted CA; production TLS is not disabled. The script
+asserts every migration was applied to an empty database, landing/health HTTP
+success, Node/Remix as PID 1, a real SQL migration error exits 1 without starting
+Remix, and SIGTERM exits 0 within 15 seconds without a SIGKILL fallback.
+
+The complete app browser matrix runs against this same container using
+`E2E_EXTERNAL_SERVER=1` and `E2E_BASE_URL`, which disable Playwright's Vite
+web-server startup. The existing development-server and component jobs remain.
+Logs, PID/exit evidence, health output, and the HTML browser report are retained
+in the `container-e2e-report` Actions artifact (30 days). No production secrets,
+Azure access, or additional hosting capacity are needed.
+
 ### Run the CI App Matrix Before Pushing
 
 Run the same app projects as the `playwright-e2e` CI job:

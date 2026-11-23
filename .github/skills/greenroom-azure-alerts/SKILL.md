@@ -1,6 +1,6 @@
 ---
 name: greenroom-azure-alerts
-description: Read-only investigation of My Call Time Azure Monitor alerts, replica interruptions, startup timelines, and notification noise.
+description: Read-only investigation of My Call Time Azure Monitor alerts, replica interruptions, startup timelines, telemetry correlation, and notification noise. Use for recurring Sev 2 alerts, availability failures, alert history, and production monitoring.
 ---
 
 # Greenroom Azure Alert Investigation
@@ -8,11 +8,15 @@ description: Read-only investigation of My Call Time Azure Monitor alerts, repli
 Read `docs/vision.md`, `AGENTS.md`, and the `azure-diagnostics` /
 `azure-observability` skills first. This runbook supplements their generic guidance.
 Issue #241 and PR #242 contain the original November 2026 investigation.
+PR #243 consolidates both investigation PRs. The original discovery commands and
+metric caveats are preserved in [references/read-only-discovery.md](references/read-only-discovery.md);
+the later probe/startup findings below supersede the original causal hypotheses.
 
 ## Safety and evidence
 
 - Azure investigation is read-only. Do not restart, deploy, scale, change probes,
   change alert rules, or send production test failures without separate approval.
+  Do not change log levels or add firewall rules during investigation.
 - **CEO constraint: retain the single-replica baseline. Do not recommend extra
   replicas, larger resources, or other cost-increasing changes.** This supersedes
   the two-replica recommendation in the original issue/PR.
@@ -21,6 +25,8 @@ Issue #241 and PR #242 contain the original November 2026 investigation.
 - Do not print container environment values, list secrets, or retrieve DB credentials.
   Public reports must exclude personal identifiers, addresses, tokens, raw request
   bodies, and token-bearing URLs. Aggregate at the source.
+  Treat console logs and dependency payloads as sensitive even if automatic
+  redaction was expected; redact calendar-feed tokens and OAuth codes too.
 - Separate observed failure mechanism, inferred trigger, and unproven hypotheses.
   Alert fired-to-resolved duration is **not** measured outage duration.
 
@@ -168,6 +174,9 @@ Baseline five enabled rules all notify `mycalltime-alerts`:
 | exception-spike | 1; exceptions Count >5, 1/1 periods | 5m / 5m |
 
 Metric `autoMitigate` is omitted (ARM default true); log rule explicitly true.
+The unhealthy description is stale (<95% / 5m); trust actual properties.
+The webtest expects HTTP 200, validates SSL with a seven-day expiry warning,
+and does not specify `RetryEnabled`; null is not evidence that retries are on.
 Two failures / nine samples = 77.78%. Window retention plus three healthy
 evaluations explains 22-25 minute alert states after much shorter interruptions.
 
@@ -221,3 +230,11 @@ Resource metrics: ACA `UsageNanoCores`, `WorkingSetBytes`, `RestartCount`,
 Divide CPU nanocores by 1e9, bytes by 2^20. Replica replacement can leave
 RestartCount=0 and Replicas=1; missing samples are not healthy samples.
 Compare deploy history/image SHA and Activity Log before attributing churn to code.
+
+## Production-image verification
+
+The `container-e2e` job builds the PR's Dockerfile and invokes
+`scripts/test-container.sh` on an isolated GitHub runner. See the
+`greenroom-testing` skill for the assertions and artifact locations. Do not
+substitute a direct-Node smoke test for building/running the actual image, and
+do not bypass unavailable Docker tooling or local execution permissions.

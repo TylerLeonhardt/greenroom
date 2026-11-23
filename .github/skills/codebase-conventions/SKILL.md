@@ -34,10 +34,12 @@ pnpm test            # vitest run (unit tests)
 pnpm run build       # remix vite:build (production build)
 ```
 
-**CI has three parallel jobs:**
+**CI has four parallel jobs:**
 1. **check** — typecheck → lint → build → vitest
 2. **playwright-explorer** — Component explorer Playwright tests (no DB needed)
 3. **playwright-e2e** — App E2E tests with PostgreSQL service container
+4. **container-e2e** — Actual production image: offline TLS PostgreSQL startup,
+   migration failure, HTTP, PID 1, app browser matrix, and SIGTERM; see the testing skill
 
 ## File Structure
 
