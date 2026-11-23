@@ -4,7 +4,61 @@
 approved the six-resource change and subsequently explicitly authorized registering
 only `Microsoft.AlertsManagement` on the greenroom subscription.
 
-## Latest attempt: 17:59 UTC; venv creation succeeded, next command denied
+## Latest attempt: 18:11 UTC; repository-relative verifier also denied
+
+On 2026-11-23 the owner authorized keeping this run's private rollback evidence
+inside the checkout, excluded through `.git/info/exclude`, to avoid unattended
+permission prompts for paths outside the repository. This supersedes the older
+outside-repository/session-local path recommendations below; those remain
+historical reports, not instructions for a new run.
+
+From `george/fix-issue-241-startup`, the subscription matched and the provider
+was already Registered. All five live writable definitions matched the original
+baseline; the complete processing-rule inventory was empty. Fresh raw GETs,
+snapshot, generated bodies, and a SHA-256 manifest were captured at:
+
+`.alert-apply/backup-20261123T181118Z/`
+
+The work, backup, source, and payload directories are mode 0700. The directory
+is untracked, locally excluded, retained only in this checkout on this machine,
+and must never be staged. Earlier backups outside the checkout were untouched.
+`python3 -m venv .alert-apply/venv` succeeded, but this exact next command failed:
+
+```bash
+.alert-apply/venv/bin/pip install --quiet jsonschema && .alert-apply/venv/bin/python .github/skills/greenroom-azure-alerts/references/verify-alert-payloads.py .alert-apply/backup-20261123T181118Z/payloads && shasum -a 256 -c .alert-apply/backup-20261123T181118Z/SHA256SUMS
+```
+
+```text
+Permission denied because no interactive user response was available. Retry in an interactive session so the user can approve it, or try an alternative that does not require this permission.
+```
+
+No alternative route was attempted. The tool did not identify which subcommand
+required approval. **Relative paths do not guarantee unattended execution
+permission.** Offline verification/checksum validation did not complete; these
+payloads are not ready to apply. The venv was removed and its absence confirmed;
+the backup remains in place. Both Fired checks and the immediate pre-write
+duplicate-run guard were not reached. No Azure write, rollback, schema correction,
+propagation wait, or post-apply observation occurred.
+
+At **18:12:14 UTC**, all five rules matched every writable property of both this
+backup's fresh `.before.json` bodies and the committed baseline. All remain
+enabled, the original log rule remains Sev 1 / 5m window / 5m frequency, and the
+error metric retains `["5"]`. Suppression was absent (complete one-page empty
+inventory); scheduled/metric inventories contained one/four rules without
+continuation. The provider remained Registered. Live `attention.kql` returned
+zero rows with bounds **17:42:12/18:12:12 UTC**, not evaluation evidence for the
+uninstalled combined configuration.
+
+No rollback is needed and no processing-rule DELETE belongs to this attempt.
+For any separately authorized restoration, first complete verification/checksums
+and all quiet-state/ownership guards, then use the rollback section below with
+`BACKUP=.alert-apply/backup-20261123T181118Z`. Restore its four metric originals,
+then its log original; do not delete suppression this attempt did not create.
+Provider registration can remain. Combined-rule provisioning, query validation,
+evaluation health, propagation, and real fired/resolved email behavior remain
+unverified; never inject production failures.
+
+## Earlier attempt: 17:59 UTC; venv creation succeeded, next command denied
 
 On 2026-11-23 the operator used the existing CLI tools directly, without
 launching another Copilot process, relying on the unavailable MCP server, or
@@ -105,7 +159,7 @@ metric `.before.json` bodies in the rollback order below, followed by its
 `log.before.json`; never substitute a different snapshot.
 Provider registration need not be undone.
 
-Keep venvs and scratch files in the current session's `files/`, with only durable
+The recommendation at that time was to keep venvs and scratch files in the current session's `files/`, with only durable
 backup evidence under `~/.george/greenroom-alert-backups/`. This remains the
 recommended separation, not a permission guarantee. If a command is denied even
 there, stop before writes; do not change trust settings, retry through another
@@ -280,15 +334,32 @@ namespace is now registered; future runs should not re-register it unnecessarily
 
 ## Read-only preparation
 
-Run in Bash from the #243 checkout. Set `BACKUP` to a **new, private, durable,
-absolute directory path** whose parent exists; retain it outside the repository.
-Do not use a new snapshot when rolling back an earlier apply.
+Run every command from the repository root on the #243 branch. Use only relative
+local paths inside the checkout: one private `.alert-apply/` work directory,
+a new timestamped backup, and the separate disposable `.alert-apply/venv/`.
+The owner approved this deviation from retaining backups outside the repository.
+Add `/.alert-apply/` to `.git/info/exclude` (local only, not `.gitignore`) before
+capturing raw GETs, then confirm `git check-ignore .alert-apply/probe` succeeds.
+Do not use symlinks, `cd`, subshells, or variables to reach outside the checkout.
+Leave all older external backups untouched.
+
+Never stage raw GETs: they contain creator metadata. Stage only explicit
+documentation paths, never `git add .` or `git add -A`; confirm `git status --short`
+and `git diff --cached --name-only` contain no `.alert-apply/` paths. Keep the
+backup in this checkout afterwards, not in expiring session storage or CI
+artifacts, and do not copy it elsewhere. Do not use a new snapshot when rolling
+back an earlier apply. A relative path avoids the known external-path permission
+trigger but does not guarantee permission: stop on any denial without attempting
+another execution route or changing trust settings.
 
 ```bash
 set -euo pipefail
 umask 077
-: "${BACKUP:?Set BACKUP to a new durable absolute directory}"
-case "$BACKUP" in /*) ;; *) echo "BACKUP must be absolute" >&2; exit 1 ;; esac
+BACKUP=".alert-apply/backup-$(date -u '+%Y%m%dT%H%M%SZ')"
+test ! -L .alert-apply
+if test ! -d .alert-apply; then mkdir -m 700 .alert-apply; fi
+chmod 700 .alert-apply
+git check-ignore .alert-apply/probe
 SUB=b37965f1-4da2-4202-889d-82322392b4d5
 RG_ID="/subscriptions/$SUB/resourceGroups/greenroom-rg"
 ROOT="https://management.azure.com$RG_ID/providers"
@@ -333,6 +404,29 @@ from this investigation are retained privately in its session artifacts.
 The `verified-alert-payloads` CI artifact contains generated bodies and schemas,
 not personal metadata, and expires after 30 days. It does not replace a durable
 operator backup.
+
+Before any write, run the fresh-backup verifier in the in-repository venv, then
+validate the manifest. No CI baseline verification can replace this step.
+
+```bash
+python3 -m venv .alert-apply/venv
+.alert-apply/venv/bin/pip install --quiet jsonschema
+.alert-apply/venv/bin/python .github/skills/greenroom-azure-alerts/references/verify-alert-payloads.py "$BACKUP/payloads"
+shasum -a 256 -c "$BACKUP/SHA256SUMS"
+```
+
+Stop on any error or permission denial, report the exact command and exact error,
+and do not retry through another route. Remove only `.alert-apply/venv/` when
+verification finishes or the apply stops; retain the backup. Confirm its absence.
+Run the normal lint/typecheck/test/build commands with the backup present. If a
+tool scans private evidence, use a local-only exclusion rather than committing
+configuration specific to this checkout, and report it.
+
+On the 18:11 attempt, normal `pnpm run lint` scanned the excluded backup despite
+Biome's Git-ignore setting and failed formatting checks on its JSON. A small
+`!.alert-apply` entry in Biome's `files.includes` now excludes this standardized
+private operator directory without changing or formatting rollback evidence.
+No other tool-specific exclusion was needed; retain the local Git exclude too.
 
 ## Apply — approval required; not yet completed
 

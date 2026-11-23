@@ -163,7 +163,7 @@ termination message; do not treat that message as a precise process-death time.
 
 ## Alerts, notification counts, and replay
 
-Live state reverified 2026-11-23 18:00:22 UTC: all five original rules remain
+Live state reverified 2026-11-23 18:12:14 UTC: all five original rules remain
 enabled and notify `mycalltime-alerts`:
 
 | Rule | Severity / condition | Evaluation / window |
@@ -174,7 +174,38 @@ enabled and notify `mycalltime-alerts`:
 | high-error-rate | 2; failed Count >5, broken result-code value `"5"` | 1m / 5m |
 | exception-spike | 1; exceptions Count >5, 1/1 periods | 5m / 5m |
 
-**Latest attempt, 17:59 UTC:** direct CLI use avoided the Copilot startup/trust
+**Latest attempt, 18:11 UTC:** the owner-authorized repository-relative approach
+also stopped at a permission denial, before any Azure write. The provider was
+already Registered. Fresh originals, generated bodies, and a SHA-256 manifest
+remain in `.alert-apply/backup-20261123T181118Z/`, private mode 0700, untracked
+and excluded via `.git/info/exclude`, local to this checkout on this machine.
+No earlier external backup was accessed. The in-repository venv was created,
+but dependency installation/verifier/checksum execution was denied with
+`Permission denied because no interactive user response was available`.
+The runbook records the exact command and full error. No alternative route was
+attempted; the venv was removed and its absence confirmed. Verification/checksums
+did not complete, so these payloads are **not ready to apply**. Neither Fired
+check nor the immediate pre-write duplicate-run guard was reached.
+
+Read-back at 18:12:14 UTC matched all five fresh `.before.json` bodies and the
+committed baseline exactly; suppression was absent (one complete empty page).
+Scheduled/metric inventories contained one/four rules without continuation.
+Live `attention.kql` returned zero rows with bounds 17:42:12/18:12:12 UTC. This is
+not evaluation evidence for the uninstalled combined configuration. No rollback,
+propagation/evaluation wait, merge, or deployment ran. This attempt created no
+suppression rule and must not delete one. Real fired/resolved email behavior,
+combined-rule provisioning, query validation, and evaluation remain unverified.
+
+**Current path/permission lesson:** use only repository-relative local paths
+under excluded `.alert-apply/`: durable timestamped backup and disposable `venv/`.
+This supersedes historical outside-repository/session-local recommendations.
+Never stage that directory or copy its backup elsewhere; stage explicit paths
+only. Retain the backup and remove the venv after verification or a stop.
+Relative paths do not guarantee permission: stop on any denial without trying
+another route or changing trust settings. Provider registration can remain.
+See the runbook for fresh-backup verification, every guard, and exact rollback.
+
+**Earlier attempt, 17:59 UTC:** direct CLI use avoided the Copilot startup/trust
 failure without changing trust settings or relying on MCP. The provider was
 already Registered; no registration or other Azure write occurred.
 Fresh originals, generated bodies, and a SHA-256 manifest were captured by
@@ -220,7 +251,7 @@ bounds 17:21:48/17:51:48 UTC. This is query execution, not evidence of evaluatio
 health for the uninstalled combined rule. Real fired/recovery email behavior
 remains unverified; never inject production failures.
 
-**Venv-location lesson:** keep verifier venvs and scratch files in the current
+**Historical venv-location lesson (superseded above):** keep verifier venvs and scratch files in the current
 Copilot session's `files/`, not under the durable backup directory. That location
 avoids mixing disposable tooling with rollback evidence, but does not guarantee
 execution permission. If the prescribed session-local command is denied, stop

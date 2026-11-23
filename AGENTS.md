@@ -495,10 +495,38 @@ Production telemetry is powered by Azure Application Insights, initialized in `a
 | `mycalltime-app-unhealthy` | Metric | Availability <80% | Sev 2 | 5m / 15m | Enabled |
 
 **All five rules above remain enabled**, reverified November 23, 2026 at
-18:00:22 UTC; all writable properties exactly match both the new attempt's fresh
+18:12:14 UTC; all writable properties exactly match both the new attempt's fresh
 `.before.json` bodies and the committed original baseline. The recovery-processing
 rule is absent (complete one-page list empty).
 The combined Sev 2 / 15m / 5m rule and four disabled metrics are **not live**.
+
+The **18:11 UTC** retry used the owner's repository-relative approach:
+`.alert-apply/backup-20261123T181118Z/` contains fresh originals, generated bodies,
+and a SHA-256 manifest. The work/backup/source/payload directories are mode 0700,
+untracked and locally excluded through `.git/info/exclude`; retain the backup
+in this checkout on this machine and never stage it or copy it elsewhere.
+The provider was already Registered; earlier external backups were untouched.
+In-repository venv creation succeeded, but the dependency-install/verifier/
+checksum command was denied with
+`Permission denied because no interactive user response was available`.
+The runbook and #241 record the exact command/error. No alternative route was
+attempted. The venv was removed and its absence confirmed. Verification/checksums
+did not complete; payloads are not ready to apply. Both Fired checks and the
+immediate pre-write duplicate-run guard were not reached. No Azure write,
+rollback, propagation wait, or post-apply observation ran.
+Read-back matched all five fresh originals and the committed baseline exactly;
+suppression was absent (one complete empty page). Scheduled/metric inventories
+contained one/four rules without continuation. Live `attention.kql` returned zero
+rows with bounds 17:42:12/18:12:12 UTC, not combined-rule evaluation evidence.
+This attempt created no processing rule and must not delete one.
+
+For future preparation use excluded `.alert-apply/` with repository-relative
+paths for both backup and venv, superseding historical path advice below.
+Relative paths do not guarantee unattended permission: stop on any denial,
+report it exactly, and do not change trust settings or retry through another
+route. Always stage explicit documentation paths, never `git add .`/`git add -A`;
+confirm nothing under `.alert-apply/` is staged. Alert rollback does not require
+unregistering the provider.
 
 The **17:59 UTC** retry used the existing CLI tools directly without changing
 trust settings or relying on MCP. The provider was already Registered.
@@ -535,7 +563,7 @@ zero rows with bounds 17:21:48/17:51:48 UTC, not rule-evaluation evidence.
 No Azure write, rollback, propagation wait, or post-apply observation occurred.
 This attempt created no suppression rule and must not delete one.
 
-Keep verifier venvs and scratch files in the current Copilot session's `files/`,
+The earlier recommendation was to keep verifier venvs and scratch files in the current Copilot session's `files/`,
 not the durable backup directory. That separation does not guarantee execution
 permission: if the session-local verifier is denied, stop before writes rather
 than bypassing verification or changing trust settings. A later apply still
