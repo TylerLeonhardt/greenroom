@@ -22,7 +22,8 @@ jobs:
       - run: pnpm test
 
   playwright-explorer:
-    runs-on: ubuntu-latest
+    # Keep the OS within the locked Playwright version's supported platforms.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -44,7 +45,7 @@ jobs:
           retention-days: 30
 
   playwright-e2e:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16

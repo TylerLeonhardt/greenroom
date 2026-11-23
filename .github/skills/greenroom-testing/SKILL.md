@@ -542,6 +542,14 @@ Any test calling these (directly or indirectly) needs timezone-controlled fixtur
 
 My Call Time has the `playwright-cli` skill (`.github/skills/playwright-cli/`) for browser automation.
 
+### CI Runner Compatibility
+
+Browser jobs use `ubuntu-24.04`, which the locked Playwright 1.58.2 supports.
+Do not switch them to `ubuntu-latest` without verifying browser installation:
+the November 2026 move to Ubuntu 26.04 failed at `playwright install --with-deps`
+before any tests ran, including on an unchanged copy of `master` (run 45197931114).
+Upgrade the runner and Playwright together in a separately verified change.
+
 ### Run the CI App Matrix Before Pushing
 
 Run the same app projects as the `playwright-e2e` CI job:
