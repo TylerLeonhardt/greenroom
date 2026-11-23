@@ -6,7 +6,9 @@ import sys
 import urllib.request
 from pathlib import Path
 
-from jsonschema import Draft4Validator, RefResolver
+from jsonschema import Draft4Validator
+from referencing import Registry, Resource
+from referencing.jsonschema import DRAFT4
 
 output = Path(sys.argv[1])
 snapshot = json.loads((output / "snapshot.json").read_text())
@@ -29,14 +31,18 @@ for name, url in urls.items():
 # Swagger's discriminator extends this base with typed subtype fields. Plain
 # JSON Schema cannot model that extension: allow those fields at the base,
 # then explicitly validate each concrete subtype against its original schema.
-schemas["metric"]["definitions"]["MetricAlertCriteria"].pop("additionalProperties", None)
-store = {urls[name]: schema for name, schema in schemas.items()}
+for model in ("MetricAlertCriteria", "MultiMetricCriteria"):
+    schemas["metric"]["definitions"][model].pop("additionalProperties", None)
+registry = Registry().with_resources(
+    (urls[name], Resource.from_contents(schema, default_specification=DRAFT4))
+    for name, schema in schemas.items()
+)
 
 
 def validate(schema_name, model, body):
-    schema = schemas[schema_name]
-    resolver = RefResolver(base_uri=urls[schema_name], referrer=schema, store=store)
-    Draft4Validator({"$ref": f"#/definitions/{model}"}, resolver=resolver).validate(body)
+    Draft4Validator(
+        {"$ref": f"{urls[schema_name]}#/definitions/{model}"}, registry=registry
+    ).validate(body)
 
 
 def load(name):
