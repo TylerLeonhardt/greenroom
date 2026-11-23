@@ -4,7 +4,69 @@
 approved the six-resource change and subsequently explicitly authorized registering
 only `Microsoft.AlertsManagement` on the greenroom subscription.
 
-## Latest attempt: 18:11 UTC; repository-relative verifier also denied
+## Latest attempt: 18:20 UTC; standalone in-repository verifier denied
+
+On 2026-11-23 this retry used the existing CLI tools directly, without launching
+another Copilot process, changing trust settings, or depending on MCP. The
+checkout was synchronized with `george/fix-issue-241-startup`. All issue #241
+comments from 16:50 UTC onward were read first. The subscription matched,
+`Microsoft.AlertsManagement` was already Registered, all five writable rule
+definitions matched the committed baseline, and suppression was absent.
+
+Fresh raw originals, snapshot, generated bodies, and a SHA-256 manifest were
+captured by **18:21:02 UTC** in `.alert-apply/backup-20261123T182045Z/`.
+The work/backup/source/payload directories are mode 0700, untracked and locally
+excluded via `.git/info/exclude`. Retain the backup only in this checkout on
+this machine; never stage it or copy it elsewhere. Earlier external backups
+were not accessed.
+
+These commands ran separately and succeeded:
+
+```bash
+python3 -m venv .alert-apply/venv
+.alert-apply/venv/bin/pip install --quiet jsonschema
+```
+
+The exact next, standalone command was denied:
+
+```bash
+.alert-apply/venv/bin/python .github/skills/greenroom-azure-alerts/references/verify-alert-payloads.py .alert-apply/backup-20261123T182045Z/payloads
+```
+
+```text
+Permission denied because no interactive user response was available. Retry in an interactive session so the user can approve it, or try an alternative that does not require this permission.
+```
+
+The apply stopped without retrying the verifier through another route. Unlike
+the earlier compound commands, this isolates the denied step to verifier
+execution, after successful dependency installation; it does not establish
+which internal permission check prompted. **In-repository relative paths and
+successful dependency installation do not guarantee verifier permission.**
+Offline verification and checksum validation did not complete. These payloads
+are **not ready to apply**. The venv was removed and its absence confirmed.
+Both Fired checks and the immediate pre-write duplicate-run guard were not
+reached. No Azure write, schema correction, rollback, propagation wait, or
+post-apply observation occurred.
+
+At **18:21:50 UTC**, every writable property of all five rules matched both the
+fresh `.before.json` and the committed original baseline. All remain enabled;
+the original exception rule is Sev 1, 5m window / 5m frequency with its original
+query/action group, and high-error-rate retains `["5"]`. Suppression was absent
+(one complete empty page); scheduled/metric inventories contained one/four
+rules without continuation. The provider remained Registered. Live
+`attention.kql` returned zero rows with bounds **17:51:47/18:21:47 UTC**.
+That is query execution, not evaluation health for the uninstalled combined
+configuration. Provisioning, query validation, propagation, evaluation history,
+and real fired/resolved email behavior remain unverified.
+
+No rollback is needed. If restoration is separately authorized, first complete
+mandatory offline verification/checksums and every quiet-state/drift/ownership
+guard, then use the rollback section with
+`BACKUP=.alert-apply/backup-20261123T182045Z`: restore the four metric originals,
+then `log.before.json`. **Do not delete suppression: this attempt created none.**
+Provider registration can remain; rollback does not require unregistering it.
+
+## Earlier attempt: 18:11 UTC; repository-relative verifier also denied
 
 On 2026-11-23 the owner authorized keeping this run's private rollback evidence
 inside the checkout, excluded through `.git/info/exclude`, to avoid unattended
@@ -160,8 +222,8 @@ metric `.before.json` bodies in the rollback order below, followed by its
 Provider registration need not be undone.
 
 The recommendation at that time was to keep venvs and scratch files in the current session's `files/`, with only durable
-backup evidence under `~/.george/greenroom-alert-backups/`. This remains the
-recommended separation, not a permission guarantee. If a command is denied even
+backup evidence under `~/.george/greenroom-alert-backups/`. This historical advice
+is superseded by the repository-relative preparation below. If a command is denied even
 there, stop before writes; do not change trust settings, retry through another
 execution route, or substitute CI's baseline verification for the fresh-backup
 verifier. A future authorized apply requires fresh preparation and every guard.
@@ -418,6 +480,9 @@ shasum -a 256 -c "$BACKUP/SHA256SUMS"
 Stop on any error or permission denial, report the exact command and exact error,
 and do not retry through another route. Remove only `.alert-apply/venv/` when
 verification finishes or the apply stops; retain the backup. Confirm its absence.
+Run the four commands separately so a denial can be attributed to its exact
+step; successful installation does not imply permission to execute the verifier.
+The 18:20 attempt reached that standalone verifier step and was denied.
 Run the normal lint/typecheck/test/build commands with the backup present. If a
 tool scans private evidence, use a local-only exclusion rather than committing
 configuration specific to this checkout, and report it.

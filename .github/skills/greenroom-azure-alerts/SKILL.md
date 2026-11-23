@@ -163,7 +163,7 @@ termination message; do not treat that message as a precise process-death time.
 
 ## Alerts, notification counts, and replay
 
-Live state reverified 2026-11-23 18:12:14 UTC: all five original rules remain
+Live state reverified 2026-11-23 18:21:50 UTC: all five original rules remain
 enabled and notify `mycalltime-alerts`:
 
 | Rule | Severity / condition | Evaluation / window |
@@ -174,7 +174,35 @@ enabled and notify `mycalltime-alerts`:
 | high-error-rate | 2; failed Count >5, broken result-code value `"5"` | 1m / 5m |
 | exception-spike | 1; exceptions Count >5, 1/1 periods | 5m / 5m |
 
-**Latest attempt, 18:11 UTC:** the owner-authorized repository-relative approach
+**Latest attempt, 18:20 UTC:** direct CLI use avoided the Copilot startup/trust
+failure without changing trust settings or using MCP. The provider was already
+Registered; all five original writable definitions matched the committed baseline
+and suppression was absent before preparation. Fresh private originals, generated
+bodies, and a SHA-256 manifest remain in
+`.alert-apply/backup-20261123T182045Z/`, locally excluded and untracked in this
+checkout on this machine. All four directories have mode 0700. Earlier external
+backups were untouched.
+
+Separate in-repository venv creation and `pip install --quiet jsonschema`
+**succeeded**. The next, standalone verifier command was denied with
+`Permission denied because no interactive user response was available`.
+The runbook records the exact command and full denial. No alternate execution
+route was tried. Offline verification and checksum validation did not complete;
+these payloads are **not ready to apply**. The venv was removed and its absence
+confirmed. Both Fired checks and the immediate pre-write duplicate-run guard
+were not reached. No Azure write, rollback, schema correction, propagation wait,
+or post-apply observation occurred.
+
+Read-back at 18:21:50 UTC matched every writable property of all five fresh
+`.before.json` bodies and the committed baseline. Suppression was absent (one
+complete empty page); scheduled/metric inventories contained one/four rules
+without continuation. Live `attention.kql` returned zero rows with API bounds
+17:51:47/18:21:47 UTC. This is not evaluation evidence for the uninstalled
+combined rule. Provisioning, query validation, evaluation health, propagation,
+and real fired/resolved email behavior remain unverified. No rollback is needed;
+this attempt created no processing rule and must not delete one.
+
+**Earlier attempt, 18:11 UTC:** the owner-authorized repository-relative approach
 also stopped at a permission denial, before any Azure write. The provider was
 already Registered. Fresh originals, generated bodies, and a SHA-256 manifest
 remain in `.alert-apply/backup-20261123T181118Z/`, private mode 0700, untracked

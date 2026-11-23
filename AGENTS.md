@@ -495,10 +495,33 @@ Production telemetry is powered by Azure Application Insights, initialized in `a
 | `mycalltime-app-unhealthy` | Metric | Availability <80% | Sev 2 | 5m / 15m | Enabled |
 
 **All five rules above remain enabled**, reverified November 23, 2026 at
-18:12:14 UTC; all writable properties exactly match both the new attempt's fresh
+18:21:50 UTC; all writable properties exactly match both the new attempt's fresh
 `.before.json` bodies and the committed original baseline. The recovery-processing
 rule is absent (complete one-page list empty).
 The combined Sev 2 / 15m / 5m rule and four disabled metrics are **not live**.
+
+The **18:20 UTC** retry used existing CLI tools directly, with no Copilot
+relaunch, trust change, or MCP dependency. Fresh private originals, generated
+bodies, and a SHA-256 manifest remain in
+`.alert-apply/backup-20261123T182045Z/` (work/backup/source/payload directories
+mode 0700), untracked and locally excluded in this checkout on this machine.
+Earlier external backups were untouched. The provider was already Registered.
+Separate in-repository venv creation and dependency installation succeeded;
+the standalone verifier command was denied with
+`Permission denied because no interactive user response was available`.
+The runbook and #241 record the exact command/full denial. No alternate route
+was attempted; the venv was removed and its absence confirmed. Offline
+verification/checksums did not complete; payloads are not ready to apply.
+Both Fired checks and the immediate pre-write duplicate-run guard were not
+reached. No Azure write, rollback, schema correction, propagation wait, or
+post-apply observation ran.
+Read-back matched all five fresh originals and the committed baseline;
+suppression was absent (one complete empty page), and scheduled/metric inventories
+contained one/four rules without continuation. Live `attention.kql` returned zero
+rows with bounds 17:51:47/18:21:47 UTC, not combined-rule evaluation evidence.
+Provisioning, query validation, evaluation health, propagation, and real
+fired/resolved email behavior remain unverified. No rollback is needed;
+this attempt created no processing rule and must not delete one.
 
 The **18:11 UTC** retry used the owner's repository-relative approach:
 `.alert-apply/backup-20261123T181118Z/` contains fresh originals, generated bodies,
