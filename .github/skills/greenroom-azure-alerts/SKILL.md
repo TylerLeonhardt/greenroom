@@ -203,6 +203,11 @@ RemoveAllActionGroups rule with `MonitorCondition == Resolved` AND the exact
 scheduled rule ID to suppress **only recoveries**. Propagation can take 30m.
 This keeps the existing log-rule count/evaluation frequency and adds no compute
 or notification service. All live changes require approval; nothing is deployed.
+See [references/alert-change.md](references/alert-change.md) for read-only
+preparation, exact rollback sources, and the separately approval-gated commands.
+The `Alert payload verification` workflow generates all eleven request bodies
+offline and checks the published REST schemas, minimal changes, and restoration.
+The dated snapshot is evidence, not permission to apply stale configuration.
 
 Replay using all synthetic results plus 20m warm-up and all 500-599 request
 samples (`sum(itemCount)` for weighting). Use relative age buckets for the three

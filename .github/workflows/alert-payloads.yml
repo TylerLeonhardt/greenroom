@@ -1,0 +1,35 @@
+name: Alert payload verification
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - .github/skills/greenroom-azure-alerts/**
+      - .github/workflows/alert-payloads.yml
+
+permissions:
+  contents: read
+
+jobs:
+  alert-payloads:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      REFERENCE: .github/skills/greenroom-azure-alerts/references
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Generate exact approval-only request bodies offline
+        run: node "$REFERENCE/build-alert-payloads.mjs" "$REFERENCE/snapshot-2026-11-23.json" "$RUNNER_TEMP/alert-payloads"
+      - name: Validate REST schemas, minimal changes, and exact rollback
+        run: |
+          python3 -m venv "$RUNNER_TEMP/alert-schema-venv"
+          "$RUNNER_TEMP/alert-schema-venv/bin/pip" --quiet install jsonschema==4.25.1
+          "$RUNNER_TEMP/alert-schema-venv/bin/python" "$REFERENCE/verify-alert-payloads.py" "$RUNNER_TEMP/alert-payloads"
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: verified-alert-payloads
+          path: ${{ runner.temp }}/alert-payloads/
+          retention-days: 30
