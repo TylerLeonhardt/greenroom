@@ -1,11 +1,44 @@
 # Owner-approved alert change: preparation and rollback
 
 **This runbook does not itself authorize Azure writes.** The owner separately
-approved the six-resource change on 2026-11-23, but its first PUT at 16:55 UTC
+approved the six-resource change and subsequently explicitly authorized registering
+only `Microsoft.AlertsManagement` on the greenroom subscription.
+
+## Latest attempt: provider registered; backup preparation blocked
+
+On 2026-11-23 registration was requested at **17:26:42 UTC** and polling first
+confirmed **Registered at 17:28:02 UTC**. The resource-group processing-rule list
+API succeeded with zero rules and no continuation. No other namespace was registered.
+
+The execution environment then denied the command to prepare the required new
+durable private backup, and denied a read-only check of its intended location:
+`Permission denied because no interactive user response was available. Retry in an
+interactive session so the user can approve it, or try an alternative that does not
+require this permission.` No alternative access was attempted. The intended path
+was `/Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T172802Z`;
+its existence/content is **unverified**, so it is **not a usable rollback source**.
+The earlier two backups were not accessed or changed.
+
+The alert apply stopped before any processing/scheduled/metric PUT. No payload
+verification, propagation wait, or post-apply observation occurred. Read-back
+completed **17:28:37 UTC**: all five rules' writable properties exactly match the
+committed original baseline; all remain enabled, the exception rule remains Sev 1
+with a 5m window/frequency, and suppression is absent (empty complete list).
+These comparisons are against the committed baseline, not a new `.before.json`.
+No alert rollback is needed or authorized by this attempt's ownership: it created
+no processing rule. Provider registration can remain; rollback does not require
+unregistering it. Evaluation health and actual fired/resolved email behavior of
+the proposed configuration remain unverified because it is not installed.
+
+## Historical prerequisite stops
+
+The first PUT at 16:55 UTC
 (recovery suppression) was rejected with HTTP 409 `MissingSubscriptionRegistration`:
 the subscription is not registered for `Microsoft.AlertsManagement`. A read-only
-provider GET confirmed `NotRegistered`. Provider registration is outside that
-approval; do not register it or proceed without suppression.
+provider GET confirmed `NotRegistered`. At that time provider registration was
+outside the approval, so the operator stopped without registering or bypassing
+suppression. The later explicit authorization and registration above supersede
+that prerequisite, but not the fresh-backup requirement.
 
 No mutation succeeded. All five rules were read back and exactly match their
 `.before.json` bodies; suppression GET returned `ResourceNotFound` and the complete
@@ -23,10 +56,10 @@ drift, complete rule inventories, and both the paginated last-30-day and
 unbounded current-state/older Fired-alert checks passed. Do not substitute this
 backup for fresh preparation on a later authorized retry.
 
-## Follow-up prerequisite stop: 2026-11-23 17:04 UTC
+### Follow-up prerequisite stop: 2026-11-23 17:04 UTC
 
-A read-only provider GET still reports `Microsoft.AlertsManagement` as
-`NotRegistered`. The follow-up stopped without retrying the rejected PUT or
+At 17:04 UTC a read-only provider GET still reported `Microsoft.AlertsManagement`
+as `NotRegistered`. The follow-up stopped without retrying the rejected PUT or
 issuing any other Azure write. Do not retry under an assumed authorization to
 register the provider; resolving this subscription prerequisite needs a separate
 owner decision outside the approved six-resource change.
@@ -43,7 +76,7 @@ active incidents via an unbounded current-state query. Live `attention.kql`
 returned no rows. No propagation wait or post-apply evaluation can validate the
 uninstalled combined configuration; notification delivery remains unverified.
 
-No rollback is needed and no processing-rule DELETE is authorized by ownership:
+No rollback was needed and no processing-rule DELETE was authorized by ownership:
 this follow-up created nothing. Its backup is only this follow-up's source, never
 a replacement for the earlier attempt's backup. The guarded restoration sequence
 below remains unchanged; do not execute it just to restore an unchanged state.
@@ -55,6 +88,38 @@ suppression rule, and preserves omitted tags instead of introducing empty tags.
 The five `.before.json` files restore every writable property, including the
 original broken `"5"` result-code filter. Read-only ARM metadata is not a PUT
 configuration property and is deliberately excluded. No action group changes.
+
+## Provider-registration prerequisite — separate authorization required
+
+First confirm the account subscription and read the provider registration state.
+Only if separately authorized, register this one namespace and poll until
+`Registered`. Stop on any registration error or missing permission; do not try
+another registration route or bypass recovery suppression.
+
+```bash
+set -euo pipefail
+SUB=b37965f1-4da2-4202-889d-82322392b4d5
+test "$(az account show --query id -o tsv)" = "$SUB"
+state=$(az provider show --subscription "$SUB" --namespace Microsoft.AlertsManagement \
+  --query registrationState -o tsv)
+if test "$state" != Registered; then
+  # Execute only with separate registration authorization:
+  az provider register --subscription "$SUB" --namespace Microsoft.AlertsManagement \
+    --output none
+fi
+while test "$state" != Registered; do
+  sleep 10
+  state=$(az provider show --subscription "$SUB" --namespace Microsoft.AlertsManagement \
+    --query registrationState -o tsv)
+done
+date -u '+Registered confirmed: %Y-%m-%dT%H:%M:%SZ'
+```
+
+Confirm read-only that the processing-rule list API works, follow every
+`nextLink`, and stop if the expected empty inventory has changed. Then take a new
+private durable backup below. Registration alone is not permission to skip any
+backup, verification, checksum, drift, inventory, or quiet-state guard. The
+namespace is now registered; future runs should not re-register it unnecessarily.
 
 ## Read-only preparation
 
@@ -112,7 +177,7 @@ The `verified-alert-payloads` CI artifact contains generated bodies and schemas,
 not personal metadata, and expires after 30 days. It does not replace a durable
 operator backup.
 
-## Apply — approval required; first attempt rejected
+## Apply — approval required; not yet completed
 
 Keep the variable definitions from preparation. Before writing, verify checksums,
 re-GET and compare all five live rules' writable properties with the saved
@@ -185,3 +250,4 @@ Re-GET all five rules and compare their writable properties to `.before.json`,
 including enabled state, conditions, actions, severity, frequency, window,
 auto-mitigation, and the original `"5"` filter. This restores configuration,
 not past alert-instance state or notification history.
+Do not unregister the provider as part of rollback.

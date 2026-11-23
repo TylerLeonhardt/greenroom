@@ -494,29 +494,35 @@ Production telemetry is powered by Azure Application Insights, initialized in `a
 | `mycalltime-availability-alert` | Webtest Availability | ≥2 locations fail | Sev 1 | 1m / 5m | Enabled |
 | `mycalltime-app-unhealthy` | Metric | Availability <80% | Sev 2 | 5m / 15m | Enabled |
 
-**All five rules above remain enabled**, reverified November 23, 2026 at 17:04 UTC.
-The owner-approved combined-alert change was blocked on its first PUT:
-`MissingSubscriptionRegistration` (`Microsoft.AlertsManagement` is `NotRegistered`).
-The recovery-processing rule remains absent; all five writable definitions
-exactly match the saved originals. No Azure mutation succeeded, no rollback
-writes were needed, and no provider registration, merge, or deployment occurred.
-Registration is outside the approved scope; do not register it or bypass suppression.
+**All five rules above remain enabled**, reverified November 23, 2026 at
+17:28:37 UTC; all writable properties exactly match the committed original
+baseline. The recovery-processing rule is absent (complete list empty).
 The combined Sev 2 / 15m / 5m rule and four disabled metrics are **not live**.
 
-The 17:04 UTC follow-up stopped at the same prerequisite, confirmed read-only,
-without retrying any Azure write. All five writable definitions match both the
-committed baseline and that follow-up's fresh originals; suppression is absent.
-Its private evidence is at
-`/Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T170404Z-guard-stop`.
-This is not a replacement rollback source for the earlier 16:55 apply. Neither
-attempt changed configuration, so no restoration or processing-rule deletion is
-needed. Combined-rule evaluation and notification behavior remain unverified.
+After explicit owner authorization, `Microsoft.AlertsManagement` registration
+was requested at 17:26:42 UTC and confirmed **Registered at 17:28:02 UTC**.
+Only that namespace was registered. The processing-rule list API succeeded.
+The environment then denied required new private durable backup preparation
+and a read-only check of the intended path:
+`Permission denied because no interactive user response was available`.
+The intended path
+`/Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T172802Z`
+is unverified and **not a usable rollback source**. No alternative access was
+attempted. No alert writes, rollback, merge, or deployment occurred. Provider
+registration may remain; alert rollback does not require unregistering it.
+
+The earlier 16:55 and 17:04 attempts stopped at the then-unregistered provider
+and changed nothing. Their private backups remain separate and untouched;
+neither may substitute for a new apply's fresh original backup. A future apply
+still requires accessible durable backup storage and all runbook guards.
+Combined-rule evaluation and real fired/resolved email behavior remain
+unverified because the combined configuration was not installed.
 
 The unhealthy rule's description still says
 <95% / 5 min, but its actual condition is <80% / 15 min, evaluated every 5 min.
 Alert rules are live Azure resources, not repository-managed IaC. See the
 `greenroom-azure-alerts` skill and [#241](https://github.com/TylerLeonhardt/greenroom/issues/241)
-for the blocked apply, private durable backup location, investigation evidence,
+for the stopped attempts, private backup requirements, investigation evidence,
 and known alert blind spots. The skill's `references/alert-change.md` preserves
 the guarded apply/rollback procedure: restore the same apply's saved metric
 `.before.json` bodies, then its log body, then delete only suppression that apply

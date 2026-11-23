@@ -163,7 +163,7 @@ termination message; do not treat that message as a precise process-death time.
 
 ## Alerts, notification counts, and replay
 
-Live state reverified 2026-11-23 17:04 UTC: all five original rules remain
+Live state reverified 2026-11-23 17:28:37 UTC: all five original rules remain
 enabled and notify `mycalltime-alerts`:
 
 | Rule | Severity / condition | Evaluation / window |
@@ -174,15 +174,38 @@ enabled and notify `mycalltime-alerts`:
 | high-error-rate | 2; failed Count >5, broken result-code value `"5"` | 1m / 5m |
 | exception-spike | 1; exceptions Count >5, 1/1 periods | 5m / 5m |
 
-The owner-approved combined-alert apply was **blocked on its first PUT** at
+**Latest attempt:** the owner explicitly authorized registration of only
+`Microsoft.AlertsManagement` in addition to the six-resource alert change.
+Registration was requested at 17:26:42 UTC and confirmed `Registered` at
+17:28:02 UTC on 2026-11-23. The processing-rule list API worked and was empty,
+without continuation. No other namespace was registered.
+
+The environment denied required private durable backup preparation and then
+denied a read-only check of its intended path, with
+`Permission denied because no interactive user response was available`.
+The intended path
+`/Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T172802Z`
+is **unverified, not a usable rollback source**. No alternative access was tried;
+the earlier backups were left alone. No alert writes occurred; backup/venv
+creation could not be verified, and no propagation/evaluation wait ran.
+All five live writable definitions exactly matched the committed original
+baseline at 17:28:37 UTC; suppression remained absent (complete list empty).
+The approved redesign is still **not live**. No rollback is needed; do not delete
+suppression this attempt did not create. Registration can remain and need not be
+undone in an alert rollback. A future apply still requires a new accessible
+private backup and every guard in the runbook. Actual combined-rule evaluation
+and fired/resolved email behavior remain unverified.
+
+**Historical stops:** the owner-approved combined-alert apply was blocked on its first PUT at
 16:55 UTC: Azure returned `MissingSubscriptionRegistration` for
 `Microsoft.AlertsManagement`; a read-only provider GET confirmed `NotRegistered`.
 `mycalltime-attention-no-recovery` remains absent (direct GET `ResourceNotFound`,
 complete processing-rule list empty). All five rules' writable properties still
 exactly match the fresh `.before.json` bodies and the committed baseline.
 No Azure mutation succeeded, no rollback writes were needed, and no provider
-registration, merge, or deployment was attempted. Registration is outside the
-approved six-resource change: stop rather than registering or bypassing suppression.
+registration, merge, or deployment was attempted during that earlier run.
+Registration was then outside the approved six-resource change; the explicit
+later approval and registration above supersede that prerequisite.
 The approved redesign is **not live**; the original broken `"5"` filter remains.
 
 The 17:04 UTC follow-up confirmed `NotRegistered` with a read-only provider GET
