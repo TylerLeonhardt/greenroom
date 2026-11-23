@@ -4,7 +4,57 @@
 approved the six-resource change and subsequently explicitly authorized registering
 only `Microsoft.AlertsManagement` on the greenroom subscription.
 
-## Latest attempt: session-local verifier also denied; no alert writes
+## Latest attempt: 17:59 UTC; venv creation succeeded, next command denied
+
+On 2026-11-23 the operator used the existing CLI tools directly, without
+launching another Copilot process, relying on the unavailable MCP server, or
+changing trust settings. The checkout was `george/fix-issue-241-startup`.
+The account matched the approved subscription; `Microsoft.AlertsManagement`
+was already Registered and was not registered again.
+
+Fresh originals, generated bodies, and a SHA-256 manifest were captured by
+**17:59:54 UTC** at
+`/Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T175951Z`.
+Root/source/payloads directories are mode 0700; earlier backups were untouched.
+The separate `python3 -m venv` command succeeded in this session's `files/`.
+The next command was denied:
+
+```bash
+/Users/tyleonha/.copilot/session-state/7c322cf2-f280-4468-b237-2eb1c1b09b03/files/alert-verifier-venv/bin/pip install --quiet jsonschema && /Users/tyleonha/.copilot/session-state/7c322cf2-f280-4468-b237-2eb1c1b09b03/files/alert-verifier-venv/bin/python .github/skills/greenroom-azure-alerts/references/verify-alert-payloads.py /Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T175951Z/payloads && shasum -a 256 -c /Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T175951Z/SHA256SUMS
+```
+
+```text
+Permission denied because no interactive user response was available. Retry in an interactive session so the user can approve it, or try an alternative that does not require this permission.
+```
+
+The tool did not identify which subcommand required approval. No alternate
+execution route or trust change was attempted. Offline verification and checksum
+validation did not complete; these payloads are **not ready to apply**.
+The session-local venv was subsequently removed and its absence confirmed.
+Both Fired checks and the immediate pre-write duplicate-run guard were not
+reached. No Azure write, schema correction, rollback, or propagation wait ran.
+
+Read-back completed **18:00:22 UTC**: every writable property of all five rules
+matched this backup's `.before.json` bodies and the committed original baseline.
+All remain enabled, the original exception rule is Sev 1 with 5m/5m window and
+frequency, and the error metric retains `["5"]`. The complete processing-rule
+inventory was empty (one page); scheduled/metric inventories contained one/four
+rules without continuation. The provider was still Registered.
+Live `attention.kql` returned zero rows with API bounds
+**17:30:22/18:00:22 UTC**. This is query execution, not combined-rule evaluation
+health: the combined configuration is not installed. No post-apply observation
+can validate it. Provisioning, query validation, propagation, evaluation history,
+and real fired/resolved email behavior remain unverified; never inject failures.
+
+No rollback is needed. If separately authorized restoration becomes necessary,
+first complete verification/checksums and every quiet-state/ownership guard,
+then use **this backup's** four metric `.before.json` bodies in the rollback
+order below, followed by `log.before.json`. No processing-rule DELETE belongs
+to this attempt, which created none. Provider registration can remain.
+Session-local venv placement separates scratch from durable evidence but does
+not guarantee permission to install dependencies or execute verification.
+
+## Earlier attempt: 17:51 UTC; session-local verifier also denied
 
 On 2026-11-23 the account matched the approved subscription and the provider
 was already `Registered`. No registration was repeated. Fresh raw originals,

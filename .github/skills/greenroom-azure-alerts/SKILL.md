@@ -163,7 +163,7 @@ termination message; do not treat that message as a precise process-death time.
 
 ## Alerts, notification counts, and replay
 
-Live state reverified 2026-11-23 17:51:52 UTC: all five original rules remain
+Live state reverified 2026-11-23 18:00:22 UTC: all five original rules remain
 enabled and notify `mycalltime-alerts`:
 
 | Rule | Severity / condition | Evaluation / window |
@@ -174,7 +174,29 @@ enabled and notify `mycalltime-alerts`:
 | high-error-rate | 2; failed Count >5, broken result-code value `"5"` | 1m / 5m |
 | exception-spike | 1; exceptions Count >5, 1/1 periods | 5m / 5m |
 
-**Latest attempt, 17:51 UTC:** the provider was already `Registered`; it was
+**Latest attempt, 17:59 UTC:** direct CLI use avoided the Copilot startup/trust
+failure without changing trust settings or relying on MCP. The provider was
+already Registered; no registration or other Azure write occurred.
+Fresh originals, generated bodies, and a SHA-256 manifest were captured by
+17:59:54 UTC at
+`/Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T175951Z`
+(root/source/payloads mode 0700); earlier backups were untouched.
+Separate session-local venv creation succeeded, but the next command (dependency
+installation, verifier, then checksums) was denied with
+`Permission denied because no interactive user response was available`.
+The exact command is in the runbook and #241. No alternative execution route
+was attempted. Verification/checksums did not complete; payloads are not ready
+to apply. Both Fired checks and the immediate pre-write duplicate-run guard
+were not reached. No rollback or propagation/evaluation wait ran.
+Read-back at 18:00:22 UTC matched every writable property of all five fresh
+originals and the committed baseline. Suppression was absent (complete one-page
+list); scheduled/metric inventories contained one/four rules without continuation.
+Live `attention.kql` returned zero rows with bounds 17:30:22/18:00:22 UTC, not
+evaluation-health evidence for the uninstalled combined configuration.
+Real fired/resolved email behavior remains unverified. This attempt created
+no processing rule and must not delete one; provider registration can remain.
+
+**Earlier attempt, 17:51 UTC:** the provider was already `Registered`; it was
 not registered again. Fresh originals, generated bodies, and a SHA-256 manifest
 were captured by 17:51:26 UTC in the new private durable directory
 `/Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T175116Z`

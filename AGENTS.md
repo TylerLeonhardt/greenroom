@@ -495,10 +495,29 @@ Production telemetry is powered by Azure Application Insights, initialized in `a
 | `mycalltime-app-unhealthy` | Metric | Availability <80% | Sev 2 | 5m / 15m | Enabled |
 
 **All five rules above remain enabled**, reverified November 23, 2026 at
-17:51:52 UTC; all writable properties exactly match both the new attempt's fresh
+18:00:22 UTC; all writable properties exactly match both the new attempt's fresh
 `.before.json` bodies and the committed original baseline. The recovery-processing
 rule is absent (complete one-page list empty).
 The combined Sev 2 / 15m / 5m rule and four disabled metrics are **not live**.
+
+The **17:59 UTC** retry used the existing CLI tools directly without changing
+trust settings or relying on MCP. The provider was already Registered.
+Fresh private originals, generated bodies, and a SHA-256 manifest were captured
+by 17:59:54 UTC at
+`/Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T175951Z`
+(root/source/payloads mode 0700). Earlier backups were untouched.
+Separate session-local venv creation succeeded, but the next dependency-install/
+verifier/checksum command was denied with
+`Permission denied because no interactive user response was available`.
+The runbook and #241 record the exact command; no alternative route was attempted.
+Verification/checksums did not complete; payloads are not ready to apply.
+Both Fired checks and the immediate pre-write duplicate-run guard were not reached.
+Read-back matched all five fresh originals and the committed baseline;
+suppression was absent (complete one-page inventory), and live `attention.kql`
+returned zero rows with bounds 17:30:22/18:00:22 UTC. This is not evaluation-health
+evidence for the uninstalled combined rule. No Azure write, rollback, propagation
+wait, or post-apply observation ran. This attempt created no suppression rule
+and must not delete one. Provider registration can remain.
 
 The **17:51 UTC** retry confirmed the provider was already Registered and did
 not register it again. A new private backup was captured by 17:51:26 UTC at
