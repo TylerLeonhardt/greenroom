@@ -1,0 +1,22 @@
+let unavailableLocations = toscalar(
+    availabilityResults
+    | where timestamp > ago(15m)
+    | where name == "My Call Time Health Check"
+    | where location in ("East US", "West US", "North Central US")
+    | summarize tests=count(), healthy=countif(tobool(success)),
+        oldest=min(timestamp), newest=max(timestamp) by location
+    | where tests >= 3 and healthy == 0 and oldest <= ago(10m) and newest > ago(6m)
+    | count);
+let serverErrorPeriods = toscalar(
+    requests
+    | where timestamp > ago(15m)
+    | where toint(resultCode) between (500 .. 599)
+    | summarize errors=sum(itemCount) by period=toint((now() - timestamp) / 5m)
+    | where errors > 5
+    | count);
+availabilityResults
+| where timestamp > ago(15m)
+| where name == "My Call Time Health Check"
+| summarize samples=count()
+| where unavailableLocations >= 2 or serverErrorPeriods >= 3 or samples == 0
+| project unavailableLocations, serverErrorPeriods, samples

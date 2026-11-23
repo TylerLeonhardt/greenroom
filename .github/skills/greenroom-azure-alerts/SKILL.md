@@ -1,0 +1,223 @@
+---
+name: greenroom-azure-alerts
+description: Read-only investigation of My Call Time Azure Monitor alerts, replica interruptions, startup timelines, and notification noise.
+---
+
+# Greenroom Azure Alert Investigation
+
+Read `docs/vision.md`, `AGENTS.md`, and the `azure-diagnostics` /
+`azure-observability` skills first. This runbook supplements their generic guidance.
+Issue #241 and PR #242 contain the original November 2026 investigation.
+
+## Safety and evidence
+
+- Azure investigation is read-only. Do not restart, deploy, scale, change probes,
+  change alert rules, or send production test failures without separate approval.
+- **CEO constraint: retain the single-replica baseline. Do not recommend extra
+  replicas, larger resources, or other cost-increasing changes.** This supersedes
+  the two-replica recommendation in the original issue/PR.
+- Start with `az account show`. If authentication is unavailable, stop Azure
+  queries; do not work around authentication.
+- Do not print container environment values, list secrets, or retrieve DB credentials.
+  Public reports must exclude personal identifiers, addresses, tokens, raw request
+  bodies, and token-bearing URLs. Aggregate at the source.
+- Separate observed failure mechanism, inferred trigger, and unproven hypotheses.
+  Alert fired-to-resolved duration is **not** measured outage duration.
+
+## Resource map
+
+Verified 2026-11-23; rediscover live values:
+
+| Resource | Name / configuration |
+|---|---|
+| Subscription | `b37965f1-4da2-4202-889d-82322392b4d5` |
+| Resource group | `greenroom-rg` |
+| Container App / environment | `greenroom` / `greenroom-env`, Central US, Consumption |
+| Capacity | min 1, max 3, 0.25 vCPU / 0.5 GiB; zone redundancy off |
+| Ingress | `mycalltime.app`, external HTTPS, target port 3000 |
+| PostgreSQL | `greenroom-db`, Central US, PG16, Burstable B1ms, HA off |
+| App Insights | `mycalltime-insights`, Central US |
+| Log Analytics | `workspace-greenroomrgLC11`, customer ID `01e90510-90f6-4f56-acee-06b96e630238` |
+| Registry | `greenroomcr`, East US |
+| Action group | `mycalltime-alerts`, one email receiver |
+
+No application deployment IaC manages probes or alerts. Pushes to `master` trigger
+the production deployment workflow. Investigation PRs must remain open for approval.
+ACA Resource Health returned 422 `UnsupportedResourceType`; that is not an auth
+failure. Use lifecycle logs, revision state, and metrics instead.
+
+```sh
+az account show --query '{name:name,id:id,state:state}'
+az containerapp show -n greenroom -g greenroom-rg \
+  --query '{state:properties.runningStatus,revision:properties.latestReadyRevisionName,scale:properties.template.scale,containers:properties.template.containers[].{image:image,resources:resources,probes:probes}}'
+az monitor log-analytics workspace show -n workspace-greenroomrgLC11 \
+  -g greenroom-rg --query '{customerId:customerId,retention:retentionInDays}'
+```
+
+## Probe configuration and health semantics
+
+App-level GET returned `probes: null`; revision `greenroom--0000158` returned
+`probes: []`. No custom HTTP probe or `/api/health` liveness path is configured.
+The [documented ingress defaults](https://learn.microsoft.com/azure/container-apps/health-probes)
+are TCP on port 3000, not database queries:
+
+| Type | Documented defaults / observed limits |
+|---|---|
+| Startup | TCP, timeout 3s, period 1s, initial delay 1s, failure threshold 240, success threshold 1 |
+| Readiness | TCP, timeout 5s, period 5s, initial delay 3s, failure threshold 48, success threshold 1 |
+| Liveness | TCP; live system logs explicitly report 5s timeouts |
+
+The revision API does **not** expose the platform-injected liveness period,
+initial delay, or failure threshold. Do not invent effective values from generic
+Kubernetes defaults. A TCP probe does not run `/api/health`; dependency-aware HTTP
+liveness killing the container is not supported by this configuration.
+
+`/api/health` is the DB-aware external synthetic/readiness endpoint: `SELECT 1`,
+three attempts at 600ms, 400/800ms backoff, nominal total budget 3s, HTTP 503 after
+exhaustion. An event-loop stall can delay JS timers beyond that budget.
+Do not force this endpoint to return 200 when PostgreSQL is unreachable.
+
+The eight incident replacements had exit-code-0 `Terminated` messages. Only
+Nov 15 20:31 and Nov 19 07:28 explicitly say liveness failed / `ProbeFailure`;
+the latter messages occur after the Nov 19 replacement started. This does not
+establish why all eight original replicas stopped serving. Node maintenance,
+eviction/rebalancing, and initiating process stalls require platform diagnostics;
+absence of control-plane Activity Log entries does not rule those out.
+
+## Read-only telemetry
+
+Use explicit fixed UTC start/end. App Insights:
+
+```sh
+az monitor app-insights query -a mycalltime-insights -g greenroom-rg \
+  --start-time "$START" --end-time "$END" --analytics-query "$KQL"
+az monitor log-analytics query --workspace 01e90510-90f6-4f56-acee-06b96e630238 \
+  --timespan "$START/$END" --analytics-query "$KQL"
+```
+
+- Availability `success` is `"0"` / `"1"`; requests use `"False"` / `"True"`.
+  Normalize with `tobool(success)`; `success == false` silently missed failures.
+- Availability **display name** is `My Call Time Health Check`, not the ARM
+  webtest resource name `mycalltime-health-ping`. Locations: `East US`, `West US`,
+  `North Central US`; each runs every 300s, 30s timeout.
+- Health dependency failure codes are in `customDimensions.probeResultCode`.
+  Top-level dependency `resultCode` can be `"0"` on failures too.
+- Query Log Analytics with its customer ID, not its ARM ID.
+- Use `p['time']`, not `p.time`, in KQL (the latter hits a parser keyword).
+  `first` is also unsuitable as a bare aggregate alias; use `firstSeen`.
+- Console `TimeGenerated` can lag source time. For structured pino request logs,
+  use `unixtime_milliseconds_todatetime(tolong(p['time']))`.
+- Console `msg == "request"` logs SSR rendering, **not every loader/action/API
+  request**. Request telemetry, console counts, sampling (`itemCount`), and DB
+  writes are different things. Do not equate HTTP 200 with successful signup.
+- No signup honeypot exists in the inspected revision. CSRF, validation, and the
+  per-process 5/min/IP limiter exist. Bot timing is not proof of bot account creation.
+  Count `UserCreated` method=email and verification-email results separately;
+  neither provides reliable attribution of human versus bot.
+- Do not retrieve request bodies, address lists, or credentials to close an
+  attribution gap. State what the available telemetry cannot prove.
+
+## Startup timeline method
+
+Collect system `AssigningReplica`, `PullingImage`, `PulledImage`,
+`ContainerStarted`, `ProbeFailed`, `ContainerTerminated`, and `Terminated`
+with replica name and time. Deduplicate repeated terminations per replica.
+Image-pull **message duration** is more useful than subtracting log timestamps:
+pull-start and pull-finished messages are often ingested together/out of order.
+
+Console startup lines must be selected explicitly:
+
+```kusto
+ContainerAppConsoleLogs_CL
+| where ContainerAppName_s == "greenroom"
+| extend p=parse_json(Log_s)
+| where Log_s startswith "Running database"
+    or Log_s startswith "Migrations applied"
+    or Log_s contains "Corepack is about to download"
+    or Log_s startswith "> remix-serve"
+    or Log_s startswith "[remix-serve]"
+| project TimeGenerated, ContainerGroupName_s, Log_s
+| order by TimeGenerated asc
+```
+
+`has_any("migration")` misses the plural word `migrations`. Redact internal
+addresses from the server-listening line before publishing.
+
+Across the eight replacements: image pulls 5-11s, container start to listening
+4.19-6.15s, Corepack-download announcement to package script 1.79-2.99s.
+Migration start/end lines share a timestamp (batched logging); only the whole
+container-start-to-migration-completion bound, 0.84-1.39s, is defensible.
+Termination-to-listening is 16.75-23.36s. Most of the observed interruption
+precedes termination; removing pnpm is a small reliability improvement, not a
+proven fix for the initiating stall. Startup failed probes occur while the new
+port is not yet listening; do not add their durations to startup a second time.
+First request after listening is traffic/probe-cadence dependent, not a measured
+readiness initial delay. Some old replicas still emit responses after the first
+termination message; do not treat that message as a precise process-death time.
+
+## Alerts, notification counts, and replay
+
+Baseline five enabled rules all notify `mycalltime-alerts`:
+
+| Rule | Severity / condition | Evaluation / window |
+|---|---|---|
+| app-unhealthy | 2; average availability <80% | 5m / 15m |
+| availability-alert | 1; >=2 failing locations | 1m / 5m |
+| slow-response | 2; average duration >5000ms | 5m / 5m |
+| high-error-rate | 2; failed Count >5, broken result-code value `"5"` | 1m / 5m |
+| exception-spike | 1; exceptions Count >5, 1/1 periods | 5m / 5m |
+
+Metric `autoMitigate` is omitted (ARM default true); log rule explicitly true.
+Two failures / nine samples = 77.78%. Window retention plus three healthy
+evaluations explains 22-25 minute alert states after much shorter interruptions.
+
+List metric rules, scheduled-query rules, webtests, action rules, smart-detector
+rules, and legacy `proactiveDetectionConfigs` separately. Empty modern smart
+detector results do not mean legacy proactive detection is off.
+
+Alerts API: `customTimeRange=START/END&pageCount=250`, no `timeRange` alongside it.
+Follow `nextLink`. `includeContext=true` requires pageCount <=25. For each
+instance, GET `ALERT_ID/history?api-version=2019-03-01`; count
+`properties.modifications[].modificationEvent == "ActionsTriggered"`.
+The 16 historical instances have **32 action-group executions** (fired + resolved
+for every instance), not proof of 32 delivered/read messages in the CEO inbox.
+
+The approval-only proposal reuses the existing 5-minute scheduled-query rule,
+disables the four metric rules, and uses [references/attention.kql](references/attention.kql)
+as a single non-dimensional Boolean condition (row Count >0, 1/1, window 15m,
+Sev 2, autoMitigate true, existing action group). This combines sustained
+two-location failure, persistent 5xx, and complete synthetic telemetry absence.
+The dormant error metric filter is also corrected to full strings 500-599.
+One stateful alert means overlapping symptoms do not send separate pages.
+Use a narrowly scoped `Microsoft.AlertsManagement/actionRules@2021-08-08`
+RemoveAllActionGroups rule with `MonitorCondition == Resolved` AND the exact
+scheduled rule ID to suppress **only recoveries**. Propagation can take 30m.
+This keeps the existing log-rule count/evaluation frequency and adds no compute
+or notification service. All live changes require approval; nothing is deployed.
+
+Replay using all synthetic results plus 20m warm-up and all 500-599 request
+samples (`sum(itemCount)` for weighting). Use relative age buckets for the three
+5xx periods, not `bin(timestamp,5m)`: three calendar-aligned bins can miss
+sustained errors when evaluation ticks have an offset. Evaluate rolling windows at every
+5-minute tick and all five possible minute phases; normalize booleans. Historical
+ingestion latency cannot be exactly reconstructed from event timestamps.
+Simulate sustained outages **locally**, preserving real per-location cadence and
+overriding successes to false; simulate sustained 5xx and no-data too. Never inject
+production failures. Model stateful transitions rather than counting every
+breaching evaluation as another notification.
+
+Replay of 2026-11-13 00:00 through Nov 23 13:50 UTC: 9,138 availability
+samples, 29 failures, maximum **one consecutive failure per location**. Five
+evaluation phases (15,231 evaluations) produced zero proposed pages versus
+32 recorded old-rule action-group executions. Fifty local 40-minute-outage
+scenarios all fired after 11-19 minutes; fifty five-minute blips did not fire.
+Sustained 5xx, missing telemetry, and simultaneous 5xx/outage scenarios each
+produced one page per incident across all five phases. This is event-time replay,
+not an exact Azure ingestion/notification-delivery simulation.
+
+Resource metrics: ACA `UsageNanoCores`, `WorkingSetBytes`, `RestartCount`,
+`Replicas`; PostgreSQL `cpu_percent`, `memory_percent`, `active_connections`,
+`cpu_credits_remaining`, `storage_percent`. Discover supported aggregations.
+Divide CPU nanocores by 1e9, bytes by 2^20. Replica replacement can leave
+RestartCount=0 and Replicas=1; missing samples are not healthy samples.
+Compare deploy history/image SHA and Activity Log before attributing churn to code.
