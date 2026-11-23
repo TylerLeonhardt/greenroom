@@ -488,17 +488,45 @@ Production telemetry is powered by Azure Application Insights, initialized in `a
 
 | Alert | Type | Condition | Severity | Evaluation / window | State |
 |-------|------|-----------|----------|---------------------|-------|
-| `mycalltime-exception-spike` | Scheduled Query | >5 exceptions in 5 min | Sev 1 | 5m / 5m | Enabled |
-| `mycalltime-slow-response` | Metric | Avg response time >5s | Sev 2 | 5m / 5m | Enabled |
-| `mycalltime-high-error-rate` | Metric | >5 failed requests; result-code filter `"5"` (misconfigured, not all 5xx) | Sev 2 | 1m / 5m | Enabled |
-| `mycalltime-availability-alert` | Webtest Availability | ≥2 locations fail | Sev 1 | 1m / 5m | Enabled |
-| `mycalltime-app-unhealthy` | Metric | Availability <80% | Sev 2 | 5m / 15m | Enabled |
+| `mycalltime-exception-spike` | Scheduled Query | "My Call Time needs attention": sustained multi-location outage, persistent 5xx, or absent synthetic telemetry; exact `attention.kql` | Sev 2 | 5m / 15m | Enabled |
+| `mycalltime-slow-response` | Metric | Avg response time >5s | Sev 2 | 5m / 5m | Disabled |
+| `mycalltime-high-error-rate` | Metric | >5 failed requests; corrected result-code strings 500–599 | Sev 2 | 1m / 5m | Disabled |
+| `mycalltime-availability-alert` | Webtest Availability | ≥2 locations fail | Sev 1 | 1m / 5m | Disabled |
+| `mycalltime-app-unhealthy` | Metric | Availability <80% | Sev 2 | 5m / 15m | Disabled |
+| `mycalltime-attention-no-recovery` | Alert Processing | Exact combined rule ID AND MonitorCondition=Resolved; RemoveAllActionGroups | N/A | Always | Enabled |
 
-**All five rules above remain enabled**, reverified November 23, 2026 at
-18:21:50 UTC; all writable properties exactly match both the new attempt's fresh
-`.before.json` bodies and the committed original baseline. The recovery-processing
-rule is absent (complete one-page list empty).
-The combined Sev 2 / 15m / 5m rule and four disabled metrics are **not live**.
+**The approved six-resource change is live**, applied November 23, 2026.
+Suppression was created at 18:37:05 UTC; the full 30-minute propagation wait
+completed at 19:07:18 UTC. Repeated quiet-state/drift/ownership guards passed.
+The combined-rule PUT succeeded at 19:07:53 UTC and the four metric PUTs by
+19:08:03 UTC. All six writable definitions exactly matched the approved bodies
+on immediate read-back; Resource Health was Available with no known issues,
+and live `attention.kql` returned zero rows. The existing action group is unchanged.
+No rejected write, schema correction, rollback, merge, or deployment occurred.
+
+Post-apply observation completed at **19:23:43 UTC**, more than 15 minutes after
+the log update. All six writable bodies still matched; both complete Fired
+checks returned zero, and complete 30-day instance history showed no new
+incidents since the update (including already resolved incidents). Resource
+Health remained Available with no known evaluation issues; the rule Activity
+Log showed a Succeeded write and no warnings/failures. Live `attention.kql`
+again returned zero rows (18:53:35.388/19:23:35.388 UTC). The API does not expose
+an explicit provisioning-state field or per-cycle evaluation trace.
+
+The owner-approved unattended alternative passed: all eleven fresh bodies deeply
+equal both the committed reference and artifact `14849627626` from green
+`alert-payloads` run `45237950898`, commit
+`a53e96524154d992c832eae62969840bb5f6c13a`. The four source files were clean;
+checksums passed. No venv or local Python verifier was used. This apply's private
+backup is `.alert-apply/backup-20261123T183520Z/`, mode 0700, untracked, locally
+excluded, retained only in this machine's checkout. Earlier backups were untouched.
+Use **only this apply's originals** for its rollback: metrics first, then log,
+then delete suppression only after ownership/body and quiet-state checks.
+Do not unregister the provider. Real fired-email delivery and resolved-email
+suppression still require a real incident; never inject production failures.
+
+The following stopped-run reports are historical, not the current live state.
+At 18:21:50 UTC all five original rules were enabled and suppression was absent.
 
 The **18:20 UTC** retry used existing CLI tools directly, with no Copilot
 relaunch, trust change, or MCP dependency. Fresh private originals, generated
@@ -544,7 +572,9 @@ rows with bounds 17:42:12/18:12:12 UTC, not combined-rule evaluation evidence.
 This attempt created no processing rule and must not delete one.
 
 For future preparation use excluded `.alert-apply/` with repository-relative
-paths for both backup and venv, superseding historical path advice below.
+backup, reference, and CI-artifact paths, superseding historical path advice below.
+The runbook documents the owner-authorized Node equivalence alternative to local
+Python verification; CI alone without fresh-body equivalence is insufficient.
 Relative paths do not guarantee unattended permission: stop on any denial,
 report it exactly, and do not change trust settings or retry through another
 route. Always stage explicit documentation paths, never `git add .`/`git add -A`;
@@ -625,8 +655,8 @@ The earlier 16:55 and 17:04 attempts stopped at the then-unregistered provider
 and changed nothing. Their private backups remain separate and untouched;
 neither may substitute for a new apply's fresh original backup. A future apply
 still requires accessible durable backup storage and all runbook guards.
-Combined-rule evaluation and real fired/resolved email behavior remain
-unverified because the combined configuration was not installed.
+Those earlier runs could not verify combined-rule evaluation because they did
+not install it. The later successful apply above supersedes their live-state notes.
 
 The unhealthy rule's description still says
 <95% / 5 min, but its actual condition is <80% / 15 min, evaluated every 5 min.
@@ -638,7 +668,8 @@ the guarded apply/rollback procedure: restore the same apply's saved metric
 `.before.json` bodies, then its log body, then delete only suppression that apply
 created after checking ownership. Never roll back from a new snapshot.
 
-All alerts notify the `mycalltime-alerts` action group (tylerl0706@gmail.com).
+The enabled combined alert retains the `mycalltime-alerts` action group.
+Only its Resolved notifications are suppressed; Fired notifications remain enabled.
 
 The **availability test** (`mycalltime-health-ping`) pings `https://mycalltime.app/api/health` every 5 minutes from 3 US locations (East US, West US, North Central US). EU locations were removed because Cloudflare's WAF/geo-blocking rules return 403 to non-US IPs (the Container Apps ingress itself has no IP restrictions). It validates HTTP 200 and SSL certificate validity (7-day expiry warning).
 

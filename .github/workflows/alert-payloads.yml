@@ -20,6 +20,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Test unattended payload equivalence guard
+        run: node --test "$REFERENCE/compare-alert-payloads.test.mjs"
       - name: Generate exact approval-only request bodies offline
         run: node "$REFERENCE/build-alert-payloads.mjs" "$REFERENCE/snapshot-2026-11-23.json" "$RUNNER_TEMP/alert-payloads"
       - name: Validate REST schemas, minimal changes, and exact rollback

@@ -163,18 +163,53 @@ termination message; do not treat that message as a precise process-death time.
 
 ## Alerts, notification counts, and replay
 
-Live state reverified 2026-11-23 18:21:50 UTC: all five original rules remain
-enabled and notify `mycalltime-alerts`:
+Live state applied/read back 2026-11-23 19:08 UTC: the existing log rule is the
+enabled combined alert; four metric rules are disabled, not deleted. The existing
+`mycalltime-alerts` action group is unchanged:
 
 | Rule | Severity / condition | Evaluation / window |
 |---|---|---|
-| app-unhealthy | 2; average availability <80% | 5m / 15m |
-| availability-alert | 1; >=2 failing locations | 1m / 5m |
-| slow-response | 2; average duration >5000ms | 5m / 5m |
-| high-error-rate | 2; failed Count >5, broken result-code value `"5"` | 1m / 5m |
-| exception-spike | 1; exceptions Count >5, 1/1 periods | 5m / 5m |
+| app-unhealthy (disabled) | 2; average availability <80% | 5m / 15m |
+| availability-alert (disabled) | 1; >=2 failing locations | 1m / 5m |
+| slow-response (disabled) | 2; average duration >5000ms | 5m / 5m |
+| high-error-rate (disabled) | 2; failed Count >5, corrected strings 500–599 | 1m / 5m |
+| exception-spike (enabled) | 2; "My Call Time needs attention", exact `attention.kql`, Count >0, 1/1 periods | 5m / 15m |
 
-**Latest attempt, 18:20 UTC:** direct CLI use avoided the Copilot startup/trust
+`mycalltime-attention-no-recovery` is enabled: RemoveAllActionGroups applies only
+to the exact log-rule ID AND `MonitorCondition == Resolved`. Fired notifications
+remain enabled. Suppression was created at 18:37:05 UTC; the full 30-minute wait
+completed at 19:07:18 UTC. Both complete Fired checks, original-body drift checks,
+and ownership/body checks passed again before the log PUT at 19:07:53 UTC and
+four metric PUTs completed by 19:08:03 UTC. All six writable bodies matched;
+Resource Health was Available, with no known issues, and live `attention.kql`
+returned zero rows. No rejected write, schema correction, rollback, or deployment.
+
+Observation completed **19:23:43 UTC**, more than 15 minutes after the log update:
+all six bodies still matched, both complete Fired checks were empty, and complete
+30-day instance history contained no new incidents since the update (including
+resolved ones). Resource Health remained Available with no known evaluation
+issues; Activity Log recorded a Succeeded write and no warnings/failures.
+Live `attention.kql` again returned no rows (18:53:35.388/19:23:35.388 UTC).
+No explicit provisioning-state field or individual evaluation trace is exposed.
+
+This apply used the owner's explicit unattended alternative, not local Python.
+All eleven fresh bodies deeply equal the committed reference and downloaded
+artifact `14849627626` from successful CI run `45237950898`, commit
+`a53e96524154d992c832eae62969840bb5f6c13a`; source cleanliness and backup checksums
+passed. The dependency-free `references/compare-alert-payloads.mjs` and its
+focused CI tests make the alternative repeatable. CI alone is not sufficient.
+Fresh originals/checksums are retained privately at
+`.alert-apply/backup-20261123T183520Z/`, untracked, mode 0700, locally excluded,
+only in this checkout on this machine. Earlier backups were untouched.
+Use that same backup for this apply's rollback: metrics, then log, then only
+its owned unchanged suppression after quiet-state checks; do not unregister
+the provider. Real fired-email delivery and resolved-email suppression remain
+unverified until a real incident; never inject production failures.
+See the runbook/#241 for exact provenance, guard, read-back and rollback evidence.
+
+**Historical stopped attempts below do not describe the current live state.**
+
+**Earlier attempt, 18:20 UTC:** direct CLI use avoided the Copilot startup/trust
 failure without changing trust settings or using MCP. The provider was already
 Registered; all five original writable definitions matched the committed baseline
 and suppression was absent before preparation. Fresh private originals, generated
@@ -225,10 +260,12 @@ suppression rule and must not delete one. Real fired/resolved email behavior,
 combined-rule provisioning, query validation, and evaluation remain unverified.
 
 **Current path/permission lesson:** use only repository-relative local paths
-under excluded `.alert-apply/`: durable timestamped backup and disposable `venv/`.
+under excluded `.alert-apply/`: durable timestamped backup, reference and CI artifact.
+The owner authorized Node fresh/reference/artifact equivalence in place of local
+Python for unattended runs; preserve exact-head CI provenance and all other guards.
 This supersedes historical outside-repository/session-local recommendations.
 Never stage that directory or copy its backup elsewhere; stage explicit paths
-only. Retain the backup and remove the venv after verification or a stop.
+only. Retain the backup; the unattended alternative creates no venv.
 Relative paths do not guarantee permission: stop on any denial without trying
 another route or changing trust settings. Provider registration can remain.
 See the runbook for fresh-backup verification, every guard, and exact rollback.
@@ -388,7 +425,7 @@ instance, GET `ALERT_ID/history?api-version=2019-03-01`; count
 The 16 historical instances have **32 action-group executions** (fired + resolved
 for every instance), not proof of 32 delivered/read messages in the CEO inbox.
 
-The owner-approved, currently blocked proposal reuses the existing 5-minute scheduled-query rule,
+The owner-approved, now-applied policy reuses the existing 5-minute scheduled-query rule,
 disables the four metric rules, and uses [references/attention.kql](references/attention.kql)
 as a single non-dimensional Boolean condition (row Count >0, 1/1, window 15m,
 Sev 2, autoMitigate true, existing action group). This combines sustained
@@ -399,7 +436,8 @@ Use a narrowly scoped `Microsoft.AlertsManagement/actionRules@2021-08-08`
 RemoveAllActionGroups rule with `MonitorCondition == Resolved` AND the exact
 scheduled rule ID to suppress **only recoveries**. Propagation can take 30m.
 This keeps the existing log-rule count/evaluation frequency and adds no compute
-or notification service. Its first write was rejected; no configuration changed.
+or notification service. Its first historical write was rejected, but the
+later 18:37/19:08 UTC apply succeeded with the exact CI-equivalent payloads.
 See [references/alert-change.md](references/alert-change.md) for read-only
 preparation, exact rollback sources, and the separately approval-gated commands.
 The `Alert payload verification` workflow generates all eleven request bodies

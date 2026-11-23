@@ -4,7 +4,76 @@
 approved the six-resource change and subsequently explicitly authorized registering
 only `Microsoft.AlertsManagement` on the greenroom subscription.
 
-## Latest attempt: 18:20 UTC; standalone in-repository verifier denied
+## Successful live apply: 2026-11-23 18:37–19:08 UTC
+
+The provider was already Registered; no registration was repeated. All five
+original writable definitions matched the committed baseline and the complete
+processing-rule inventory was empty. Fresh private originals, eleven apply/
+rollback bodies, reference set, downloaded artifact, provenance and checksums
+are retained in `.alert-apply/backup-20261123T183520Z/`, untracked, locally
+excluded, mode 0700, only in this checkout on this machine. Earlier in-repository
+and external backups were untouched; no venv/local Python verifier was used.
+
+Equivalence passed against **both** the committed reference and artifact
+`14849627626` (`sha256:d02390b3d81d23218209ba79cced0096569e4c597792eaff7baa30e679f8e083`)
+from successful `alert-payloads` run
+[45237950898](https://github.com/TylerLeonhardt/greenroom/actions/runs/45237950898),
+commit `a53e96524154d992c832eae62969840bb5f6c13a`. Builder, snapshot, query and verifier
+were clean against that exact HEAD, which matched the remote PR head. Checksums
+passed before writes and again after propagation.
+
+Both complete Fired checks (30-day API and unbounded current-state Resource
+Graph), writable drift, complete inventories and immediate newest-comment/
+duplicate-run guards passed. Suppression was created at **18:37:05 UTC** and its
+whole writable body matched. The full 1800-second wait completed at **19:07:18 UTC**.
+A separate operator saw the ownership announcement and correctly stopped without
+touching this apply. After the wait, both Fired checks and all original-body/
+suppression-ownership comparisons passed again. Log PUT succeeded **19:07:53 UTC**;
+metric PUTs succeeded at **19:07:55**, **19:07:58**, **19:08:00**, **19:08:02 UTC**
+(unhealthy, availability, slow-response, high-error-rate respectively).
+
+Immediate GETs of all six resources matched every approved writable property:
+combined log alert enabled, Sev 2, `PT15M`/`PT5M`, exact query, query validation
+not skipped, existing action group; four metric rules disabled and dormant
+result-code strings corrected to 500–599; exact-rule/Resolved-only suppression
+enabled. Resource Health was **Available**, "There are no known issues affecting
+this log search alert rule resource." No explicit provisioning-state field is
+exposed by this API. Live `attention.kql` returned zero rows with bounds
+**18:38:08.697/19:08:08.697 UTC**. No write rejection, schema correction, rollback,
+merge of #243/#244, push to master, deployment, or cost-increasing resource change.
+
+Post-apply observation completed **19:23:43 UTC**, more than 15 minutes after
+the log update. All six full writable-body comparisons passed again. Complete
+30-day Fired and unbounded current-state checks returned zero (one page each,
+no truncation/continuation). Complete all-state 30-day history contained 21
+instances, one page, with **zero new incidents since 19:07:46.920 UTC** (the
+start of the log PUT), including no incident that fired then resolved.
+Resource Health remained Available at **19:23:35.090 UTC**, with no known issues.
+The rule Activity Log over **19:07:46.920/19:23:43.138 UTC** contained only the
+Started and Succeeded write events (Succeeded at **19:07:52.853 UTC**), with no
+warnings, errors, or evaluation-failure reports. This supports successful
+provisioning/healthy evaluation; it is not an individual per-cycle execution
+trace. Query validation was enabled and accepted. Live `attention.kql` returned
+zero rows again with bounds **18:53:35.388/19:23:35.388 UTC**. Checksums still pass.
+
+Rollback, if needed, uses **only** this apply's saved originals and the guards/
+sequence below with `BACKUP=.alert-apply/backup-20261123T183520Z`: restore the
+four metric `.before.json` files in order, then `log.before.json`, then delete
+suppression only after confirming this apply's ownership and exact body.
+This deliberately restores the original broken `["5"]` filter. Do not unregister
+the provider. Real fired-email delivery and resolved-email suppression require a
+real incident and remain unverified; never inject production failures.
+
+## Unattended verification decision (2026-11-23)
+
+The owner explicitly replaced local Python verification for the next apply with
+the Node equivalence procedure below. Do not create a venv or execute
+`verify-alert-payloads.py` locally for that apply. Python still runs in CI.
+This supersedes historical statements below that CI cannot replace the local
+verifier: CI alone is insufficient, but exact fresh/reference/artifact equality
+with verified provenance is the approved alternative. Every other guard remains.
+
+## Earlier attempt: 18:20 UTC; standalone in-repository verifier denied
 
 On 2026-11-23 this retry used the existing CLI tools directly, without launching
 another Copilot process, changing trust settings, or depending on MCP. The
@@ -398,7 +467,7 @@ namespace is now registered; future runs should not re-register it unnecessarily
 
 Run every command from the repository root on the #243 branch. Use only relative
 local paths inside the checkout: one private `.alert-apply/` work directory,
-a new timestamped backup, and the separate disposable `.alert-apply/venv/`.
+a new timestamped backup, a separate reference set, and the downloaded CI artifact.
 The owner approved this deviation from retaining backups outside the repository.
 Add `/.alert-apply/` to `.git/info/exclude` (local only, not `.gitignore`) before
 capturing raw GETs, then confirm `git check-ignore .alert-apply/probe` succeeds.
@@ -467,21 +536,68 @@ The `verified-alert-payloads` CI artifact contains generated bodies and schemas,
 not personal metadata, and expires after 30 days. It does not replace a durable
 operator backup.
 
-Before any write, run the fresh-backup verifier in the in-repository venv, then
-validate the manifest. No CI baseline verification can replace this step.
+### Unattended alternative: exact equivalence to successful CI
+
+Use this only with owner authorization for the equivalence alternative. It does
+not validate new or different payloads. Before preparation, confirm a successful
+`alert-payloads` job on the current feature-branch HEAD. The committed workflow
+must build from the committed snapshot and execute the Python verifier. Record
+the run URL, commit, job conclusion, and artifact ID/digest in the issue report.
+The builder, snapshot, query, and verifier must be byte-identical to that commit.
+Stop if the remote PR head differs, the job is not green, the artifact is expired,
+or any required file is dirty. Do not apply a different payload as a "close enough"
+match. Do not change trust or retry a permission-denied operation another way.
 
 ```bash
-python3 -m venv .alert-apply/venv
-.alert-apply/venv/bin/pip install --quiet jsonschema
-.alert-apply/venv/bin/python .github/skills/greenroom-azure-alerts/references/verify-alert-payloads.py "$BACKUP/payloads"
+test "$(git branch --show-current)" = george/fix-issue-241-startup
+HEAD=$(git rev-parse HEAD)
+test "$(gh pr view 243 --json headRefOid --jq .headRefOid)" = "$HEAD"
+git diff --quiet HEAD -- \
+  "$REFERENCE/build-alert-payloads.mjs" "$REFERENCE/snapshot-2026-11-23.json" \
+  "$REFERENCE/attention.kql" "$REFERENCE/verify-alert-payloads.py"
+RUN=$(gh run list --workflow alert-payloads.yml --commit "$HEAD" \
+  --event pull_request --status success --limit 20 \
+  --json databaseId --jq '.[0].databaseId // empty')
+test -n "$RUN"
+gh run view "$RUN" --json headSha,status,conclusion,jobs,url \
+  > "$BACKUP/ci-run.json"
+jq -e --arg head "$HEAD" '.headSha == $head and .status == "completed" and
+  .conclusion == "success" and
+  any(.jobs[]; .name == "alert-payloads" and .conclusion == "success")' \
+  "$BACKUP/ci-run.json"
+gh api "repos/TylerLeonhardt/greenroom/actions/runs/$RUN/artifacts" \
+  > "$BACKUP/ci-artifacts.json"
+node "$REFERENCE/build-alert-payloads.mjs" \
+  "$REFERENCE/snapshot-2026-11-23.json" "$BACKUP/reference"
+gh run download "$RUN" --name verified-alert-payloads --dir "$BACKUP/ci-artifact"
+node "$REFERENCE/compare-alert-payloads.mjs" \
+  "$BACKUP/payloads" "$BACKUP/reference" "$BACKUP/ci-artifact"
 shasum -a 256 -c "$BACKUP/SHA256SUMS"
 ```
 
+Confirm CI provenance before backup capture; the commands that save CI evidence
+need the newly created backup directory. Build the reference into a new directory,
+never over the fresh payloads. The dependency-free comparator requires exactly
+eleven request bodies in all three sets and deeply compares every property and
+array element. It ignores only the builder's known supporting snapshots/originals
+and CI schema files, which are not PUT bodies. Unknown files, missing bodies,
+extra properties, reordered arrays, and symlinks fail closed. JSON object key
+order is immaterial. Error output identifies the file and first differing
+property path. Any difference means **stop before writes** and report it exactly.
+Do not edit either set to make the check pass. This does not relax live drift,
+quiet-state, pagination, duplicate-run, propagation, or rollback requirements.
+
+### Interactive Python verification (not used by the authorized unattended apply)
+
+When explicitly choosing the original interactive verification route instead,
+create `.alert-apply/venv/`, install `jsonschema==4.25.1`, and execute the committed
+verifier on this apply's fresh payload directory, then check `SHA256SUMS`. Do not
+try this route after a denial of the selected unattended procedure (or vice versa).
 Stop on any error or permission denial, report the exact command and exact error,
 and do not retry through another route. Remove only `.alert-apply/venv/` when
 verification finishes or the apply stops; retain the backup. Confirm its absence.
-Run the four commands separately so a denial can be attributed to its exact
-step; successful installation does not imply permission to execute the verifier.
+Run interactive verification commands separately so a denial can be attributed
+to its exact step; installation does not imply permission to execute the verifier.
 The 18:20 attempt reached that standalone verifier step and was denied.
 Run the normal lint/typecheck/test/build commands with the backup present. If a
 tool scans private evidence, use a local-only exclusion rather than committing
@@ -493,7 +609,7 @@ Biome's Git-ignore setting and failed formatting checks on its JSON. A small
 private operator directory without changing or formatting rollback evidence.
 No other tool-specific exclusion was needed; retain the local Git exclude too.
 
-## Apply — approval required; not yet completed
+## Apply — separate owner approval required
 
 Keep the variable definitions from preparation. Before writing, verify checksums,
 re-GET and compare all five live rules' writable properties with the saved
@@ -520,10 +636,42 @@ while test -n "$url"; do
     "$BACKUP/fired-page.json" >/dev/null
   url=$(jq -r '.nextLink // empty' "$BACKUP/fired-page.json")
 done
-# Execute only within a separately owner-approved apply.
+```
+
+Also query Resource Graph current state with **no age predicate**; follow every
+`$skipToken`, require `resultTruncated == false` on the final page, and stop on
+any returned incident or incomplete result. A POST to this query endpoint is
+read-only, not an ARM resource deployment:
+
+```bash
+az rest --method post \
+  --url 'https://management.azure.com/providers/Microsoft.ResourceGraph/resources?api-version=2022-10-01' \
+  --body '{"subscriptions":["b37965f1-4da2-4202-889d-82322392b4d5"],"query":"alertsmanagementresources | where type =~ '\''microsoft.alertsmanagement/alerts'\'' | where tostring(properties.essentials.monitorCondition) =~ '\''Fired'\'' | project id","options":{"resultFormat":"objectArray","$top":1000}}'
+```
+
+Immediately repeat the newest issue-comment/remote-head/live-drift/processing-name
+checks, then create suppression only within the approved apply:
+
+```bash
 az rest --method put --url "$APR?api-version=2021-08-08" \
   --body @"$BACKUP/payloads/recovery-suppression.json" --output none
+```
+
+GET suppression and compare **every writable property** to its saved request body.
+Record successful creation/ownership and the propagation-start UTC time in #241
+so another unattended operator does not start a duplicate apply.
+
+```bash
 sleep 1800 # Allow up to 30 minutes for processing-rule propagation.
+```
+
+After the full wait, repeat both complete Fired checks, account/checksum checks,
+all five original writable-body comparisons, and suppression ownership/body
+comparison. Stop on firing, drift, incomplete results, or ownership uncertainty;
+do not continue switching rules on the strength of the earlier quiet check.
+Then update the log rule and metrics in order:
+
+```bash
 az rest --method put --url "$LOG?api-version=2023-12-01" \
   --body @"$BACKUP/payloads/log.after.json" --output none
 for rule in mycalltime-app-unhealthy mycalltime-availability-alert \
@@ -538,6 +686,20 @@ after bodies. Read the recovery rule back too. Never inject production failures
 to test notifications. PUT/query acceptance, propagation, and email delivery are
 **not** proven by offline schema validation. There is no validation-only operation
 in these resource-provider APIs. No ARM deployment/what-if call is needed or used.
+
+Check `enabled`, Sev 2, `PT15M` window, `PT5M` frequency, exact query and action
+group, `skipQueryValidation == false`, and successful PUT/read-back. Inspect
+provisioning state if exposed and the rule's Resource Health status:
+`$LOG/providers/Microsoft.ResourceHealth/availabilityStatuses/current?api-version=2024-02-01`.
+Do not interpret an absent provisioning-state field as an error or as proof of
+success. Use the successful write Activity Log and Resource Health evidence too.
+Run `attention.kql` read-only using explicit UTC API bounds; healthy means no rows.
+After **at least 15 minutes from the log-rule update**, repeat query, six-resource
+read-back, complete Fired/history checks, Resource Health, and relevant Activity
+Log health/failure checks. Report exact time bounds and any unavailable evidence.
+No health warning or query validation error should be present. No incident during
+observation proves neither fired-email delivery nor resolved-email suppression;
+those remain unverified until a real incident. Never inject production failures.
 
 ## Rollback — approval required; not executed
 
