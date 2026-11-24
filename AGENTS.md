@@ -420,10 +420,11 @@ Before committing:
 2. `pnpm run lint` — Biome linter passes
 3. `pnpm run build` — Production build succeeds
 
-CI runs on every push/PR to `master` with three parallel jobs:
+CI runs on every push/PR to `master` with four parallel jobs:
 - **check** — typecheck → lint → build → vitest (unit tests)
 - **playwright-explorer** — Component explorer Playwright tests (172 tests, no DB needed). Uses `playwright.explorer.config.ts` which only starts the explorer Vite server.
 - **playwright-e2e** — App E2E Playwright tests (119 tests) with PostgreSQL 16 service container. Runs DB migrations, seeds test data, tests across Desktop Chrome, Mobile Safari, and Mobile Chrome.
+- **container-e2e** — Builds the production Dockerfile and checks offline startup against TLS PostgreSQL, migration failure, HTTP, PID 1, the app browser matrix, and SIGTERM shutdown.
 
 ### Code Style
 
@@ -459,7 +460,7 @@ CI runs on every push/PR to `master` with three parallel jobs:
 - **Container:** Node.js 20 slim, multi-stage Docker build (deps → build → runtime)
 - **Migrations:** Auto-run on container startup via `scripts/migrate.mjs` (uses `drizzle-orm/node-postgres/migrator`, not drizzle-kit). Idempotent — safe with multiple replicas. Fails fast if migration fails (prevents app from starting with broken schema).
 - **CI/CD:** GitHub Actions
-  - `ci.yml` — Three parallel jobs: check (typecheck + lint + build + vitest), playwright-explorer (component tests), playwright-e2e (app E2E with PostgreSQL)
+  - `ci.yml` — Four parallel jobs: check, playwright-explorer, playwright-e2e (development server), container-e2e (production Docker image)
   - `deploy.yml` — Docker build → Azure Container Registry → Azure Container Apps on push to `master`
 - **Database:** Azure PostgreSQL (SSL in production, verified against DigiCert Global Root G2 CA cert in `certs/`)
 
@@ -485,15 +486,190 @@ Production telemetry is powered by Azure Application Insights, initialized in `a
 
 ### Alert Rules
 
-| Alert | Type | Condition | Severity | Window |
-|-------|------|-----------|----------|--------|
-| `mycalltime-exception-spike` | Scheduled Query | >5 exceptions in 5 min | Sev 1 | 5 min |
-| `mycalltime-slow-response` | Metric | Avg response time >5s | Sev 2 | 5 min |
-| `mycalltime-high-error-rate` | Metric | >5 failed requests in 5 min (5xx only) | Sev 2 | 5 min |
-| `mycalltime-availability-alert` | Webtest Availability | ≥2 locations fail | Sev 1 | 5 min |
-| `mycalltime-app-unhealthy` | Metric | Availability <95% | Sev 2 | 5 min |
+| Alert | Type | Condition | Severity | Evaluation / window | State |
+|-------|------|-----------|----------|---------------------|-------|
+| `mycalltime-exception-spike` | Scheduled Query | "My Call Time needs attention": sustained multi-location outage, persistent 5xx, or absent synthetic telemetry; exact `attention.kql` | Sev 2 | 5m / 15m | Enabled |
+| `mycalltime-slow-response` | Metric | Avg response time >5s | Sev 2 | 5m / 5m | Disabled |
+| `mycalltime-high-error-rate` | Metric | >5 failed requests; corrected result-code strings 500–599 | Sev 2 | 1m / 5m | Disabled |
+| `mycalltime-availability-alert` | Webtest Availability | ≥2 locations fail | Sev 1 | 1m / 5m | Disabled |
+| `mycalltime-app-unhealthy` | Metric | Availability <80% | Sev 2 | 5m / 15m | Disabled |
+| `mycalltime-attention-no-recovery` | Alert Processing | Exact combined rule ID AND MonitorCondition=Resolved; RemoveAllActionGroups | N/A | Always | Enabled |
 
-All alerts notify the `mycalltime-alerts` action group (tylerl0706@gmail.com).
+**The approved six-resource change is live**, applied November 23, 2026.
+Suppression was created at 18:37:05 UTC; the full 30-minute propagation wait
+completed at 19:07:18 UTC. Repeated quiet-state/drift/ownership guards passed.
+The combined-rule PUT succeeded at 19:07:53 UTC and the four metric PUTs by
+19:08:03 UTC. All six writable definitions exactly matched the approved bodies
+on immediate read-back; Resource Health was Available with no known issues,
+and live `attention.kql` returned zero rows. The existing action group is unchanged.
+No rejected write, schema correction, rollback, merge, or deployment occurred.
+
+Post-apply observation completed at **19:23:43 UTC**, more than 15 minutes after
+the log update. All six writable bodies still matched; both complete Fired
+checks returned zero, and complete 30-day instance history showed no new
+incidents since the update (including already resolved incidents). Resource
+Health remained Available with no known evaluation issues; the rule Activity
+Log showed a Succeeded write and no warnings/failures. Live `attention.kql`
+again returned zero rows (18:53:35.388/19:23:35.388 UTC). The API does not expose
+an explicit provisioning-state field or per-cycle evaluation trace.
+
+The owner-approved unattended alternative passed: all eleven fresh bodies deeply
+equal both the committed reference and artifact `14849627626` from green
+`alert-payloads` run `45237950898`, commit
+`a53e96524154d992c832eae62969840bb5f6c13a`. The four source files were clean;
+checksums passed. No venv or local Python verifier was used. This apply's private
+backup is `.alert-apply/backup-20261123T183520Z/`, mode 0700, untracked, locally
+excluded, retained only in this machine's checkout. Earlier backups were untouched.
+Use **only this apply's originals** for its rollback: metrics first, then log,
+then delete suppression only after ownership/body and quiet-state checks.
+Do not unregister the provider. Real fired-email delivery and resolved-email
+suppression still require a real incident; never inject production failures.
+
+The following stopped-run reports are historical, not the current live state.
+At 18:21:50 UTC all five original rules were enabled and suppression was absent.
+
+The **18:20 UTC** retry used existing CLI tools directly, with no Copilot
+relaunch, trust change, or MCP dependency. Fresh private originals, generated
+bodies, and a SHA-256 manifest remain in
+`.alert-apply/backup-20261123T182045Z/` (work/backup/source/payload directories
+mode 0700), untracked and locally excluded in this checkout on this machine.
+Earlier external backups were untouched. The provider was already Registered.
+Separate in-repository venv creation and dependency installation succeeded;
+the standalone verifier command was denied with
+`Permission denied because no interactive user response was available`.
+The runbook and #241 record the exact command/full denial. No alternate route
+was attempted; the venv was removed and its absence confirmed. Offline
+verification/checksums did not complete; payloads are not ready to apply.
+Both Fired checks and the immediate pre-write duplicate-run guard were not
+reached. No Azure write, rollback, schema correction, propagation wait, or
+post-apply observation ran.
+Read-back matched all five fresh originals and the committed baseline;
+suppression was absent (one complete empty page), and scheduled/metric inventories
+contained one/four rules without continuation. Live `attention.kql` returned zero
+rows with bounds 17:51:47/18:21:47 UTC, not combined-rule evaluation evidence.
+Provisioning, query validation, evaluation health, propagation, and real
+fired/resolved email behavior remain unverified. No rollback is needed;
+this attempt created no processing rule and must not delete one.
+
+The **18:11 UTC** retry used the owner's repository-relative approach:
+`.alert-apply/backup-20261123T181118Z/` contains fresh originals, generated bodies,
+and a SHA-256 manifest. The work/backup/source/payload directories are mode 0700,
+untracked and locally excluded through `.git/info/exclude`; retain the backup
+in this checkout on this machine and never stage it or copy it elsewhere.
+The provider was already Registered; earlier external backups were untouched.
+In-repository venv creation succeeded, but the dependency-install/verifier/
+checksum command was denied with
+`Permission denied because no interactive user response was available`.
+The runbook and #241 record the exact command/error. No alternative route was
+attempted. The venv was removed and its absence confirmed. Verification/checksums
+did not complete; payloads are not ready to apply. Both Fired checks and the
+immediate pre-write duplicate-run guard were not reached. No Azure write,
+rollback, propagation wait, or post-apply observation ran.
+Read-back matched all five fresh originals and the committed baseline exactly;
+suppression was absent (one complete empty page). Scheduled/metric inventories
+contained one/four rules without continuation. Live `attention.kql` returned zero
+rows with bounds 17:42:12/18:12:12 UTC, not combined-rule evaluation evidence.
+This attempt created no processing rule and must not delete one.
+
+For future preparation use excluded `.alert-apply/` with repository-relative
+backup, reference, and CI-artifact paths, superseding historical path advice below.
+The runbook documents the owner-authorized Node equivalence alternative to local
+Python verification; CI alone without fresh-body equivalence is insufficient.
+Relative paths do not guarantee unattended permission: stop on any denial,
+report it exactly, and do not change trust settings or retry through another
+route. Always stage explicit documentation paths, never `git add .`/`git add -A`;
+confirm nothing under `.alert-apply/` is staged. Alert rollback does not require
+unregistering the provider.
+
+The **17:59 UTC** retry used the existing CLI tools directly without changing
+trust settings or relying on MCP. The provider was already Registered.
+Fresh private originals, generated bodies, and a SHA-256 manifest were captured
+by 17:59:54 UTC at
+`/Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T175951Z`
+(root/source/payloads mode 0700). Earlier backups were untouched.
+Separate session-local venv creation succeeded, but the next dependency-install/
+verifier/checksum command was denied with
+`Permission denied because no interactive user response was available`.
+The runbook and #241 record the exact command; no alternative route was attempted.
+Verification/checksums did not complete; payloads are not ready to apply.
+Both Fired checks and the immediate pre-write duplicate-run guard were not reached.
+Read-back matched all five fresh originals and the committed baseline;
+suppression was absent (complete one-page inventory), and live `attention.kql`
+returned zero rows with bounds 17:30:22/18:00:22 UTC. This is not evaluation-health
+evidence for the uninstalled combined rule. No Azure write, rollback, propagation
+wait, or post-apply observation ran. This attempt created no suppression rule
+and must not delete one. Provider registration can remain.
+
+The **17:51 UTC** retry confirmed the provider was already Registered and did
+not register it again. A new private backup was captured by 17:51:26 UTC at
+`/Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T175116Z`
+(root/source/payloads mode 0700), leaving earlier backups untouched.
+The required verifier command was denied with
+`Permission denied because no interactive user response was available`
+**even with the venv in this session's `files/` and no removal command**.
+The runbook and #241 record the exact denied command. No alternative route was
+attempted; no successful offline verification or checksum validation is claimed.
+The generated bodies are not ready to apply; full pre-write guards did not run.
+Read-back matched all five fresh originals and the committed baseline;
+suppression was absent (complete one-page list). Live `attention.kql` returned
+zero rows with bounds 17:21:48/17:51:48 UTC, not rule-evaluation evidence.
+No Azure write, rollback, propagation wait, or post-apply observation occurred.
+This attempt created no suppression rule and must not delete one.
+
+The earlier recommendation was to keep verifier venvs and scratch files in the current Copilot session's `files/`,
+not the durable backup directory. That separation does not guarantee execution
+permission: if the session-local verifier is denied, stop before writes rather
+than bypassing verification or changing trust settings. A later apply still
+requires fresh originals and every runbook guard, including the immediate
+duplicate-run check. Alert rollback does not require unregistering the provider.
+
+After explicit owner authorization, `Microsoft.AlertsManagement` registration
+was requested at 17:26:42 UTC and confirmed **Registered at 17:28:02 UTC**.
+Only that namespace was registered. The processing-rule list API succeeded.
+The environment then denied required new private durable backup preparation
+and a read-only check of the intended path:
+`Permission denied because no interactive user response was available`.
+The intended path
+`/Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T172802Z`
+is unverified and **not a usable rollback source**. No alternative access was
+attempted. No alert writes, rollback, merge, or deployment occurred. Provider
+registration may remain; alert rollback does not require unregistering it.
+
+At **17:36:06 UTC**, a new run confirmed the provider was already Registered
+without registering it again; the complete processing-rule inventory was empty.
+Fresh originals, generated payloads, and a SHA-256 manifest were successfully
+captured by 17:36:19 UTC in a new private durable directory:
+`/Users/tyleonha/.george/greenroom-alert-backups/issue-241-20261123T173606Z`
+(root/source/payload directories mode 0700). Earlier directories were left alone.
+The environment then denied the isolated-verifier command with
+`Permission denied because no interactive user response was available`.
+No alternative route was attempted. Offline verification/checksum validation
+did not complete; venv creation/removal cannot be confirmed. These generated
+payloads are not verified or ready to apply. No alert PUT, rollback, propagation
+wait, or post-apply observation occurred. Read-only `attention.kql` returned no
+rows (API bounds 17:06:51/17:36:51 UTC), not proof of uninstalled-rule health.
+The full pre-apply guard sequence did not complete. This attempt created no
+suppression rule and must not delete one; provider registration can remain.
+
+The earlier 16:55 and 17:04 attempts stopped at the then-unregistered provider
+and changed nothing. Their private backups remain separate and untouched;
+neither may substitute for a new apply's fresh original backup. A future apply
+still requires accessible durable backup storage and all runbook guards.
+Those earlier runs could not verify combined-rule evaluation because they did
+not install it. The later successful apply above supersedes their live-state notes.
+
+The unhealthy rule's description still says
+<95% / 5 min, but its actual condition is <80% / 15 min, evaluated every 5 min.
+Alert rules are live Azure resources, not repository-managed IaC. See the
+`greenroom-azure-alerts` skill and [#241](https://github.com/TylerLeonhardt/greenroom/issues/241)
+for the stopped attempts, private backup requirements, investigation evidence,
+and known alert blind spots. The skill's `references/alert-change.md` preserves
+the guarded apply/rollback procedure: restore the same apply's saved metric
+`.before.json` bodies, then its log body, then delete only suppression that apply
+created after checking ownership. Never roll back from a new snapshot.
+
+The enabled combined alert retains the `mycalltime-alerts` action group.
+Only its Resolved notifications are suppressed; Fired notifications remain enabled.
 
 The **availability test** (`mycalltime-health-ping`) pings `https://mycalltime.app/api/health` every 5 minutes from 3 US locations (East US, West US, North Central US). EU locations were removed because Cloudflare's WAF/geo-blocking rules return 403 to non-US IPs (the Container Apps ingress itself has no IP restrictions). It validates HTTP 200 and SSL certificate validity (7-day expiry warning).
 
@@ -539,6 +715,7 @@ getTelemetryClient()?.trackException({ exception: error });
 
 ## Available Skills
 
+- **greenroom-azure-alerts** (`.github/skills/greenroom-azure-alerts/`) — App-specific read-only Azure alert investigation: live resource map, alert history APIs, telemetry encoding traps, replica replacement correlation, and notification-noise diagnosis.
 - **greenroom-architecture** (`.github/skills/greenroom-architecture/`) — Remix route structure, loader/action patterns, service layer conventions, component architecture, and UI styling guidelines. Reference for how to build features that match the existing codebase.
 - **greenroom-db** (`.github/skills/greenroom-db/`) — Drizzle ORM schema reference, migration workflow, query patterns (joins, upserts, transactions, window functions), JSON column patterns, index strategy, and multi-tenancy approach.
 - **schema-changes** (`.github/skills/schema-changes/`) — **Required reading before any schema change.** Checklist covering write-site discovery, NOT NULL pitfalls, migration defaults, lifecycle testing, FK cascades, and LEFT JOIN awareness. Born from a production bug where Drizzle `.default()` didn't propagate to the DB.
